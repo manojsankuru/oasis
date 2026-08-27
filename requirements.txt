@@ -1,0 +1,14 @@
+openai
+python-dotenv
+pydantic
+geopandas
+shapely
+pyproj
+google-auth
+google-genai
+requests
+tenacity
+rasterio
+numpy
+pandas
+matplotlib
