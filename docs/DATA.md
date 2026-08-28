@@ -59,6 +59,28 @@ than somewhere clean.
 > and record both in `Provenance.declared_crs` / `working_crs`. This is a real
 > ingestion-time CRS mismatch and it belongs in the paper as one.
 
+> **Measured, VERIFIED 28 Aug 2026** against this layer for Charleston County.
+> The trap bites only with `f=json`:
+>
+> ```
+> f=json     no outSR     wkid=102100     x = -8900562.9108   metres
+> f=json     outSR=4326   wkid=4326       x =      -79.9551   degrees
+> f=geojson  no outSR     no CRS stated   x =      -79.9551   degrees
+> f=geojson  outSR=4326   no CRS stated   x =      -79.9551   degrees
+> ```
+>
+> All four return HTTP 200. GeoJSON is specified as 4326, so the service ignores
+> `outSR` there and the query above is safe as written.
+>
+> **But this weakens the assertion.** `f=geojson` states no CRS at all in the
+> response, so there is nothing to compare the received CRS against and
+> geopandas simply assumes 4326. "Assert the CRS received matches the CRS
+> requested" is only a real check with `f=json`, where `spatialReference.wkid`
+> comes back. Either request `f=json` and assert on `spatialReference.wkid`, or
+> keep `f=geojson` and record in `Provenance.notes` that the CRS was assumed
+> from the format rather than verified from the response. Do not claim an
+> assertion the format cannot support.
+
 ## 2. Block groups — `block_groups`
 
 - **VERIFIED 25 Aug 2026** (same service, layer `1`).
