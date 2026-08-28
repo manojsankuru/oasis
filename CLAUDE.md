@@ -129,6 +129,7 @@ leak into `agent.py`.
 .\.venv\Scripts\Activate.ps1
 python -m src.test_api          # does the endpoint work, and does it tool-call
 python -m src.acquire           # live retrieval -> data/snapshot/ + manifest.json
+python -m src.acquire --check   # exercise the real endpoints: paging, CRS, error bodies
 python -m src.demo              # run the agent on the built-in questions
 python -m src.demo "question"
 python -m src.experiments.faults    # robustness runs

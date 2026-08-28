@@ -42,16 +42,33 @@ than somewhere clean.
   **the vintage you join to matters**; record which layer id you used in
   `Provenance.vintage`.
 - Fields: `GEOID, STATE, COUNTY, TRACT, BASENAME, NAME, AREALAND, AREAWATER,
-  CENTLAT, CENTLON, INTPTLAT, INTPTLON, OBJECTID, MTFCC, LSADC, FUNCSTAT`.
+  CENTLAT, CENTLON, INTPTLAT, INTPTLON, OBJECTID, MTFCC, LSADC, FUNCSTAT`, plus
+  `OID` (a string, not the object id) and `BLKGRP` on layer 1.
+- **Every numeric-looking field is `esriFieldTypeString`.** `AREALAND`,
+  `AREAWATER`, `CENTLAT`, `CENTLON`, `INTPTLAT` and `INTPTLON` all arrive as
+  text, so they concatenate instead of summing and sort lexically. Cast them in
+  `align.py`, at run time — measured 28 Aug 2026 from the layer metadata.
 - `maxRecordCount` is 100000, so one county returns in a single request. Still
   implement `resultOffset` paging — the transfer county is the reason.
 
 ```
 ?where=STATE='{state_fips}' AND COUNTY='{county_fips}'
-&outFields=GEOID,NAME,AREALAND,AREAWATER,INTPTLAT,INTPTLON
+&outFields=*
+&returnGeometry=true
 &outSR=4326
-&f=geojson
+&f=json
+&orderByFields={object id field}
+&resultOffset={n}&resultRecordCount={page}
 ```
+
+`acquire.fetch_arcgis_vector` sends exactly this. Three departures from the
+original sketch, each for a reason recorded below: `f=json` so the CRS assertion
+is real, `outFields=*` so no column list has to be kept in step with the
+service, and `orderByFields` so paging is stable.
+
+The object-id field is **discovered**, not named: this layer omits the
+`objectIdField` key from its metadata, so `_object_id_field` falls back to
+scanning `fields` for `esriFieldTypeOID` and finds `OBJECTID`.
 
 > **Trap.** The service advertises `wkid 102100` (Web Mercator). Omit `outSR`
 > and you get metres where the rest of the pipeline expects degrees, with no
@@ -80,6 +97,35 @@ than somewhere clean.
 > keep `f=geojson` and record in `Provenance.notes` that the CRS was assumed
 > from the format rather than verified from the response. Do not claim an
 > assertion the format cannot support.
+
+> **Resolved 28 Aug 2026 (session 3).** `f=json`, and the assertion is real.
+> GDAL's ESRIJSON driver parses the Esri FeatureSet, so nothing hand-rolls
+> ring-to-polygon conversion. Confirmed the driver reads the document's
+> `spatialReference` rather than assuming one: `outSR=5070` reads back as
+> EPSG:5070 and omitting `outSR` reads back as EPSG:3857. The CRS on the frame
+> is then set from the asserted wkid, so there is one source of truth for it.
+>
+> `_received_crs` compares the request against **both** `wkid` and `latestWkid`,
+> because Esri codes are not EPSG codes — wkid 102100 is EPSG:3857 and
+> `CRS.from_user_input("EPSG:102100")` raises.
+>
+> Measured live by `python -m src.acquire --check`: `outSR=4326` returns
+> x = -79.9551 (degrees), `outSR=3857` returns x = -8900562.9 (metres), and
+> asking the 4326 payload to satisfy a 3857 request raises `CRSMismatch`.
+
+> **Paging, VERIFIED 28 Aug 2026.** `supportsPagination` is true and Charleston
+> County's 99 tracts arrive in one request, as documented. The check forces a
+> page size of 10 and confirms that 10 requests return the same 99 object ids
+> with no duplicates — so the transfer county will not be the first time the
+> paging path runs. The loop is bounded three ways (page cap, empty page, and a
+> page whose rows were all seen before) because a service that ignores
+> `resultOffset` returns page one forever with `exceededTransferLimit` stuck
+> true.
+
+> **Error bodies.** A bad `where` returns **HTTP 200** with
+> `{"error":{"code":400,...}}` and no `features` key. Measured. `_get_json`
+> raises on it rather than letting it reach disk, and does not retry it: only
+> transport errors, 429 and 5xx are retried.
 
 ## 2. Block groups — `block_groups`
 
@@ -189,8 +235,13 @@ out center tags;
 
 ## 6. Hazard polygons — `flood_zones` *(optional, and useful precisely because it might fail)*
 
-- **UNVERIFIED** — `hazards.fema.gov` refused programmatic inspection from this
-  session, so the layer id must be discovered, not assumed.
+- **VERIFIED 28 Aug 2026** — the service answered `?f=json` (v11.1). An earlier
+  session could not reach this host at all, which is exactly why the dataset
+  stays non-load-bearing.
+- Discovery on `name_contains="Flood Hazard"` matches two layers:
+  `27 Flood Hazard Boundaries` (polyline) and `28 Flood Hazard Zones` (polygon).
+  `select_layer(..., geometry_type="esriGeometryPolygon")` resolves to 28
+  without that id appearing anywhere in the code.
 - `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer`
 - Call `discover_arcgis_layers(service_url, name_contains="Flood Hazard")` and
   match by name. **Never hardcode a layer id.** Autonomous discovery of an
