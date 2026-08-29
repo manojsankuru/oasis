@@ -12,3 +12,4 @@ rasterio
 numpy
 pandas
 matplotlib
+pyarrow

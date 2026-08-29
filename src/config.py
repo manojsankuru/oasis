@@ -172,7 +172,8 @@ def setting_warnings() -> list[str]:
     warnings: list[str] = []
     if not CENSUS_API_KEY:
         warnings.append(
-            "CENSUS_API_KEY is unset; the Census API allows keyless use up to a daily "
-            "cap, after which requests fail intermittently mid-retrieval"
+            "CENSUS_API_KEY is unset; a keyless ACS request returns HTTP 200 with an "
+            "HTML 'Missing Key' page, not data. Free key: "
+            "https://api.census.gov/data/key_signup.html"
         )
     return warnings

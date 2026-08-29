@@ -139,34 +139,134 @@ scanning `fields` for `esriFieldTypeOID` and finds `OBJECTID`.
 
 ## 3. Demography — `acs`
 
-- **VERIFIED 25 Aug 2026 that a key is REQUIRED.** An unkeyed request returns
-  an error page, not data. Free, instant: `https://api.census.gov/data/key_signup.html`.
-- `https://api.census.gov/data/{year}/acs/acs5`
+- **VERIFIED 28 Aug 2026.** A key is REQUIRED for the data endpoint and is NOT
+  required for the variable catalogue. Free, instant, but a new key must be
+  activated from its confirmation email before it works:
+  `https://api.census.gov/data/key_signup.html`.
+- `https://api.census.gov/data/{year}/acs/acs5` — the year is discovered, below.
 - Catalogue: `https://api.census.gov/data/{year}/acs/acs5/variables.json`
+- Descriptor: `https://api.census.gov/data/{year}/acs/acs5.json` — vintage and
+  licence come from here.
 
 ```
-?get=NAME,{comma-separated variable ids}
+?get=NAME,{comma-separated variable ids and their M variants}
 &for=tract:*
 &in=state:{state_fips}%20county:{county_fips}
 &key={CENSUS_API_KEY}
 ```
 
-> **Do not hardcode variable ids.** `resolve_acs_variables()` fetches
-> `variables.json` and matches on `concept` and `label` at run time. Two reasons:
-> ids shift between vintages, and "the agent discovers which variables it needs"
-> is exactly the autonomy criterion TU is paying for. Seed the search with table
-> prefixes — `B01003` population, `B17001` poverty, `B01001` age, `B18101`
-> disability, `B08201` vehicle availability, `B16005` English proficiency — and
-> let the resolver find the specific ids. Log the resolution in provenance.
+> **Verified live 28 Aug 2026 (session 4)**, by `python -m src.acquire --check`.
+> The key was rejected earlier the same day and works once activated from its
+> confirmation email; nothing below is from memory.
 >
-> **Keep the margins of error.** Request the `M` variants alongside the `E`
-> estimates. The paper's ethics section claims that point estimates suppress
-> uncertainty; having the MOEs on disk is what makes that claim honest.
+> **Vintage is discovered, not written down.** `acs5` answered for 2024 and
+> 404'd for 2025 and 2026. `discover_acs_year()` probes downwards from next year
+> and stops at the first year that answers, bounded at 2010. It probes
+> `.../acs/acs5.json` (19 KB) rather than `variables.json` (several MB), and that
+> descriptor is also where the vintage and the licence come from:
+> `title` "ACS 5-Year Detailed Tables", `c_vintage` 2024, `temporal` 2024/2024,
+> `license` CC0. Recorded as read, never composed.
+>
+> **The catalogue needs no key.** `variables.json` returned 28,475 variables
+> unkeyed. Only the data endpoint is keyed.
+>
+> **The data endpoint returns a JSON ARRAY, not an object.** Row 0 is the
+> header. This is why the retry helper returns `Any` and the object assertion
+> sits in `_get_json` — one retry policy, two response shapes, because
+> `faults.py` in S12 depends on there being exactly one choke point.
+>
+> **A missing or wrong key is HTTP 200 with `text/html`**, titled "Missing Key"
+> or "Invalid Key". `raise_for_status()` passes and only the content type gives
+> it away, so the content-type guard is the check and its message names
+> `CENSUS_API_KEY` explicitly. Measured: the key is *not* echoed in that body,
+> and every error this module raises is redacted anyway.
+>
+> **An unknown variable id is HTTP 400 `text/plain`** — `error: unknown variable
+> 'B99999_001E'`. A different path from the key failure, which is why both are
+> checked separately.
+>
+> **`get` is capped at 50 variables, `NAME` included.** 51 returns
+> `error: 'get' is limited to 50 variables`. The six indicators expand to 56
+> estimates plus 56 margins, so retrieval takes three requests. They are joined
+> on the geography columns, never on row position: separate requests carry no
+> ordering guarantee, and a positional concatenation would corrupt silently.
+>
+> **The geography columns are appended to the header** in hierarchy order —
+> `state, county, tract` and then `block group` — after whatever was asked for.
+> `fetch_acs` derives them by difference from the requested list rather than
+> naming them, and builds `Col.GEOID` by concatenating them in that order.
+
+**Do not hardcode variable ids.** `resolve_acs_variables()` fetches
+`variables.json` and matches a regex against `"{concept}||{label}"` at run time.
+Two reasons: ids shift between vintages, and "the agent discovers which variables
+it needs" is exactly the autonomy criterion TU is paying for. The search is
+seeded with table prefixes — `B01003` population, `B17001` poverty, `B01001` age,
+`B18101` disability, `B08201` vehicle availability, `B16005` English proficiency
+— and the resolver finds the ids inside them. `--check` scans every file under
+`src/` for an ACS id and fails if it finds one.
+
+> **A resolved value is a group of ids, not one id.** The ACS publishes most of
+> these concepts only as leaves: 65-and-over is twelve sex-by-age cells and
+> limited English is twenty-four language-by-proficiency cells. So
+> `resolve_acs_variables` returns `id[+id...][/denominator]`, keyed by the exact
+> `contracts.Col` name every later session joins on. Read one back with
+> `acs_variable_ids()`; nothing outside `acquire.py` splits the string itself.
+>
+> **Patterns are anchored to the end of the label.** B08201 publishes "No vehicle
+> available" once for the table and again inside each household-size block, so an
+> unanchored pattern sums the same households five times. Depth is not uniform
+> across tables, so a global depth rule does not work — each pattern is anchored
+> instead.
+>
+> **The denominator is resolved too**, by matching `Estimate!!Total:` in the same
+> table. Assuming `{table}_001E` happens to hold for all six and is still the
+> same mistake as hardcoding an id.
+
+**What it resolved on 28 Aug 2026** — this is *output*, recorded as the evidence
+for criterion TU. It is not configuration, and pasting any of it back into the
+code would be the failure this section exists to prevent.
+
+| canonical column | numerator | denominator | universe |
+| --- | --- | --- | --- |
+| `population` | `B01003_001E` | — (a count) | total population |
+| `pct_poverty` | `B17001_002E` | `B17001_001E` | poverty status determined |
+| `pct_age_65_plus` | 12 ids, `B01001_020E`–`_025E` and `_044E`–`_049E` | `B01001_001E` | total population |
+| `pct_disability` | 12 ids, the `With a disability` leaves of `B18101` | `B18101_001E` | civilian noninstitutionalised |
+| `pct_no_vehicle` | `B08201_002E` | `B08201_001E` | households, not people |
+| `pct_limited_english` | 24 ids, `"well"` / `"not well"` / `"not at all"` | `B16005_001E` | population 5 years and over |
+
+Two of those universes are worth a sentence in the paper: the no-vehicle rate is
+a **household** rate while the others are person rates, and limited English is
+defined as speaking English less than "very well", which is the standard
+definition and excludes the `"very well"` cells.
+
+> **Verified against a figure this code did not compute.** Charleston County's
+> 99 tracts sum to 420,264 population; its 261 block groups sum to 420,264; and a
+> separate `for=county:` query returns 420,264. `--check` asserts all three.
+> Chatham County, Georgia runs the same code with no change: 88 tracts, 246 block
+> groups, 300,879 population.
+>
+> **Keep the margins of error.** Every `E` is requested with its `M`. The
+> catalogue lists only the `E` variables, so the `M` id is derived by suffix and
+> then verified by the request itself — an id the API does not recognise comes
+> back as HTTP 400 naming it, not as a silently missing column. The paper's
+> ethics section claims point estimates suppress uncertainty; having the MOEs on
+> disk is what makes that claim honest.
 >
 > **Sentinel values.** Suppressed estimates come back as `-666666666`,
 > `-999999999`, `-888888888` and friends. They are numerically valid and
-> catastrophically wrong if summed. `scrub_sentinels()` handles them and counts
-> them; the count is reported.
+> catastrophically wrong if summed. `fetch_acs` deliberately leaves them alone
+> and returns every value as the string the API sent; `scrub_sentinels()` in
+> `align.py` handles them and counts them, and the count is reported. Charleston
+> had none in these 56 variables, so the transfer county is where that path first
+> runs on real data.
+>
+> **The snapshot is parquet, not CSV.** County and tract codes are zero-padded
+> and `pd.read_csv` reads them back as integers with the padding gone, which
+> breaks the GEOID join in a way that looks like missing data rather than a
+> format bug. `Registry` already accepted `.parquet`; `pyarrow` was the missing
+> dependency and is now in `requirements.txt`.
+
 
 ## 4. Elevation raster — `elevation`
 
