@@ -311,3 +311,268 @@ extended to 34 mutations covering each fix, and catches all 34.
 for the second feedback cycle: a reviewer with the invariants in hand found five
 defects in a module whose own 66 checks were green, and the fix for every one of
 them was a check that could fail.
+
+## 2026-08-29 — the independent check was wrong, not the code (S7)
+
+**What happened.** The acceptance gate for `zonal_stats` says a spatial result is
+verified against an independently computed value. The independent value was a
+cell-centre point-in-polygon average, written with shapely and numpy and never
+calling `zonal_stats`. On the first run the two disagreed:
+
+```
+INDEPENDENT centre-in-polygon: n=285 min=1.462943 mean=3.230679 max=4.205657
+rasterio.mask:                 n=286 min=1.462943 mean=3.227710 max=4.205657
+```
+
+One cell in 286, and a mean 0.09% apart. The obvious reading was a boundary
+rasterisation rule — GDAL including a cell whose centre sits exactly on the edge
+where shapely's `contains` excludes it. That reading was wrong. Swapping
+`contains` for `covers` and then `intersects` changed nothing, which was the clue:
+a boundary-rule difference would have moved with the predicate.
+
+The real cause was the window. The independent path built its own read window
+with `rasterio.windows.from_bounds(...).round_offsets().round_lengths()`, which
+rounds *inward* and produced a 29x22 array where `rasterio.mask` had used 31x23.
+The check was reading a slightly smaller piece of the raster than the polygon
+covers, and losing a boundary cell. Padding the window by three cells and reading
+`boundless=True` made the two agree to the last digit printed:
+
+```
+independent n=286 mean=3.22771025   rio.mask n=286 mean=3.22771025   dmean=0.0
+```
+
+**Where.** `_independent_zonal` in `src/align.py`.
+
+**Why.** A verification written to be independent is still code, and it has its
+own bugs. This one was in the half nobody thinks of as the hard part: not the
+averaging, the windowing. Had the disagreement been accepted as a boundary rule
+and papered over with a 1% tolerance, the check would have passed for the rest of
+the build while silently permitting a real off-by-one in `zonal_stats`.
+
+**Did the agent recover?** Yes. The padding is now load-bearing rather than
+defensive and the docstring of `_independent_zonal` says so, naming this failure,
+so a later session cannot tidy it away as belt-and-braces.
+
+**Kept as a paper failure case?** Yes — §3.7. It is the cleanest example in the
+build of a check that disagreed with the code and was itself at fault, which is
+the failure mode that makes teams stop trusting their checks.
+
+## 2026-08-29 — three mutations survived by raising the right exception for the wrong reason (S7)
+
+**What happened.** The first mutation sweep after implementing `apportion` and
+`zonal_stats` ran 64 mutations and caught 60. Four survived:
+
+```
+SURVIVOR: a statistic this module does not compute is accepted and returned empty
+SURVIVOR: the elevation columns never reach the joined layers
+SURVIVOR: a frame holding two geographic levels is accepted and rolled up anyway
+SURVIVOR: a repeated coarse GEOID is tolerated, so there is no single published value
+```
+
+One was a bad mutation: the replacement expanded to `X if False else Y`, which is
+just `Y`, so nothing was actually mutated. The other three were checks that could
+not fail, and all three failed the same way. Each asserted only that a call raised
+`ValueError`, and with the guard under test removed a *different* guard raised
+`ValueError` a few lines later:
+
+- delete the unsupported-statistic guard, and `_statistic` still raises on
+  `"median"` with "no reduction named";
+- delete the mixed-GEOID-width guard, and the width-ordering guard raises
+  "must be the longer identifier" instead, because a frame holding widths 11 and
+  12 reports its smallest width as the fine width;
+- delete the repeated-coarse-GEOID guard, and pandas raises on constructing a
+  frame from a Series with a duplicated index.
+
+Every one of those checks was green, and every one would have stayed green over a
+module that had lost the guard it was named after.
+
+**Where.** `_zonal_checks` and `_apportion_checks` in `src/align.py`.
+
+**Why.** `except ValueError: return True` tests that something went wrong, not
+that the right thing went wrong. In a module whose guards are stacked — validate
+the method, then the columns, then the widths, then the ordering — the type alone
+carries almost no information, because every guard raises the same type.
+
+**Did the agent recover?** Yes. The refusal helper now takes the phrase it
+expects and returns `phrase in str(exc)`, so each check names the specific refusal
+it is asserting. With that change and one rewritten mutation the sweep reports
+64 of 64 caught.
+
+## 2026-08-29 — a published population of zero would have made the apportionment error 0/0 (S7)
+
+**What happened.** Not a run-time break; found by measuring the county before
+writing the aggregation, and worth recording because the wrong version would have
+produced the right number for the wrong reason and passed every check.
+
+`AlignmentReport.apportionment_error` is a percentage per column. The natural
+definition is the worst per-unit relative error,
+`max(|aggregated - published| / published)`. Charleston County publishes a tract
+whose population is zero:
+
+```
+tracts with population == 0: 1
+      GEOID       population
+65    45019990100          0
+```
+
+It is a 9900-series water tract, and its block groups sum to zero as well. So
+that unit contributes `0/0`. Nothing raises: pandas `.max()` skips the resulting
+NaN and returns `0.0` — the correct answer, arrived at over 98 units while
+reporting a denominator of 99, with nothing anywhere saying a unit had been
+dropped.
+
+**Where.** `apportion_detailed` in `src/align.py`.
+
+**Why.** The same shape as the S6 findings. A silently skipped NaN is a shrinking
+denominator, and this module exists to refuse those.
+
+**Did the agent recover?** It never shipped the broken version. The percentage is
+taken over the units whose published value is non-zero, `units_undefined` counts
+the ones excluded, and the maximum absolute difference — which stays defined at
+zero population — is reported beside it. `format_report` prints all three, and a
+fixture in `_apportion_checks` asserts that a unit publishing zero is excluded
+*and* counted. The live report now reads:
+
+```
+population  max |aggregated - published| = 0 over 99 unit(s); 420,264 aggregated against 420,264 published
+            the % is taken over the 98 unit(s) publishing a non-zero value; 1 publish zero, where a
+            relative error has no meaning and the absolute difference above is the real number
+```
+
+**Kept as a paper failure case?** Yes — §3.7, alongside the S6 entries, as
+evidence that the reported zeros in §2.3 were interrogated rather than accepted.
+
+## 2026-08-29 — one line of S7 cannot be tested on this county, and the sweep hides it (S7)
+
+**What happened.** Not a break. A limitation found while building the mutation
+sweep, recorded because the mutation score would otherwise overstate what is
+covered.
+
+`align_snapshot` accumulates the threshold count across the two joined layers:
+
+```python
+report.units_below_cell_threshold += zonal.below_threshold
+```
+
+On Charleston County the true value is zero — the smallest tract covers 286 cells
+and the smallest block group 87, against a `MIN_RASTER_CELLS` of 10. So mutating
+that line to `= 0`, deleting the accumulation entirely, changes no observable
+number and every one of the 142 checks stays green. The mutation survives, and it
+survives because the county has nothing to count, not because the line is
+unimportant.
+
+The sweep therefore uses a mutation that *is* observable here —
+`+= zonal.polygons`, which makes the report say 360 — and that one is caught. The
+64/64 score is honest about the checks it runs and silent about this asymmetry.
+
+**Where.** `align_snapshot` in `src/align.py`; the entry "the threshold count
+reports polygons measured instead of polygons flagged" in `mutate.py`.
+
+**Why.** A mutation can only be caught if it changes something the data can show.
+A field whose true value is zero on the only county available is untestable at the
+wiring level by any amount of mutation, and no amount of check-writing fixes that
+— it is a property of the county, not of the code.
+
+**What covers it instead.** Three separate things, none of which is the live
+county:
+
+1. The threshold logic itself is proven on a synthetic raster in `_zonal_checks`,
+   where four of five fixture polygons fall under the threshold and the fifth
+   clears it. The flag discriminates.
+2. `format_report` prints the denominator, so a zero always arrives as "0 of 360
+   polygon(s) over 2 layer(s), threshold 10 cells" rather than as "0".
+3. If no raster is measured at all, `align_snapshot` appends a warning saying the
+   zero means nothing was measured. That is the "not built looks like nothing to
+   do" confusion the module was built to refuse, and it is the case a second
+   county with a failed elevation retrieval will actually hit.
+
+**Kept as a paper failure case?** Yes — §3.7, as the honest footnote to the
+mutation numbers. A mutation score reported without naming what it cannot reach is
+the same overstatement as a green test suite that mocks its own boundary.
+
+## 2026-08-29 — a green suite and a zero-survivor mutation sweep still hid seven defects (S7)
+
+**What happened.** `src/align.py` reached 142 checks all PASS, exit 0, and a
+mutation sweep of 64 for 64 caught. The `invariant-reviewer` subagent, run on the
+diff before commit, then found seven defects. Two matter more than the rest.
+
+**The reported zero was not proven.** `apportionment_error` reads
+`{'population': 0.0}` and the live check asserted a biconditional:
+
+```python
+(report.apportionment_error.get(Col.POPULATION) == 0.0)
+== (apportion.max_abs_difference.get(Col.POPULATION) == 0.0)
+```
+
+beside `total_fine == total_coarse`. Take one tract aggregating to 100 against a
+published 90 and another to 90 against a published 100. Both sides of the
+biconditional are then non-zero, so `False == False` passes. The two errors cancel
+in the sum, so the total-equality passes. Every one of the five live apportionment
+checks passes while the module reports an 11% error as though it were zero. The
+check was self-consistency dressed as verification — both sides were computed from
+the same `difference` series, in the same loop.
+
+Confirmed by mutation after the fix: attaching each aggregate to the wrong parent,
+which leaves the county total exactly right, is caught only by the replacement
+assertion "every tract's apportioned population equals its published one, unit by
+unit". The old form did not move.
+
+**The CRS scan had a hole this session widened.** `_contract_checks` greps an
+explicit tuple of implementation parts for `.area`, `.buffer(`, `.centroid` and
+the rest. The tuple never included the evidence dataclasses, and S7 added two more
+of them plus four property bodies that run inside `format_report` and
+`align_snapshot`. A metric operation written into any of those seven classes was
+invisible to invariant 2's only mechanical guard. The failure mode is silent by
+construction: an inclusion list exempts whatever nobody remembers to add.
+
+The other five: `apportion` raised on a zero-row frame with a message saying the
+frame held *more than one* geographic level, and `align_snapshot` did not catch
+it, so a transfer county whose block-group join matched nothing would lose the
+whole alignment stage including the tract work; the apportion branch had no
+"nothing was apportioned" warning where the zonal branch had one, leaving two of
+the three fields able to report `{}` for a reason nobody could distinguish;
+`counts_agree` filtered on a column's existence inside its own generator, so it
+returned `all([])` — True — precisely when the elevation join stopped running;
+`units_below_cell_threshold` sums across granularities and rasters, so its check
+silently assumed one raster and would break in S8; and a bare `except ValueError`
+attributed every `rasterio.mask` failure to "the polygon is outside the raster",
+which would have printed a confident and false explanation.
+
+**Where.** `src/align.py`: `apportion_detailed`, `align_snapshot`, `_cells_under`,
+`format_report`, `_snapshot_checks`, `_contract_checks`, `_module_functions`.
+
+**Why.** Every one of the seven is a check or a guard that was written against the
+county in front of it. Charleston's block groups nest perfectly, its elevation
+raster covers every unit, its population is Census-controlled to agree exactly,
+and no frame is ever empty. On that data a biconditional, an `all([])`, and a
+message about the wrong failure all look identical to correct code. This is the
+same root cause as the five S6 findings, one session later, in code written by
+someone who had just read the S6 entry.
+
+**Did the agent recover?** Yes, all seven, in one pass. The zero is now asserted
+directly rather than relationally; `EVIDENCE_RECORDS` is named once and read by
+both source scans so the two hand-maintained lists became one; empty frames are
+refused as empty and `align_snapshot` guards the call; the apportion branch warns
+when nothing was rolled up; `counts_agree` requires the column rather than
+filtering on it; the polygon count scales by the number of rasters measured; and
+the no-overlap catch matches `RASTER_NO_OVERLAP` and re-raises anything else. The
+sweep is now 70 mutations, 70 caught, and the suite is 145 checks.
+
+**What the mutation sweep could not have found.** Three of the seven were invisible
+to it, and the reason is worth stating because the 64/64 figure implied otherwise:
+
+1. A vacuous check whose blind spot another check happens to cover is reported
+   CAUGHT. `counts_agree` returning `all([])` was masked by `elevation_named`.
+2. A widened scan cannot be mutated back. Removing the evidence records from the
+   scan tuple changes no number until something metric is written into one of
+   them, so it survives as a no-op rather than a defect. Two such entries were
+   deleted from `mutate.py` rather than left standing as survivors.
+3. A field whose true value is zero on the only county available cannot have its
+   wiring mutated observably — see the entry above on
+   `units_below_cell_threshold`.
+
+**Kept as a paper failure case?** Yes — §3.7, and it is now the primary evidence
+for the second feedback cycle. The number worth quoting is not 145 checks or 70
+mutations. It is that a reviewer holding the invariants found seven defects behind
+both of those, that two of them made a *reported zero* untrustworthy, and that the
+fix for every one was a check that could fail.

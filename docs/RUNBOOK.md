@@ -8,14 +8,47 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Sat 29 Aug 11:50, at the end of S6.
+Checked Sat 29 Aug, at the end of S7.
 
 | | |
 | --- | --- |
 | Plan | Day 3 = Sat 29 Aug, S9-S11. |
-| Reality | S1-S6 committed. S6 finished Sat 29 Aug 11:50. |
-| Built | `config`, `contracts`, `schemas`, `llm_client`, `agent`, `trace`, `tools` (empty), `provenance`, `registry`, `acquire`, `align` |
+| Reality | S1-S7 done. S7 finished Sat 29 Aug, inside its 2 h. |
+| Built | `config`, `contracts`, `schemas`, `llm_client`, `agent`, `trace`, `tools` (empty), `provenance`, `registry`, `acquire`, `align` (complete) |
 | Missing | `hazard`, `vulnerability`, `risk`, `sandbox`, `critic`, `scenarios`, `faults`, `figures` |
+
+**`src/align.py` is finished.** Every method of the frozen `Aligner` protocol is
+implemented and no `AlignmentReport` field is a placeholder. `python -m src.align
+--check` reports 145 checks, all PASS, exit 0, and `python mutate.py` reports
+70 of 70 mutations caught. The `invariant-reviewer` run found seven defects behind
+those numbers and all seven are fixed; read that entry in `failures.md` before
+trusting a green suite in S8. What S8 inherits:
+
+- `tracts_joined` is 99 x 12 and `block_groups_joined` is 261 x 7. Both now carry
+  `Col.ELEV_MIN_M`, `Col.ELEV_MEAN_M` and `Col.RASTER_CELLS` beside GEOID, the
+  canonical columns and geometry. S8 does not need to run zonal statistics over
+  elevation again.
+- `zonal_stats` returns GENERIC statistic names -- "min", "mean", "max", "count"
+  -- and the caller maps them onto `Col`. `RASTER_STAT_COLUMNS` is that map for
+  elevation; S8 writes the matching one for inundation. Do not add `ELEV_MAX_M`
+  to `contracts.py` unless something actually needs it: `Col` publishes no such
+  column and the generic-name design is why that is not a problem.
+- `zonal_stats` RAISES on a raster whose CRS differs from the working CRS rather
+  than warping it. `acquire.fetch_arcgis_raster` takes `out_sr`, so retrieve in
+  the working CRS. A derived depth raster S8 writes must carry EPSG:5070.
+- Cell geometry, measured: 39.8161 m cells, 1585.3 m2 each. The 10 m request was
+  capped by the service and both numbers are in the elevation `Provenance`.
+  Smallest tract covers 286 cells, smallest block group 87; `MIN_RASTER_CELLS`
+  is 10, so nothing on this county is below the threshold.
+- `apportion` aggregates by GEOID string prefix, reading the prefix width from
+  the coarse frame. `method="sum"` for counts, `"population_weighted"` for rates;
+  weighting a population by itself is refused.
+- `Col.RASTER_CELLS` is already filled from the elevation grid. S8 should not
+  remap `"count"` onto it for inundation unless that raster's grid genuinely
+  differs from elevation's, or the two will fight over one column.
+- Add every new mutation to `mutate.py` and keep it at zero survivors. It is
+  self-contained now -- it takes its own backup and restores in a `finally`.
+  One line it cannot reach on this county is written up in `failures.md`.
 
 **You are two calendar days behind, on the morning of Day 3.** Eight sessions and
 18 hours remain (S7 2, S8 2.5, S9 2, S10 2.5, S11 2.5, S12 2, S13 2.5, S14 2),
@@ -30,7 +63,7 @@ paper and two days is enough for it.
 
 | Day | Sessions | Hours |
 | --- | --- | --- |
-| Sat 29 (from 12:00) | S7, S8, S9 | 6.5 |
+| Sat 29 (from 12:00) | ~~S7~~ done, S8, S9 | 6.5 |
 | Sun 30 | S10, S11, S12 | 7 |
 | Mon 31 (was paper day 1) | S13, S14 | 4.5 |
 | Tue 1 - Wed 2 Sep | paper | -- |

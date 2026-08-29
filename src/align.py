@@ -22,10 +22,15 @@ Three things this module is built around.
   `AlignmentEvidence` record that travels with the report. "0 of 837 geometries
   needed repair" is evidence; "0" is a claim.
 
-* **Three states, not two.** A field is zero because nothing needed doing, or
-  non-zero because something did, or *not yet implemented* -- `apportioned`,
-  `apportionment_error` and `units_below_cell_threshold` belong to session 7 and
-  are named in `DEFERRED_FIELDS` rather than left looking like clean results.
+* **Nothing is deferred, so every zero has to carry its denominator.** The
+  module now implements the whole `Aligner` protocol, and the three fields that
+  used to be placeholders -- `apportioned`, `apportionment_error` and
+  `units_below_cell_threshold` -- hold measured results. Two of them are
+  legitimately zero on this county, which is exactly why `ApportionEvidence` and
+  `ZonalEvidence` record what was compared and what was measured beside them.
+  `units_below_cell_threshold` says so out loud when it is zero because no
+  raster was measured at all: that is the old "not built looks like nothing to
+  do" confusion arriving through a different door.
 
 `AlignmentReport.reprojected` and `.temporal_span` are read from each dataset's
 `Provenance`, not recomputed here. A CRS this module worked out for itself would
@@ -45,13 +50,17 @@ from typing import Any, Literal
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import rasterio
 from pyproj import CRS, Geod
+from rasterio import features as rasterio_features
+from rasterio import mask as rasterio_mask
 from shapely import wkt as shapely_wkt
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 
 from . import acquire, config
 from . import provenance as prov
 from .contracts import (
+    MIN_RASTER_CELLS,
     VULNERABILITY_INDICATORS,
     AlignmentReport,
     Aligner,
@@ -113,15 +122,62 @@ def is_degraded(record: Provenance) -> bool:
     """
     return record.request_params.get(DEGRADED_KEY) == "true"
 
-DEFERRED_FIELDS: dict[str, str] = {
-    "apportioned": "session 7 -- apportion()",
-    "apportionment_error": "session 7 -- apportion()",
-    "units_below_cell_threshold": "session 7 -- zonal_stats()",
+ZONAL_STATISTICS: tuple[str, ...] = ("min", "mean", "max", "count")
+"""Every statistic `zonal_stats` computes. Anything else is refused by name
+rather than returned as a null column, which is how a caller learns it asked for
+something this module does not do instead of reading nulls as missing data."""
+
+RASTER_NO_OVERLAP = "do not overlap raster"
+"""The one `rasterio.mask` failure that is a fact about the county rather than a
+bug: a census unit sitting off the edge of what the service covered.
+
+Matched by message rather than by type, because `ValueError` is also what a
+malformed geometry raises, and recording that as "outside the raster" would
+attach a confident and false explanation to it -- the warning says "a gap in the
+retrieved coverage, not flat ground". The refusal checks in this file are held to
+naming the reason they expect; this catch is held to the same standard."""
+
+ALL_TOUCHED = False
+"""Which cells a polygon owns: those whose CENTRE falls inside it, not every
+cell the boundary clips. Recorded in `ZonalEvidence` and printed, because the
+choice changes every number in the result and only one of the two was verified
+against an independently computed value. `True` would double-count a cell shared
+by two adjacent census units and inflate the total cell count above the raster's.
+"""
+
+RASTER_STAT_COLUMNS: dict[str, str] = {
+    "min": Col.ELEV_MIN_M,
+    "mean": Col.ELEV_MEAN_M,
+    "count": Col.RASTER_CELLS,
 }
-"""`AlignmentReport` fields this session does not fill. Printed as their own
-category, because an empty dict from a function that never ran looks exactly
-like an empty dict from a function that ran and found nothing to do. That
-confusion is the whole reason this module reports denominators."""
+"""How a generic statistic becomes a named elevation column, applied by
+`align_snapshot` and by nothing inside `zonal_stats`.
+
+`zonal_stats` is a raster utility that does not know it is looking at elevation,
+so it returns "min" and "mean"; the caller that does know the semantics names
+them. There is deliberately no entry for "max": `contracts.Col` publishes
+ELEV_MIN_M and ELEV_MEAN_M and no ELEV_MAX_M, and inventing one here as a string
+literal is exactly what the frozen-contract rule forbids. Session 8 maps the
+same generic names onto the inundation columns `Col` does publish."""
+
+CONTROLLED_TO_TRACT = (
+    "this zero is guaranteed rather than measured: the Census controls block-group "
+    "population to sum to the published tract estimate, so population is the one "
+    "variable whose apportionment cannot disagree. An uncontrolled variable would"
+)
+"""Why the apportionment error for population is exactly zero on real data.
+
+Worth stating wherever the zero is printed. A reader who takes it as evidence
+that apportionment is accurate in general has drawn the wrong conclusion from
+it: the agreement is a property of how the Bureau publishes this one variable,
+not a measurement of this module."""
+
+APPORTION_METHODS: tuple[str, ...] = ("sum", "population_weighted")
+"""The two aggregations, and which column each is right for. A count adds up:
+the people in a tract are the people in its block groups. A rate does not --
+averaging percentages over units of wildly different size is a well-known way to
+get a number that is wrong in the direction of the smallest unit -- so a share is
+weighted by the population it describes."""
 
 MOE_RULE = "root of the summed squares, the Bureau's published rule for the margin of a derived sum"
 
@@ -133,12 +189,16 @@ METRIC_OPERATIONS: dict[str, str] = {
     "distance": r"\.distance\(",
     "length": r"\.length\b",
 }
-"""Every call invariant 2 covers, and the marker that separates the
-implementation from its own self check -- the first line of the first fixture. The implementation half of this file may
+"""Every call invariant 2 covers. The implementation half of this file may
 contain exactly one of these -- the `to_crs` inside `to_working_crs` -- because
-each of the others answers in degrees on a geographic frame, silently. The self
-check deliberately does the opposite on purpose, which is why it is scanned
-separately rather than exempted by name."""
+each of the others answers in degrees on a geographic frame, silently.
+
+What counts as the implementation half is `Alignment`, `EVIDENCE_RECORDS` and the
+module-level helpers named in `_contract_checks`. The self check is outside that
+set and may use these calls freely, since a fixture has to measure an area to
+compare one. That is an exemption by omission, and it is the scan's weak point:
+an implementation helper that nobody adds to the list is exempt without anyone
+choosing to exempt it. `EVIDENCE_RECORDS` exists to shrink that surface."""
 
 
 def sentinel_label(value: float) -> str:
@@ -305,6 +365,83 @@ class JoinEvidence:
 
 
 @dataclass(slots=True)
+class ZonalEvidence:
+    """What `zonal_stats` read, beside the statistics it returned.
+
+    `units_below_cell_threshold` is a single integer on the frozen report, and on
+    a county whose smallest census unit still covers hundreds of cells it is
+    zero. The denominators that make that zero readable -- how many polygons were
+    measured, how few cells the smallest one covered, and against what threshold
+    -- live here.
+    """
+
+    dataset: str = ""
+    raster: str = ""
+    raster_crs: str = ""
+    cell_size_m: float = 0.0
+    cell_area_m2: float = 0.0
+    polygons: int = 0
+    cells: int = 0
+    nodata_cells: int = 0
+    non_finite_cells: int = 0
+    empty_polygons: int = 0
+    outside_raster: int = 0
+    below_threshold: int = 0
+    threshold: int = MIN_RASTER_CELLS
+    min_cells: int = 0
+    median_cells: float = 0.0
+    max_cells: int = 0
+    stats: tuple[str, ...] = ()
+    all_touched: bool = ALL_TOUCHED
+
+    @property
+    def valid_cells(self) -> int:
+        """Cells that carried a usable number, as opposed to merely being inside.
+
+        The three categories are counted separately and must add back up to
+        `cells`; a check asserts exactly that. Folding nodata into "outside the
+        polygon" is how a raster hole becomes an invisibly smaller denominator.
+        """
+        return self.cells - self.nodata_cells - self.non_finite_cells
+
+
+@dataclass(slots=True)
+class ApportionEvidence:
+    """What `apportion` rolled up, beside the error it reported.
+
+    `AlignmentReport.apportionment_error` carries one percentage per column. On
+    this county that percentage is zero for population, and the zero is real
+    rather than untested -- so what it was computed over has to travel with it:
+    how many units were compared, how many of those publish a value a percentage
+    can be taken against, and the absolute difference, which stays defined for
+    the unit that publishes none.
+    """
+
+    fine: str = ""
+    coarse: str = ""
+    method: str = ""
+    method_note: str = ""
+    weight_column: str = ""
+    fine_rows: int = 0
+    coarse_rows: int = 0
+    fine_width: int = 0
+    coarse_width: int = 0
+    parents: int = 0
+    orphan_children: int = 0
+    childless_parents: int = 0
+    columns: tuple[str, ...] = ()
+    compared: tuple[str, ...] = ()
+    not_published: tuple[str, ...] = ()
+    units_compared: dict[str, int] = field(default_factory=dict)
+    units_undefined: dict[str, int] = field(default_factory=dict)
+    incomplete: dict[str, int] = field(default_factory=dict)
+    error: dict[str, float] = field(default_factory=dict)
+    max_abs_difference: dict[str, float] = field(default_factory=dict)
+    total_fine: dict[str, float] = field(default_factory=dict)
+    total_coarse: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class AlignmentEvidence:
     """Everything `AlignmentReport` counts, with the denominator beside it.
 
@@ -318,11 +455,12 @@ class AlignmentEvidence:
     repairs: list[RepairEvidence] = field(default_factory=list)
     scrubs: list[ScrubEvidence] = field(default_factory=list)
     joins: list[JoinEvidence] = field(default_factory=list)
+    zonals: list[ZonalEvidence] = field(default_factory=list)
+    apportionments: list[ApportionEvidence] = field(default_factory=list)
     datasets: tuple[str, ...] = ()
     crs_observed: dict[str, str] = field(default_factory=dict)
     degraded: dict[str, str] = field(default_factory=dict)
     derived: dict[str, str] = field(default_factory=dict)
-    deferred: dict[str, str] = field(default_factory=dict)
     undefined: dict[str, int] = field(default_factory=dict)
     columns_dropped: dict[str, int] = field(default_factory=dict)
 
@@ -358,6 +496,19 @@ class AlignmentEvidence:
     def geoids_matched(self) -> int:
         return sum(item.matched for item in self.joins)
 
+    @property
+    def polygons_measured(self) -> int:
+        return sum(item.polygons for item in self.zonals)
+
+    @property
+    def smallest_polygon_cells(self) -> int:
+        measured = [item.min_cells for item in self.zonals if item.polygons]
+        return min(measured) if measured else 0
+
+    @property
+    def units_apportioned(self) -> int:
+        return sum(item.fine_rows for item in self.apportionments)
+
     def codes_seen(self) -> dict[str, int]:
         """Every distinct removed value, labelled, across all scrubbed tables."""
         seen: dict[str, int] = {}
@@ -374,6 +525,27 @@ class AlignedSnapshot:
     frames: dict[str, Any]
     report: AlignmentReport
     evidence: AlignmentEvidence
+
+
+EVIDENCE_RECORDS: tuple[type, ...] = (
+    RepairEvidence,
+    ScrubEvidence,
+    JoinEvidence,
+    ZonalEvidence,
+    ApportionEvidence,
+    AlignmentEvidence,
+    AlignedSnapshot,
+)
+"""Every record the implementation half of this module defines.
+
+Named once and read by both source scans -- the metric-operation scan in
+`_contract_checks` and the annotation scan in `_module_functions` -- because they
+were previously two hand-maintained lists of the same thing and only one of them
+was kept up to date. These carry real bodies: `valid_cells`, `polygons_measured`
+and `units_apportioned` all run inside `format_report` and `align_snapshot`, so a
+metric operation written into one of them is production code. An inclusion list
+fails silently when something is left off it, which is the worst way for a guard
+to fail, so there is now one list rather than two."""
 
 
 # ---------------------------------------------------------------------------
@@ -678,7 +850,7 @@ class Alignment:
             )
         return joined, report, evidence
 
-    # -- session 7 -----------------------------------------------------------
+    # -- granularity: a finer geography rolled up to a coarser one -----------
 
     def apportion(
         self,
@@ -688,15 +860,205 @@ class Alignment:
         *,
         method: Literal["sum", "population_weighted"],
     ) -> tuple[Any, dict[str, float]]:
-        """Not implemented in this session. Session 7 owns it.
+        """Aggregate `fine` units onto `coarse` ones and report the error.
 
-        Declared rather than omitted so that `isinstance(Alignment(), Aligner)`
-        answers honestly and the frozen signature is checked from today, and
-        raising rather than returning an empty result so that no caller can
-        mistake "not built" for "nothing to do" -- the distinction this whole
-        module is about.
+        The frozen signature carries the aggregated frame and one percentage per
+        column. Everything that percentage was computed over -- units compared,
+        units whose published value a percentage cannot be taken against, the
+        absolute difference -- is in `ApportionEvidence`, which is how the report
+        reaches them without changing the contract.
         """
-        raise NotImplementedError(f"apportion is {DEFERRED_FIELDS['apportioned']}")
+        aggregated, evidence = self.apportion_detailed(fine, coarse, columns, method=method)
+        return aggregated, evidence.error
+
+    def apportion_detailed(
+        self,
+        fine: Any,
+        coarse: Any,
+        columns: list[str],
+        *,
+        method: Literal["sum", "population_weighted"],
+        weight_column: str = Col.POPULATION,
+        fine_name: str = "",
+        coarse_name: str = "",
+    ) -> tuple[pd.DataFrame, ApportionEvidence]:
+        """`apportion`, keeping the denominator.
+
+        **The rollup is a string operation, not a spatial one.** A block-group
+        GEOID is its tract's GEOID plus one digit, so the identifier already
+        carries the nesting exactly, and taking the leading characters is not an
+        approximation of centroid containment -- it is the published definition.
+        That is why nothing here routes through `to_working_crs`: there is no
+        area, distance or overlay to get wrong, and CLAUDE.md puts area-weighted
+        apportionment out of scope in as many words. The prefix width is read
+        from the coarse frame's own GEOIDs rather than written down, so the same
+        call rolls blocks into block groups on a county that has them.
+
+        **Which aggregation is right depends on the column, not on the caller's
+        preference.** A count adds: the people in a tract are the people in its
+        block groups. A share does not -- averaging percentages over units of
+        very different size pulls the answer toward the smallest unit -- so
+        `population_weighted` weights each child by the population it describes.
+        Asking for a population-weighted population is refused rather than
+        answered, because it computes sum of p squared over sum of p, which is a
+        real number, is not the population, and looks entirely plausible sitting
+        in a table.
+
+        **A suppressed child suppresses its parent.** A tract one of whose block
+        groups carries no value gets no value, not the sum of the rest. The
+        alternative is an undercount that looks like a smaller tract, which is
+        the same failure `derive_acs_columns` refuses when it sums ACS leaves.
+
+        **The error is the worst unit, not the county.** A total can agree while
+        individual units are wrong in opposite directions; a maximum cannot
+        cancel. It is taken over the units whose published value is non-zero,
+        because a relative error against a published zero is undefined -- and
+        this county has such a unit, a water tract with no residents. Those units
+        are counted in `units_undefined` rather than skipped in silence, and the
+        absolute difference, which stays defined for them, is recorded beside it.
+        """
+        if method not in APPORTION_METHODS:
+            raise ValueError(
+                f"apportion does not know the method {method!r}; it knows "
+                f"{list(APPORTION_METHODS)}"
+            )
+        if not columns:
+            raise ValueError("apportion was asked to roll up no column at all")
+        left = fine_name or "fine geography"
+        right = coarse_name or "coarse geography"
+        for label, frame in ((left, fine), (right, coarse)):
+            if Col.GEOID not in frame.columns:
+                raise KeyError(
+                    f"{label}: no {Col.GEOID} column to apportion on; it carries "
+                    f"{list(frame.columns)[:10]}"
+                )
+        absent = [column for column in columns if column not in fine.columns]
+        if absent:
+            raise KeyError(
+                f"{left}: apportion was asked for {len(absent)} column(s) the frame does "
+                f"not carry: {absent[:8]}"
+            )
+        if method == "population_weighted":
+            if weight_column not in fine.columns:
+                raise KeyError(
+                    f"{left}: population_weighted needs {weight_column!r} to weight by and "
+                    "the frame does not carry it"
+                )
+            if any(column == weight_column for column in columns):
+                raise ValueError(
+                    f"population_weighted was asked to weight {weight_column!r} by itself, "
+                    "which computes the sum of the squares over the sum -- a plausible "
+                    f"number that is not the {weight_column}. A count uses method='sum'"
+                )
+
+        fine_frame = fine.copy()
+        coarse_frame = coarse.copy()
+        fine_frame[Col.GEOID] = _geoid_strings(fine_frame[Col.GEOID], left)
+        coarse_frame[Col.GEOID] = _geoid_strings(coarse_frame[Col.GEOID], right)
+        repeated = int(coarse_frame[Col.GEOID].duplicated().sum())
+        if repeated:
+            raise ValueError(
+                f"{right}: {repeated} of {len(coarse_frame)} rows repeat a {Col.GEOID}, so "
+                "there is no single published value to compare an aggregate against"
+            )
+
+        for label, frame in ((left, fine_frame), (right, coarse_frame)):
+            if not len(frame):
+                raise ValueError(
+                    f"{label}: carries no rows, so there is nothing to apportion and no "
+                    "prefix width to read from it. An empty frame is not a granularity "
+                    "mismatch, and join_on_geoid returns one rather than raising"
+                )
+
+        fine_widths = _width_counts(fine_frame[Col.GEOID].dropna())
+        coarse_widths = _width_counts(coarse_frame[Col.GEOID].dropna())
+        for label, widths in ((left, fine_widths), (right, coarse_widths)):
+            if len(widths) != 1:
+                raise ValueError(
+                    f"{label}: {Col.GEOID} carries widths {sorted(widths)}, so this frame "
+                    "holds more than one geographic level and no single prefix rolls it up"
+                )
+        fine_width = next(iter(fine_widths))
+        coarse_width = next(iter(coarse_widths))
+        if fine_width <= coarse_width:
+            raise ValueError(
+                f"{left} carries {Col.GEOID} width {fine_width} and {right} carries "
+                f"{coarse_width}: the fine geography must be the longer identifier, since "
+                "apportionment goes from smaller units to larger ones"
+            )
+
+        parent = fine_frame[Col.GEOID].str[:coarse_width]
+        published_ids = set(coarse_frame[Col.GEOID])
+        evidence = ApportionEvidence(
+            fine=left,
+            coarse=right,
+            method=method,
+            weight_column=weight_column if method == "population_weighted" else "",
+            fine_rows=len(fine_frame),
+            coarse_rows=len(coarse_frame),
+            fine_width=fine_width,
+            coarse_width=coarse_width,
+            parents=int(parent.nunique()),
+            orphan_children=int((~parent.isin(published_ids)).sum()),
+            childless_parents=len(published_ids - set(parent.dropna())),
+            columns=tuple(columns),
+        )
+        evidence.method_note = (
+            f"{method} of {evidence.fine_rows} {left} value(s) into {evidence.parents} "
+            f"{right} unit(s) by {Col.GEOID} prefix, width {fine_width} -> {coarse_width}"
+        )
+
+        sizes = parent.groupby(parent).size()
+        published_frame = coarse_frame.set_index(Col.GEOID)
+        aggregated = pd.DataFrame(index=sizes.index.rename(Col.GEOID))
+        compared: list[str] = []
+        not_published: list[str] = []
+        for column in columns:
+            value = pd.to_numeric(fine_frame[column], errors="coerce")
+            present = value.notna()
+            complete = present.groupby(parent).sum() == sizes
+            evidence.incomplete[column] = int((~complete).sum())
+
+            if method == "sum":
+                rolled = value.groupby(parent).sum(min_count=1)
+            else:
+                weight = pd.to_numeric(fine_frame[weight_column], errors="coerce")
+                usable = present & weight.notna()
+                numerator = (value * weight).where(usable).groupby(parent).sum(min_count=1)
+                denominator = weight.where(usable).groupby(parent).sum(min_count=1)
+                rolled = numerator / denominator.where(denominator > 0)
+            aggregated[column] = pd.to_numeric(
+                rolled.where(complete), errors="coerce"
+            ).astype("Float64")
+
+            if column not in published_frame.columns:
+                not_published.append(column)
+                continue
+            compared.append(column)
+            published = pd.to_numeric(
+                published_frame[column], errors="coerce"
+            ).astype("Float64")
+            pair = pd.DataFrame(
+                {"published": published, "aggregated": aggregated[column]}
+            ).dropna()
+            evidence.units_compared[column] = len(pair)
+            evidence.total_fine[column] = float(pair["aggregated"].sum())
+            evidence.total_coarse[column] = float(pair["published"].sum())
+            difference = (pair["aggregated"] - pair["published"]).abs()
+            evidence.max_abs_difference[column] = (
+                float(difference.max()) if len(pair) else 0.0
+            )
+            defined = pair["published"] != 0
+            evidence.units_undefined[column] = int((~defined).sum())
+            if int(defined.sum()):
+                relative = 100.0 * difference[defined] / pair.loc[defined, "published"].abs()
+                evidence.error[column] = float(relative.max())
+
+        evidence.compared = tuple(compared)
+        evidence.not_published = tuple(not_published)
+        return aggregated, evidence
+
+    # -- raster to vector: zonal statistics ---------------------------------
 
     def zonal_stats(
         self,
@@ -705,10 +1067,200 @@ class Alignment:
         *,
         stats: tuple[str, ...] = ("min", "mean", "max", "count"),
     ) -> Any:
-        """Not implemented in this session. Session 7 owns it. See `apportion`."""
-        raise NotImplementedError(
-            f"zonal_stats is {DEFERRED_FIELDS['units_below_cell_threshold']}"
+        """Summarise a raster inside each polygon, indexed by GEOID.
+
+        Returns GENERIC statistic names -- "min", "mean", "max", "count" -- and
+        not `Col.ELEV_MEAN_M`. This is a raster utility; it does not know it is
+        looking at elevation, and the caller that does know maps the names onto
+        `Col` where the semantics are known. `RASTER_STAT_COLUMNS` is that map
+        for elevation, and session 8 writes the matching one for inundation.
+
+        The denominators are in `ZonalEvidence`.
+        """
+        frame, _ = self.zonal_stats_detailed(raster_path, polygons, stats=stats)
+        return frame
+
+    def zonal_stats_detailed(
+        self,
+        raster_path: Path,
+        polygons: Any,
+        *,
+        stats: tuple[str, ...] = ("min", "mean", "max", "count"),
+        dataset: str = "",
+    ) -> tuple[pd.DataFrame, ZonalEvidence]:
+        """`zonal_stats`, keeping the denominator.
+
+        **The raster is not warped, and a CRS mismatch raises.** Every other
+        spatial operation in this module routes through `to_working_crs`, but
+        reprojecting a raster is not reprojecting a frame: it resamples, so it
+        would answer a question about elevation by inventing elevations between
+        the ones that were measured. `acquire.fetch_arcgis_raster` takes
+        `out_sr` and the manifest records what it asked for, so a raster in the
+        wrong CRS is a retrieval that needs fixing rather than a frame this
+        module can quietly repair. Refusing it by name is also what makes the
+        `wrong_crs` fault in `contracts.FaultKind` observable instead of silent.
+
+        **A cell belongs to the polygon its centre falls in.** `ALL_TOUCHED` is
+        False, which is the rule the independent check verified; the alternative
+        gives every boundary cell to both neighbours at once and totals more
+        cells than the raster holds.
+
+        **Three ways to have no value, counted apart.** A cell can be outside the
+        polygon, inside it but nodata, or inside it and not a finite number.
+        Only the first is not a fact about the data. They are counted separately
+        and must add back to the cells examined, because folding a raster hole
+        into "outside the polygon" shrinks a denominator invisibly.
+
+        A polygon that misses the raster entirely is recorded and returns no
+        value rather than ending the run: the study extent is derived from the
+        tract layer, and a unit sitting off the edge of a service's coverage is
+        a retrieval fact worth reporting.
+        """
+        if not stats:
+            raise ValueError("zonal_stats was asked for no statistic at all")
+        unsupported = [name for name in stats if name not in ZONAL_STATISTICS]
+        if unsupported:
+            raise ValueError(
+                f"zonal_stats does not compute {unsupported}; it computes "
+                f"{list(ZONAL_STATISTICS)}"
+            )
+        if not isinstance(polygons, gpd.GeoDataFrame):
+            raise TypeError(
+                f"zonal_stats needs a GeoDataFrame of polygons, got "
+                f"{type(polygons).__name__}"
+            )
+        label = dataset or "zonal polygons"
+        if Col.GEOID not in polygons.columns:
+            raise KeyError(
+                f"{label}: no {Col.GEOID} column to index the result by; the frame carries "
+                f"{list(polygons.columns)[:10]}"
+            )
+        path = Path(raster_path)
+        if not path.exists():
+            raise FileNotFoundError(
+                f"zonal_stats was pointed at {path}, which does not exist. A raster is "
+                "reached with Registry.path_of, never by building a path here"
+            )
+
+        frame = self.to_working_crs(polygons)
+        geoids = _geoid_strings(frame[Col.GEOID], label)
+        repeated = int(geoids.duplicated().sum())
+        if repeated:
+            raise ValueError(
+                f"{label}: {repeated} of {len(frame)} rows repeat a {Col.GEOID}, so the "
+                "result could not be indexed by it"
+            )
+
+        evidence = ZonalEvidence(
+            dataset=dataset,
+            raster=path.name,
+            polygons=len(frame),
+            threshold=MIN_RASTER_CELLS,
+            stats=tuple(stats),
+            all_touched=ALL_TOUCHED,
         )
+        counts: list[int] = []
+        gathered: dict[str, list[float | None]] = {
+            name: [] for name in stats if name != "count"
+        }
+        with rasterio.open(path) as handle:
+            if handle.crs is None:
+                raise ValueError(
+                    f"{path.name} carries no CRS on disk, so which ground its cells cover "
+                    "is not knowable. Record the CRS at retrieval time"
+                )
+            raster_crs = CRS.from_user_input(handle.crs)
+            if raster_crs != CRS.from_user_input(self.working_crs):
+                raise ValueError(
+                    f"{path.name} is stored in {raster_crs.to_string()} but this study area "
+                    f"works in {self.working_crs}. Warping it here would resample the very "
+                    "values being measured; retrieve it in the working CRS instead -- "
+                    "acquire.fetch_arcgis_raster takes out_sr for exactly that"
+                )
+            evidence.raster_crs = raster_crs.to_string()
+            evidence.cell_size_m = float(abs(handle.transform.a))
+            evidence.cell_area_m2 = float(abs(handle.transform.a * handle.transform.e))
+            for geometry in frame.geometry:
+                values = self._cells_under(handle, geometry, evidence)
+                counts.append(int(values.size))
+                for name in gathered:
+                    gathered[name].append(self._statistic(name, values))
+
+        if counts:
+            evidence.min_cells = int(min(counts))
+            evidence.max_cells = int(max(counts))
+            evidence.median_cells = float(np.median(counts))
+            evidence.empty_polygons = sum(1 for count in counts if count == 0)
+            evidence.below_threshold = sum(
+                1 for count in counts if count < MIN_RASTER_CELLS
+            )
+
+        built: dict[str, Any] = {}
+        for name in stats:
+            if name == "count":
+                built[name] = pd.array(counts, dtype="Int64")
+            else:
+                built[name] = pd.array(gathered[name], dtype="Float64")
+        return pd.DataFrame(built, index=pd.Index(geoids.to_numpy(), name=Col.GEOID)), evidence
+
+    def _cells_under(self, handle: Any, geometry: Any, evidence: ZonalEvidence) -> np.ndarray:
+        """Every usable value whose cell centre falls inside one polygon.
+
+        `rasterio.mask` does the windowing, which is the part that is easy to get
+        wrong by hand -- a window rounded inward drops the boundary cells and
+        quietly returns a different mean, which is a mistake this session made
+        once while building the independent check. The shape mask is then
+        recomputed on the window it returned, because the masked array folds
+        "outside the polygon" and "nodata" into one mask and this module counts
+        them apart.
+        """
+        try:
+            window, window_transform = rasterio_mask.mask(
+                handle,
+                [geometry],
+                crop=True,
+                filled=False,
+                all_touched=ALL_TOUCHED,
+                indexes=[1],
+            )
+        except ValueError as exc:
+            if RASTER_NO_OVERLAP not in str(exc):
+                raise
+            evidence.outside_raster += 1
+            return np.empty(0, dtype="float64")
+
+        band = window[0]
+        inside = ~rasterio_features.geometry_mask(
+            [geometry],
+            band.shape,
+            window_transform,
+            all_touched=ALL_TOUCHED,
+            invert=False,
+        )
+        nodata = np.ma.getmaskarray(band)
+        data = np.asarray(band.data, dtype="float64")
+        finite = np.isfinite(data)
+        evidence.cells += int(inside.sum())
+        evidence.nodata_cells += int((inside & nodata).sum())
+        evidence.non_finite_cells += int((inside & ~nodata & ~finite).sum())
+        return data[inside & ~nodata & finite]
+
+    def _statistic(self, name: str, values: np.ndarray) -> float | None:
+        """One reduction over the cells of one polygon, or None if it had none.
+
+        None rather than zero, and nullable rather than a nan inside a float
+        column: a polygon the raster does not cover has no minimum elevation,
+        and a zero there would read downstream as sea level.
+        """
+        if values.size == 0:
+            return None
+        if name == "min":
+            return float(values.min())
+        if name == "mean":
+            return float(values.mean())
+        if name == "max":
+            return float(values.max())
+        raise ValueError(f"no reduction named {name!r}")
 
     # -- the whole snapshot --------------------------------------------------
 
@@ -861,9 +1413,7 @@ class Alignment:
             registry.load_manifest()
 
         report = AlignmentReport()
-        evidence = AlignmentEvidence(
-            datasets=tuple(registry.names()), deferred=dict(DEFERRED_FIELDS)
-        )
+        evidence = AlignmentEvidence(datasets=tuple(registry.names()))
         frames: dict[str, Any] = {}
         canonical: dict[str, list[str]] = {}
 
@@ -973,10 +1523,110 @@ class Alignment:
             report.warnings.extend(sub.warnings)
             evidence.joins.append(join)
 
-        for name, owner in sorted(evidence.deferred.items()):
+        tracts_key = f"{acquire.DATASET_TRACTS}{JOINED_SUFFIX}"
+        groups_key = f"{acquire.DATASET_BLOCK_GROUPS}{JOINED_SUFFIX}"
+        apportionable = (
+            tracts_key in frames
+            and groups_key in frames
+            and len(frames[tracts_key]) > 0
+            and len(frames[groups_key]) > 0
+        )
+        if apportionable:
+            _, apportion = self.apportion_detailed(
+                frames[groups_key],
+                frames[tracts_key],
+                [Col.POPULATION],
+                method="sum",
+                fine_name=groups_key,
+                coarse_name=tracts_key,
+            )
+            evidence.apportionments.append(apportion)
+            for column in apportion.columns:
+                report.apportioned[column] = apportion.method_note
+            report.apportionment_error.update(apportion.error)
+            for column in apportion.not_published:
+                report.warnings.append(
+                    f"{column} was rolled up from {groups_key} but {tracts_key} publishes "
+                    "no value for it, so there is an aggregate here and no error beside it"
+                )
+            if apportion.orphan_children:
+                report.warnings.append(
+                    f"{groups_key}: {apportion.orphan_children} of {apportion.fine_rows} "
+                    f"unit(s) carry a {Col.GEOID} whose parent is absent from {tracts_key}, "
+                    "so their values are in no aggregate"
+                )
+            if apportion.childless_parents:
+                report.warnings.append(
+                    f"{tracts_key}: {apportion.childless_parents} of "
+                    f"{apportion.coarse_rows} unit(s) have no finer unit nested inside "
+                    "them and were not compared"
+                )
+            for column, count in apportion.incomplete.items():
+                if count:
+                    report.warnings.append(
+                        f"{column}: {count} of {apportion.parents} aggregate(s) carry no "
+                        "value because a finer unit inside them carries none; a partial "
+                        "sum would read as a smaller unit rather than as a suppression"
+                    )
+
+        else:
             report.warnings.append(
-                f"{name} is not filled by this stage and its value here is a placeholder, "
-                f"not a result: {owner}"
+                "apportioned and apportionment_error are empty because no pair of "
+                "granularities was available to roll up, not because a rollup ran and "
+                "found nothing to correct. A join that matched nothing returns an empty "
+                "layer rather than raising, and an empty layer cannot be apportioned"
+            )
+
+        rasters = [
+            record
+            for record in registry.records()
+            if record.kind == "raster" and not is_degraded(record.provenance)
+        ]
+        for record in rasters:
+            for key in (tracts_key, groups_key):
+                if key not in frames:
+                    continue
+                measured, zonal = self.zonal_stats_detailed(
+                    record.path,
+                    frames[key],
+                    stats=tuple(RASTER_STAT_COLUMNS),
+                    dataset=key,
+                )
+                evidence.zonals.append(zonal)
+                report.units_below_cell_threshold += zonal.below_threshold
+                if record.name == acquire.DATASET_ELEVATION:
+                    frames[key] = frames[key].join(
+                        measured.rename(columns=RASTER_STAT_COLUMNS), on=Col.GEOID
+                    )
+                if zonal.below_threshold:
+                    report.warnings.append(
+                        f"{key}: {zonal.below_threshold} of {zonal.polygons} unit(s) cover "
+                        f"fewer than {zonal.threshold} cells of {zonal.raster}; a zonal "
+                        "statistic over that few cells is not trustworthy"
+                    )
+                if zonal.empty_polygons:
+                    report.warnings.append(
+                        f"{key}: {zonal.empty_polygons} of {zonal.polygons} unit(s) contain "
+                        f"no cell centre of {zonal.raster} at all and carry no value rather "
+                        "than a zero"
+                    )
+                if zonal.outside_raster:
+                    report.warnings.append(
+                        f"{key}: {zonal.outside_raster} of {zonal.polygons} unit(s) fall "
+                        f"outside the extent of {zonal.raster}; that is a gap in the "
+                        "retrieved coverage, not flat ground"
+                    )
+                if zonal.nodata_cells or zonal.non_finite_cells:
+                    report.warnings.append(
+                        f"{key}: {zonal.nodata_cells} nodata and "
+                        f"{zonal.non_finite_cells} non-finite cell(s) of {zonal.cells} "
+                        f"inside these units were excluded from every statistic"
+                    )
+        if not evidence.zonals:
+            report.warnings.append(
+                f"units_below_cell_threshold is {report.units_below_cell_threshold} because "
+                "no raster was measured, not because every unit cleared the threshold; the "
+                "registry holds no usable raster for this study area"
             )
 
         return AlignedSnapshot(frames=frames, report=report, evidence=evidence)
@@ -1078,10 +1728,81 @@ def format_report(
         )
 
     out.append("")
-    out.append("  not filled by this session -- three states, not two:")
-    for name, owner in sorted(evidence.deferred.items()):
-        current = getattr(report, name)
-        out.append(f"      {name:<27} {str(current):<9} {owner}")
+    out.append(
+        _line(
+            "apportioned",
+            len(report.apportioned),
+            f"column(s) rolled up from a finer geography, over "
+            f"{evidence.units_apportioned} finer unit(s)",
+        )
+    )
+    for item in evidence.apportionments:
+        out.append(f"      {item.method_note}")
+        if item.not_published:
+            out.append(
+                f"      aggregated but not published at the coarse level, so not compared: "
+                f"{list(item.not_published)}"
+            )
+        out.append(
+            f"      {item.orphan_children} child unit(s) with no parent, "
+            f"{item.childless_parents} parent(s) with no child, "
+            f"{sum(item.incomplete.values())} aggregate(s) suppressed by a missing child"
+        )
+
+    if report.apportionment_error:
+        error_note = (
+            "worst unit, not the county total -- a maximum cannot cancel the way a sum can"
+        )
+    elif not evidence.apportionments:
+        error_note = "NOTHING WAS APPORTIONED -- no pair of granularities to roll up"
+    else:
+        error_note = "no column carried a published coarse value to compare against"
+
+    out.append(_line("apportionment_error", dict(report.apportionment_error), error_note))
+    for item in evidence.apportionments:
+        for column in item.compared:
+            compared = item.units_compared.get(column, 0)
+            undefined = item.units_undefined.get(column, 0)
+            out.append(
+                f"      {column:<21} max |aggregated - published| = "
+                f"{item.max_abs_difference.get(column, 0.0):,.6g} over {compared} unit(s); "
+                f"{item.total_fine.get(column, 0.0):,.0f} aggregated against "
+                f"{item.total_coarse.get(column, 0.0):,.0f} published"
+            )
+            out.append(
+                f"      {'':21} the % is taken over the {compared - undefined} unit(s) "
+                f"publishing a non-zero value; {undefined} publish zero, where a relative "
+                "error has no meaning and the absolute difference above is the real number"
+            )
+            if column == Col.POPULATION and not item.max_abs_difference.get(column, 1.0):
+                out.append(f"      {'':21} {CONTROLLED_TO_TRACT} not")
+
+    below_note = (
+        f"of {evidence.polygons_measured} polygon(s) over {len(evidence.zonals)} layer(s), "
+        f"threshold {MIN_RASTER_CELLS} cells"
+        if evidence.zonals
+        else "NOTHING WAS MEASURED -- the registry holds no usable raster"
+    )
+    out.append(
+        _line("units_below_cell_threshold", report.units_below_cell_threshold, below_note)
+    )
+    for item in evidence.zonals:
+        out.append(
+            f"      {item.dataset:<21} {item.polygons} polygon(s) over {item.raster}: "
+            f"smallest covers {item.min_cells} cell(s), median {item.median_cells:,.0f}, "
+            f"largest {item.max_cells:,}"
+        )
+        out.append(
+            f"      {'':21} {item.cells:,} cell centre(s) inside them = "
+            f"{item.valid_cells:,} usable + {item.nodata_cells} nodata + "
+            f"{item.non_finite_cells} non-finite; {item.empty_polygons} polygon(s) held "
+            f"none, {item.outside_raster} fell outside the raster"
+        )
+        out.append(
+            f"      {'':21} {item.cell_size_m:.4f} m cells of {item.cell_area_m2:,.1f} m2 "
+            f"in {item.raster_crs}, all_touched={item.all_touched} -- a cell belongs to "
+            "the polygon its centre falls in, which is the rule the check verified"
+        )
 
     out.append("")
     out.append(
@@ -1584,6 +2305,496 @@ def _join_checks(aligner: Alignment) -> list[tuple[str, bool]]:
     ]
 
 
+def _projected_anchor(aligner: Alignment) -> tuple[float, float]:
+    """A point in working-CRS metres to hang a synthetic raster on.
+
+    Derived from the working CRS's own area of use, like every other fixture in
+    this file, so the module still contains no coordinate literal and a fixture
+    raster lands somewhere the CRS is actually defined.
+    """
+    lon, lat = _fixture_point(aligner.working_crs)
+    placed = aligner.to_working_crs(gpd.GeoSeries([Point(lon, lat)], crs=config.STORAGE_CRS))
+    return float(placed.iloc[0].x), float(placed.iloc[0].y)
+
+
+def _write_raster(
+    path: Path, values: np.ndarray, x0: float, y0: float, cell: float, crs: str | None
+) -> Path:
+    """Write a small GeoTIFF whose every cell value this file chose.
+
+    The point of a fixture raster is that the right answer is arithmetic rather
+    than another run of the code under test: a polygon over four known cells has
+    a mean this file can state in the check itself.
+    """
+    transform = rasterio.transform.from_origin(x0, y0 + values.shape[0] * cell, cell, cell)
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        height=values.shape[0],
+        width=values.shape[1],
+        count=1,
+        dtype="float32",
+        crs=crs,
+        transform=transform,
+        nodata=FIXTURE_NODATA,
+    ) as handle:
+        handle.write(values.astype("float32"), 1)
+    return path
+
+
+FIXTURE_NODATA = -9999.0
+FIXTURE_CELL = 100.0
+FIXTURE_SIDE = 10
+
+
+def _box(x0: float, y0: float, x1: float, y1: float) -> Polygon:
+    return Polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)])
+
+
+def _zonal_checks(aligner: Alignment) -> list[tuple[str, bool]]:
+    """Verify zonal statistics twice: against arithmetic, and against the county.
+
+    Two independent verifications, because they catch different things. The
+    synthetic raster has values this file chose, so the expected minimum, mean,
+    maximum and count are stated here as numbers rather than read off a run --
+    that is what catches a reduction applied to the wrong cells. The county
+    raster is then checked against a cell-centre point-in-polygon average
+    computed here with shapely and numpy, never calling `zonal_stats` -- that is
+    what catches the windowing, which is the part that is easy to get subtly
+    wrong and impossible to notice from a plausible-looking mean.
+    """
+    import tempfile
+
+    x0, y0 = _projected_anchor(aligner)
+    cell, side = FIXTURE_CELL, FIXTURE_SIDE
+    values = np.arange(side * side, dtype="float64").reshape(side, side)
+    values[5][5] = FIXTURE_NODATA
+    values[5][6] = np.nan
+
+    root = Path(tempfile.mkdtemp(prefix="zonal_check_"))
+    good = _write_raster(root / "fixture.tif", values, x0, y0, cell, aligner.working_crs)
+    top = y0 + side * cell
+
+    quad = _box(x0 + 1, top - 2 * cell + 1, x0 + 2 * cell - 1, top - 1)
+    holed = _box(x0 + 5 * cell + 1, top - 6 * cell + 1, x0 + 9 * cell - 1, top - 5 * cell - 1)
+    single = _box(x0 + 9 * cell + 1, top - 10 * cell + 1, x0 + 10 * cell - 1, top - 9 * cell - 1)
+    away = _box(x0 + 500 * cell, top + 500 * cell, x0 + 501 * cell, top + 501 * cell)
+    wide = _box(x0 + 1, top - 3 * cell + 1, x0 + side * cell - 1, top - 1)
+
+    polygons = _frame(
+        [quad, holed, single, away, wide],
+        ["01001000100", "01001000200", "01001000300", "01001000400", "01001000500"],
+        aligner.working_crs,
+    )
+    measured, evidence = aligner.zonal_stats_detailed(
+        good, polygons, stats=("min", "mean", "max", "count"), dataset="fixture"
+    )
+
+    quad_row = measured.loc["01001000100"]
+    holed_row = measured.loc["01001000200"]
+    single_row = measured.loc["01001000300"]
+    away_row = measured.loc["01001000400"]
+    wide_row = measured.loc["01001000500"]
+
+    print(
+        f"zonal fixture: a {side}x{side} raster of known values at "
+        f"{x0:,.0f}, {y0:,.0f} in {aligner.working_crs}"
+    )
+    print(
+        f"  four cells holding 0, 1, 10, 11 -> min {quad_row['min']} mean {quad_row['mean']} "
+        f"max {quad_row['max']} count {quad_row['count']}   (expected 0, 5.5, 11, 4)"
+    )
+    print(
+        f"  four cells, one nodata and one nan -> count {holed_row['count']} "
+        f"mean {holed_row['mean']}   (expected 2, 57.5)"
+    )
+    print(
+        f"  three whole rows, holding 0 to 29 -> mean {wide_row['mean']} "
+        f"count {wide_row['count']}   (expected 14.5, 30)"
+    )
+    print(
+        f"  cells inside {evidence.cells}, of which {evidence.nodata_cells} nodata and "
+        f"{evidence.non_finite_cells} non-finite; {evidence.outside_raster} polygon(s) "
+        f"missed the raster entirely; {evidence.below_threshold} of {evidence.polygons} "
+        f"fall under the {evidence.threshold}-cell threshold"
+    )
+
+    def refusal(call: Any, kind: Any, phrase: str) -> bool:
+        """Did this call refuse for the stated reason, rather than merely raise?
+
+        The phrase is not decoration. Removing the unsupported-statistic guard
+        leaves the reduction itself raising ValueError, so a check that asked
+        only for the type would pass over a module that had lost the guard.
+        """
+        try:
+            call()
+        except kind as exc:
+            return phrase in str(exc)
+        except Exception:
+            return False
+        return False
+
+    class _HostileHandle:
+        """A dataset handle whose every use fails, and not because of overlap.
+
+        `rasterio.mask` raises ValueError for a polygon that misses the raster,
+        which `_cells_under` records as a fact about the county. Nothing reachable
+        through a geometry makes it raise ValueError for any OTHER reason -- a
+        closed dataset gives RasterioIOError, a degenerate polygon an IndexError --
+        so the discipline of matching the message cannot be exercised through the
+        public interface. This stub exercises it directly: the policy under test is
+        this module's, not rasterio's.
+        """
+
+        def __getattr__(self, name: str) -> Any:
+            raise ValueError("a failure that is not about overlap")
+
+    hostile_evidence = ZonalEvidence()
+
+    def hostile_propagates() -> bool:
+        try:
+            aligner._cells_under(_HostileHandle(), quad, hostile_evidence)
+        except ValueError as exc:
+            return (
+                "not about overlap" in str(exc)
+                and hostile_evidence.outside_raster == 0
+            )
+        return False
+
+    crossed = _write_raster(
+        root / "wrong_crs.tif", values, x0, y0, cell, config.STORAGE_CRS
+    )
+    homeless = _write_raster(root / "no_crs.tif", values, x0, y0, cell, None)
+
+    repeated = _frame(
+        [quad, holed], ["01001000100", "01001000100"], aligner.working_crs
+    )
+    keyless = gpd.GeoDataFrame({"value": [1]}, geometry=[quad], crs=aligner.working_crs)
+
+    checks: list[tuple[str, bool]] = [
+        ("a statistic over four cells this file chose equals the arithmetic on those cells",
+         float(quad_row["min"]) == 0.0
+         and float(quad_row["mean"]) == 5.5
+         and float(quad_row["max"]) == 11.0
+         and int(quad_row["count"]) == 4),
+        ("nodata and a nan inside a polygon are excluded from the statistics, not summed",
+         int(holed_row["count"]) == 2 and float(holed_row["mean"]) == 57.5),
+        ("and they are counted apart, so a raster hole does not shrink a denominator unseen",
+         evidence.nodata_cells == 1 and evidence.non_finite_cells == 1),
+        ("a second statistic over thirty known cells also equals the arithmetic on them",
+         float(wide_row["mean"]) == 14.5
+         and int(wide_row["count"]) == 30
+         and float(wide_row["max"]) == 29.0),
+        ("every cell centre inside a polygon is one of usable, nodata or non-finite",
+         evidence.cells == 4 + 4 + 1 + 0 + 30
+         and evidence.valid_cells == evidence.cells - 2),
+        ("a polygon covering fewer cells than the threshold is counted, so the live zero can move",
+         evidence.below_threshold == 4 and int(single_row["count"]) == 1),
+        ("and the polygon that clears the threshold is not counted, so the flag discriminates",
+         evidence.polygons == 5 and int(wide_row["count"]) >= MIN_RASTER_CELLS),
+        ("a polygon that misses the raster is recorded and does not end the run",
+         evidence.outside_raster == 1 and int(away_row["count"]) == 0),
+        ("a failure that is NOT about overlap is re-raised, not filed under outside the raster",
+         hostile_propagates()),
+        ("a polygon with no cells carries no value rather than a zero that reads as sea level",
+         pd.isna(away_row["min"]) and pd.isna(away_row["mean"])),
+        ("counts come back as a nullable integer and statistics as nullable floats",
+         str(measured["count"].dtype) == "Int64"
+         and {str(measured[name].dtype) for name in ("min", "mean", "max")} == {"Float64"}),
+        ("the result is indexed by GEOID and carries exactly the statistics asked for",
+         measured.index.name == Col.GEOID
+         and list(measured.columns) == ["min", "mean", "max", "count"]),
+        ("asking for a subset returns that subset, in the order requested",
+         list(aligner.zonal_stats(good, polygons, stats=("count", "min")).columns)
+         == ["count", "min"]),
+        ("a raster in a different CRS is refused rather than silently warped",
+         refusal(lambda: aligner.zonal_stats(crossed, polygons), ValueError,
+                 "is stored in")),
+        ("a raster with no CRS at all is refused",
+         refusal(lambda: aligner.zonal_stats(homeless, polygons), ValueError,
+                 "carries no CRS on disk")),
+        ("a statistic this module does not compute is refused by name",
+         refusal(lambda: aligner.zonal_stats(good, polygons, stats=("median",)), ValueError,
+                 "does not compute")),
+        ("asking for no statistic at all is refused",
+         refusal(lambda: aligner.zonal_stats(good, polygons, stats=()), ValueError,
+                 "no statistic at all")),
+        ("a raster path that does not exist is refused before anything is read",
+         refusal(lambda: aligner.zonal_stats(root / "absent.tif", polygons),
+                 FileNotFoundError, "does not exist")),
+        ("a repeated GEOID is refused, since the result is indexed by it",
+         refusal(lambda: aligner.zonal_stats(good, repeated), ValueError,
+                 "rows repeat a")),
+        ("a frame with no GEOID column is refused",
+         refusal(lambda: aligner.zonal_stats(good, keyless), KeyError,
+                 "column to index the result by")),
+        ("a plain table is refused",
+         refusal(lambda: aligner.zonal_stats(good, pd.DataFrame({Col.GEOID: ["A"]})),
+                 TypeError, "needs a GeoDataFrame of polygons")),
+    ]
+
+    registry = aligner.registry
+    elevation = [record for record in registry.records() if record.kind == "raster"]
+    if not elevation:
+        return checks
+
+    snapshot_frames = aligner.align_snapshot().frames
+    tracts = snapshot_frames.get(f"{acquire.DATASET_TRACTS}{JOINED_SUFFIX}")
+    if tracts is None or not len(tracts):
+        return checks
+
+    smallest = tracts.loc[tracts.geometry.area.idxmin()]
+    geometry = smallest.geometry
+    named = str(smallest[Col.GEOID])
+    truth = _independent_zonal(elevation[0].path, geometry)
+    computed = aligner.zonal_stats(
+        elevation[0].path,
+        tracts.loc[[smallest.name]],
+        stats=("min", "mean", "max", "count"),
+    ).iloc[0]
+
+    agrees = (
+        int(truth["count"]) == int(computed["count"])
+        and abs(float(truth["mean"]) - float(computed["mean"])) < 1e-9
+        and abs(float(truth["min"]) - float(computed["min"])) < 1e-9
+        and abs(float(truth["max"]) - float(computed["max"])) < 1e-9
+    )
+    print(
+        f"zonal county: GEOID {named}, the smallest tract by area. Selected by rank at run "
+        "time, so the identifier is printed from the data and never written into this file"
+    )
+    print(
+        f"  independent centre-in-polygon (shapely + numpy, not zonal_stats): "
+        f"n={int(truth['count'])} min={truth['min']:.8f} mean={truth['mean']:.8f} "
+        f"max={truth['max']:.8f}"
+    )
+    print(
+        f"  zonal_stats:                                                     "
+        f"n={int(computed['count'])} min={float(computed['min']):.8f} "
+        f"mean={float(computed['mean']):.8f} max={float(computed['max']):.8f}"
+    )
+
+    checks.append(
+        ("a real polygon's zonal statistics match a value computed independently of this module",
+         agrees)
+    )
+    checks.append(
+        ("that independent check ran over a real number of cells, not an empty polygon",
+         int(truth["count"]) > MIN_RASTER_CELLS)
+    )
+    return checks
+
+
+def _independent_zonal(raster_path: Path, geometry: Any) -> dict[str, float]:
+    """Average a raster inside one polygon without calling `zonal_stats`.
+
+    Deliberately a different route to the same number: a window read generously
+    and padded rather than fitted, cell centres built from the transform by hand,
+    and shapely asked one point at a time. Slow, and that is fine for one
+    polygon. An earlier draft of this function padded nothing and quietly lost
+    the boundary cells, which is exactly the mistake it exists to catch -- so the
+    padding here is load-bearing, not defensive.
+    """
+    pad = 3
+    with rasterio.open(raster_path) as handle:
+        fitted = rasterio.windows.from_bounds(*geometry.bounds, transform=handle.transform)
+        window = rasterio.windows.Window(
+            int(np.floor(fitted.col_off)) - pad,
+            int(np.floor(fitted.row_off)) - pad,
+            int(np.ceil(fitted.width)) + 2 * pad,
+            int(np.ceil(fitted.height)) + 2 * pad,
+        )
+        block = handle.read(1, window=window, boundless=True, fill_value=handle.nodata)
+        transform = handle.window_transform(window)
+        nodata = handle.nodata
+
+    rows, cols = block.shape
+    grid_rows, grid_cols = np.mgrid[0:rows, 0:cols]
+    xs = transform.c + (grid_cols + 0.5) * transform.a
+    ys = transform.f + (grid_rows + 0.5) * transform.e
+    inside = np.array(
+        [
+            [geometry.contains(Point(float(xs[r, c]), float(ys[r, c]))) for c in range(cols)]
+            for r in range(rows)
+        ]
+    )
+    picked = block[inside].astype("float64")
+    picked = picked[np.isfinite(picked)]
+    if nodata is not None:
+        picked = picked[picked != nodata]
+    if not picked.size:
+        return {"count": 0.0, "min": float("nan"), "mean": float("nan"), "max": float("nan")}
+    return {
+        "count": float(picked.size),
+        "min": float(picked.min()),
+        "mean": float(picked.mean()),
+        "max": float(picked.max()),
+    }
+
+
+def _apportion_checks(aligner: Alignment) -> list[tuple[str, bool]]:
+    """Roll up frames built so the answer is known before the call is made.
+
+    The live county cannot exercise this. Block-group population is controlled
+    to sum to the tract estimate, so the real apportionment error is exactly
+    zero, and a machine that returned zero unconditionally would look identical.
+    These fixtures disagree on purpose, by a margin stated here as arithmetic.
+    """
+    children = ["010010001001", "010010001002", "010010002001", "010010002002"]
+    parents = ["01001000100", "01001000200"]
+
+    fine = pd.DataFrame(
+        {
+            Col.GEOID: children,
+            Col.POPULATION: [100, 150, 120, 80],
+            Col.PCT_POVERTY: [10.0, 50.0, 25.0, 25.0],
+        }
+    )
+    coarse = pd.DataFrame(
+        {Col.GEOID: parents, Col.POPULATION: [300, 200], Col.PCT_POVERTY: [34.0, 25.0]}
+    )
+
+    rolled, wrong = aligner.apportion_detailed(
+        fine, coarse, [Col.POPULATION], method="sum", fine_name="fixture", coarse_name="parent"
+    )
+    expected_error = 100.0 * 50.0 / 300.0
+
+    agreeing = coarse.copy()
+    agreeing[Col.POPULATION] = [250, 200]
+    _, right = aligner.apportion_detailed(fine, agreeing, [Col.POPULATION], method="sum")
+
+    weighted, weighted_evidence = aligner.apportion_detailed(
+        fine, coarse, [Col.PCT_POVERTY], method="population_weighted"
+    )
+    summed, _ = aligner.apportion_detailed(fine, coarse, [Col.PCT_POVERTY], method="sum")
+
+    zeroed = coarse.copy()
+    zeroed[Col.POPULATION] = [250, 0]
+    _, zero_evidence = aligner.apportion_detailed(fine, zeroed, [Col.POPULATION], method="sum")
+
+    suppressed = fine.copy()
+    suppressed[Col.POPULATION] = pd.array([100, None, 120, 80], dtype="Int64")
+    gapped, gap_evidence = aligner.apportion_detailed(
+        suppressed, agreeing, [Col.POPULATION], method="sum"
+    )
+
+    orphaned = pd.concat(
+        [
+            fine,
+            pd.DataFrame(
+                {Col.GEOID: ["010010009001"], Col.POPULATION: [10], Col.PCT_POVERTY: [1.0]}
+            ),
+        ],
+        ignore_index=True,
+    )
+    _, orphan_evidence = aligner.apportion_detailed(
+        orphaned, coarse, [Col.POPULATION], method="sum"
+    )
+
+    unpublished = coarse.drop(columns=[Col.PCT_POVERTY])
+    _, unpublished_evidence = aligner.apportion_detailed(
+        fine, unpublished, [Col.POPULATION, Col.PCT_POVERTY], method="sum"
+    )
+
+    def refusal(call: Any, kind: Any, phrase: str) -> bool:
+        """Did this call refuse for the stated reason? See `_zonal_checks`."""
+        try:
+            call()
+        except kind as exc:
+            return phrase in str(exc)
+        except Exception:
+            return False
+        return False
+
+    mixed = pd.DataFrame(
+        {Col.GEOID: ["010010001001", "01001000200"], Col.POPULATION: [1, 2]}
+    )
+    repeated = pd.DataFrame({Col.GEOID: parents[:1] * 2, Col.POPULATION: [1, 2]})
+
+    print(
+        f"apportion fixture: children summing to 250 and 200 against published 300 and 200 "
+        f"-> max per-unit error {wrong.error.get(Col.POPULATION, -1):.4f}% "
+        f"(expected {expected_error:.4f}%), max abs "
+        f"{wrong.max_abs_difference.get(Col.POPULATION, -1):.0f} (expected 50)"
+    )
+    print(
+        f"  a rate over populations 100 and 150: weighted "
+        f"{float(weighted[Col.PCT_POVERTY].iloc[0]):.4f} (expected 34.0), "
+        f"summed {float(summed[Col.PCT_POVERTY].iloc[0]):.4f} (expected 60.0) -- "
+        "the two methods are not interchangeable and only one is right for a share"
+    )
+
+    return [
+        ("children that do not sum to the published parent produce the exact error expected",
+         abs(wrong.error[Col.POPULATION] - expected_error) < 1e-9
+         and wrong.max_abs_difference[Col.POPULATION] == 50.0),
+        ("the same call on agreeing frames reports zero, so the live zero is a result",
+         right.error[Col.POPULATION] == 0.0
+         and right.units_compared[Col.POPULATION] == 2),
+        ("the error is the worst unit, not the county total, so opposite errors cannot cancel",
+         abs(wrong.error[Col.POPULATION] - expected_error) < 1e-9
+         and wrong.total_fine[Col.POPULATION] != wrong.total_coarse[Col.POPULATION]),
+        ("a population-weighted share equals the weighted mean computed by hand",
+         abs(float(weighted[Col.PCT_POVERTY].iloc[0]) - 34.0) < 1e-9),
+        ("and summing that same share gives a different, wrong answer, so the weighting is real",
+         abs(float(summed[Col.PCT_POVERTY].iloc[0]) - 60.0) < 1e-9),
+        ("the weighted call records which column it weighted by",
+         weighted_evidence.weight_column == Col.POPULATION),
+        ("a unit publishing zero is excluded from the percentage and counted, not dropped",
+         zero_evidence.units_undefined[Col.POPULATION] == 1
+         and zero_evidence.units_compared[Col.POPULATION] == 2
+         and zero_evidence.error[Col.POPULATION] == 0.0),
+        ("a suppressed child suppresses its parent rather than shrinking it to a partial sum",
+         bool(pd.isna(gapped[Col.POPULATION].iloc[0]))
+         and gap_evidence.incomplete[Col.POPULATION] == 1
+         and gap_evidence.units_compared[Col.POPULATION] == 1),
+        ("a child whose parent is absent is counted rather than silently left out",
+         orphan_evidence.orphan_children == 1
+         and orphan_evidence.fine_rows == len(fine) + 1),
+        ("a column the coarse frame does not publish is aggregated but named as uncompared",
+         unpublished_evidence.not_published == (Col.PCT_POVERTY,)
+         and unpublished_evidence.compared == (Col.POPULATION,)),
+        ("the rollup width is read from the coarse GEOIDs rather than written down",
+         wrong.fine_width == 12 and wrong.coarse_width == 11 and wrong.parents == 2),
+        ("the protocol wrapper returns the same error dict the evidence carries",
+         aligner.apportion(fine, coarse, [Col.POPULATION], method="sum")[1] == wrong.error),
+        ("weighting a population by itself is refused rather than answered",
+         refusal(
+             lambda: aligner.apportion(fine, coarse, [Col.POPULATION],
+                                       method="population_weighted"),
+             ValueError,
+             "by itself",
+         )),
+        ("a method this module does not know is refused by name",
+         refusal(lambda: aligner.apportion(fine, coarse, [Col.POPULATION], method="mean"),
+                 ValueError, "does not know the method")),
+        ("rolling up no column at all is refused",
+         refusal(lambda: aligner.apportion(fine, coarse, [], method="sum"), ValueError,
+                 "no column at all")),
+        ("a column the fine frame does not carry is refused",
+         refusal(lambda: aligner.apportion(fine, coarse, ["absent"], method="sum"), KeyError,
+                 "column(s) the frame does not carry")),
+        ("a frame holding two geographic levels at once is refused",
+         refusal(lambda: aligner.apportion(mixed, coarse, [Col.POPULATION], method="sum"),
+                 ValueError, "more than one geographic level")),
+        ("apportioning a coarse frame into a finer one is refused, since it inverts the nesting",
+         refusal(lambda: aligner.apportion(coarse, fine, [Col.POPULATION], method="sum"),
+                 ValueError, "must be the longer identifier")),
+        ("a repeated coarse GEOID is refused, since there is no single published value",
+         refusal(lambda: aligner.apportion(fine, repeated, [Col.POPULATION], method="sum"),
+                 ValueError, "rows repeat a")),
+        ("an empty fine frame is refused as having no rows, not as a granularity mismatch",
+         refusal(lambda: aligner.apportion(fine.iloc[0:0], coarse, [Col.POPULATION],
+                                           method="sum"),
+                 ValueError, "carries no rows")),
+        ("and an empty coarse frame is refused the same way",
+         refusal(lambda: aligner.apportion(fine, coarse.iloc[0:0], [Col.POPULATION],
+                                           method="sum"),
+                 ValueError, "carries no rows")),
+    ]
+
+
 def _indicator_checks(
     clean: pd.DataFrame, tracts: Any, table_prov: Any
 ) -> tuple[list[str], list[str]]:
@@ -1762,10 +2973,13 @@ def _snapshot_checks(aligner: Alignment) -> list[tuple[str, bool]]:
         for name in (acquire.DATASET_TRACTS, acquire.DATASET_BLOCK_GROUPS)
         if f"{name}{JOINED_SUFFIX}" in snapshot.frames
     }
+    elevation_columns = set(RASTER_STAT_COLUMNS.values())
     expected_columns = {
         acquire.DATASET_TRACTS: {Col.GEOID, "geometry", Col.POPULATION, Col.POP_MOE}
-        | set(VULNERABILITY_INDICATORS),
-        acquire.DATASET_BLOCK_GROUPS: {Col.GEOID, "geometry", Col.POPULATION, Col.POP_MOE},
+        | set(VULNERABILITY_INDICATORS)
+        | elevation_columns,
+        acquire.DATASET_BLOCK_GROUPS: {Col.GEOID, "geometry", Col.POPULATION, Col.POP_MOE}
+        | elevation_columns,
     }
     coordinate_named = {
         name: {
@@ -1810,12 +3024,54 @@ def _snapshot_checks(aligner: Alignment) -> list[tuple[str, bool]]:
         "two sets happen to coincide, so neither test is asserted against the other"
     )
 
+    apportion = evidence.apportionments[0] if evidence.apportionments else None
+    zonal_by_layer = {item.dataset: item for item in evidence.zonals}
+    zero_published = int((tracts[Col.POPULATION] == 0).sum()) if tracts is not None else -1
+
+    prefix_width = apportion.coarse_width if apportion else 0
+    nested_units, cell_gap = 0, -1.0
+    if (
+        tracts is not None
+        and groups is not None
+        and prefix_width
+        and Col.RASTER_CELLS in tracts.columns
+        and Col.RASTER_CELLS in groups.columns
+    ):
+        per_tract = tracts.set_index(Col.GEOID)[Col.RASTER_CELLS].astype("Float64")
+        rolled_cells = groups.groupby(groups[Col.GEOID].str[:prefix_width])[
+            Col.RASTER_CELLS
+        ].sum()
+        cell_pair = pd.DataFrame(
+            {"tract": per_tract, "rolled": rolled_cells.astype("Float64")}
+        ).dropna()
+        nested_units = len(cell_pair)
+        if nested_units:
+            cell_gap = float((cell_pair["tract"] - cell_pair["rolled"]).abs().max())
+
+    measured_rasters = len({item.raster for item in evidence.zonals})
+    counts_agree = bool(zonal_by_layer) and all(
+        name in snapshot.frames
+        and Col.RASTER_CELLS in snapshot.frames[name].columns
+        and int(snapshot.frames[name][Col.RASTER_CELLS].sum()) == item.valid_cells
+        for name, item in zonal_by_layer.items()
+    )
+    elevation_named = bool(zonal_by_layer) and all(
+        elevation_columns <= set(snapshot.frames[name].columns)
+        for name in zonal_by_layer
+        if name in snapshot.frames
+    )
+
     print()
     print(format_report(report, evidence, aligner.study_area))
     print()
     print(
         f"cross-check: {evidence.geometries_examined} geometries examined against "
         f"{declared} features the manifest recorded at retrieval"
+    )
+    print(
+        f"cross-check: block group cell counts rolled up to {nested_units} tract(s) by "
+        f"GEOID prefix differ from the tract's own count by at most {cell_gap:g} cell(s) -- "
+        "the same nesting the population is checked through, applied to the raster"
     )
     print(
         f"cross-check: {tract_population:,} people totalled over tracts against "
@@ -1877,11 +3133,12 @@ def _snapshot_checks(aligner: Alignment) -> list[tuple[str, bool]]:
          actual_nulls == reported_nulls
          and (reported_nulls == 0
               or any("universe for that indicator is zero" in item for item in report.warnings))),
-        ("the deferred fields carry their placeholder status inside the frozen report",
-         all(
-             any(name in item and "placeholder" in item for item in report.warnings)
-             for name in DEFERRED_FIELDS
-         )),
+        ("the three fields session 7 owns hold measured results, not placeholder warnings",
+         report.apportioned != {}
+         and report.apportionment_error != {}
+         and evidence.units_apportioned > 0
+         and evidence.polygons_measured > 0
+         and not any("placeholder" in item for item in report.warnings)),
         ("every derived share re-derives to the same value through a different expression",
          len(recomputed) == len(VULNERABILITY_INDICATORS)),
         ("no numerator exceeds its own table total, which an over-matched pattern would",
@@ -1905,11 +3162,42 @@ def _snapshot_checks(aligner: Alignment) -> list[tuple[str, bool]]:
          share_dtypes == {"Float64"}),
         ("every degraded dataset quotes its own Provenance notes, not a message written here",
          quotes_provenance),
-        ("the fields session 7 owns are named as deferred rather than reported as clean",
-         set(evidence.deferred) == set(DEFERRED_FIELDS)
-         and report.apportioned == {}
-         and report.apportionment_error == {}
-         and report.units_below_cell_threshold == 0),
+        ("every tract's apportioned population equals its published one, unit by unit",
+         apportion is not None
+         and apportion.units_compared.get(Col.POPULATION, 0) == len(tracts)
+         and apportion.max_abs_difference.get(Col.POPULATION) == 0.0
+         and report.apportionment_error.get(Col.POPULATION) == 0.0),
+        ("the apportioned population equals the published total at the coarser granularity",
+         apportion is not None
+         and apportion.total_fine.get(Col.POPULATION, -1.0)
+         == apportion.total_coarse.get(Col.POPULATION, -2.0)
+         and apportion.total_fine.get(Col.POPULATION, 0.0) > 0),
+        ("the unit publishing a zero population is excluded from the percentage and counted",
+         apportion is not None
+         and apportion.units_undefined.get(Col.POPULATION, -1) == zero_published),
+        ("no child unit was left out of an aggregate and no parent was left uncompared",
+         apportion is not None
+         and apportion.orphan_children == 0
+         and apportion.childless_parents == 0
+         and apportion.fine_rows == len(groups)
+         and apportion.parents == len(tracts)),
+        ("units_below_cell_threshold is zero exactly when the smallest polygon clears it",
+         evidence.polygons_measured > 0
+         and (report.units_below_cell_threshold == 0)
+         == (evidence.smallest_polygon_cells >= MIN_RASTER_CELLS)),
+        ("every polygon of both granularities was measured against every raster",
+         measured_rasters > 0
+         and evidence.polygons_measured
+         == (len(tracts) + len(groups)) * measured_rasters),
+        ("the cell counts in the layers sum to the usable cells the evidence recorded",
+         counts_agree),
+        ("block group cell counts roll up to tract cell counts through the same nesting",
+         nested_units == len(tracts) and cell_gap == 0.0),
+        ("no cell inside any unit was nodata or non-finite, over a real denominator",
+         sum(item.cells for item in evidence.zonals) > 0
+         and sum(item.nodata_cells + item.non_finite_cells for item in evidence.zonals) == 0),
+        ("the elevation statistics reached both joined layers under the names Col publishes",
+         elevation_named),
     ]
 
 
@@ -1945,26 +3233,28 @@ def _contract_checks(aligner: Alignment) -> list[tuple[str, bool]]:
         ("every signature matches contracts.py argument for argument", not mismatched)
     )
 
-    deferred_raise = 0
-    for call in (
-        lambda: aligner.apportion(None, None, [], method="sum"),
-        lambda: aligner.zonal_stats(Path("x.tif"), None),
-    ):
-        try:
-            call()
-        except NotImplementedError as exc:
-            deferred_raise += int("session 7" in str(exc))
-        except Exception:
-            pass
+    placeholders = [
+        name
+        for name in protocol_methods
+        if "NotImplementedError" in inspect.getsource(getattr(Alignment, name))
+    ]
+    for name in placeholders:
+        print(f"  still a placeholder: {name}")
     checks.append(
-        ("the two session-7 methods raise and name their session, rather than returning empty",
-         deferred_raise == 2)
+        ("no method on the protocol is still a placeholder that raises instead of answering",
+         not placeholders)
+    )
+    retired = "DEFERRED" "_FIELDS"
+    checks.append(
+        ("the module names no deferred field anywhere, having filled all three of them",
+         retired not in source and not hasattr(sys.modules[__name__], retired))
     )
 
     implementation = "".join(
         inspect.getsource(part)
         for part in (
             Alignment,
+            *EVIDENCE_RECORDS,
             is_degraded,
             census_jam_values,
             sentinel_label,
@@ -2033,14 +3323,7 @@ def _module_functions() -> list[tuple[str, Any]]:
         for name, member in vars(module).items()
         if inspect.isfunction(member) and member.__module__ == __name__
     ]
-    holders = (
-        Alignment,
-        RepairEvidence,
-        ScrubEvidence,
-        JoinEvidence,
-        AlignmentEvidence,
-        AlignedSnapshot,
-    )
+    holders = (Alignment, *EVIDENCE_RECORDS)
     for holder in holders:
         for name, member in vars(holder).items():
             if name.startswith("__"):
@@ -2081,6 +3364,10 @@ def _self_check() -> int:
     checks += _derive_checks(aligner)
     print()
     checks += _join_checks(aligner)
+    print()
+    checks += _zonal_checks(aligner)
+    print()
+    checks += _apportion_checks(aligner)
     checks += _snapshot_checks(aligner)
     print()
     checks += _contract_checks(aligner)

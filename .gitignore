@@ -22,3 +22,6 @@ outputs/*
 data/*.geojson
 data/snapshot/
 !data/.gitkeep
+
+# mutation harness backup, written and removed by mutate.py
+*.mutation-backup
