@@ -270,8 +270,22 @@ definition and excludes the `"very well"` cells.
 
 ## 4. Elevation raster — `elevation`
 
-- **VERIFIED 27 Aug 2026** — service reachable, `Image` capability present,
+- **VERIFIED 28 Aug 2026** — `exportImage` returned real GeoTIFF bytes at the
+  requested `imageSR`, not merely a reachable service. A 64×56 probe came back
+  as 66,748 bytes beginning `II*\x00`, `EPSG:5070`, `float32`, `nodata -9999`,
+  and the full study raster is on disk. `Image` capability present,
   `maxImageWidth`/`maxImageHeight` both 8000, native `wkid 102100`.
+- **The advertised 8000 × 8000 cap is not the operative one.** Measured the same
+  day: 3000×2366 (7.1 Mpx) succeeded, 4000×3154 (12.6 Mpx) returned HTTP 500
+  "Error exporting image", and 8000×6309 (50.5 Mpx) returned HTTP 504 after 90 s.
+  `acquire.MAX_EXPORT_PIXELS` therefore applies a second, lower budget before the
+  request, and `_raster_grid` coarsens against whichever cap binds and records
+  which one in Provenance. See `docs/failures.md`.
+- The study extent is **126,789 m × 99,978 m** in EPSG:5070, computed at run time
+  from the retrieved tract layer. An earlier planning note said 106,785 × 93,524;
+  four independent methods (pyproj corners, `transform_bounds` densified and not,
+  `rasterio.warp`) agree on the larger figure. The conclusion is unchanged — 10 m
+  needs 12,679 px and blows the cap either way — but do not reuse the old number.
 - `https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage`
 
 ```
@@ -286,15 +300,29 @@ definition and excludes the `"very well"` cells.
 &f=image
 ```
 
-- Choose `size` from the bbox extent and a target cell size (10–30 m is plenty).
-  A county at 10 m will exceed 8000 px in one dimension — compute the size, and
-  if it exceeds the cap either coarsen the cell size or tile. **Handle this in
-  code**, because the transfer county will have a different extent and a
-  hardcoded size is a hardcoded study area.
-- Response is a GeoTIFF body, not JSON. Check `Content-Type` before writing;
-  ArcGIS returns a JSON error body with HTTP 200 when a parameter is wrong,
-  which is a silent failure worth catching explicitly (and worth a
-  `docs/failures.md` entry the first time it happens).
+- Choose `size` from the bbox extent **reprojected into `imageSR` and measured
+  in metres**. A size computed from the degree span is invariant 2 broken
+  silently: the request succeeds, the raster is a handful of pixels, and only a
+  strange zonal statistic ever hints at it. `acquire._metric_bounds` refuses a
+  geographic or non-metre `out_sr` rather than computing anything.
+- A county at 10 m exceeds 8000 px in one dimension — compute the size, and if it
+  exceeds either cap, coarsen. **Handle this in code**, because the transfer
+  county will have a different extent and a hardcoded size is a hardcoded study
+  area. Coarsening shrinks both axes proportionally; clamping each axis to its
+  own cap would square off a rectangular county. Record the requested *and* the
+  effective cell size — a raster quietly coarser than asked for is a number the
+  paper would get wrong.
+- Response is a GeoTIFF body, not JSON. **Checking `Content-Type` is not enough,
+  and measurement is why:** an over-cap `size`, an invalid `imageSR` and a
+  three-number `bbox` each returned HTTP 200 with `Content-Type: image/tiff` and
+  a ~150-byte JSON error document. Both the status line and the header report
+  success. The TIFF magic bytes (`II*\x00` / `MM\x00*`, and the BigTIFF pair) are
+  the only discriminator, so `acquire._expect_image` tests those and hands a JSON
+  body to `_raise_for_arcgis_error` for the service's own reason. See
+  `docs/failures.md`.
+- Verify the written file, do not trust the request: open it with rasterio and
+  assert the CRS is what `imageSR` asked for and the transform's pixel size
+  matches the effective cell size. Same discipline as `_received_crs`.
 
 ### Inundation model
 
@@ -312,7 +340,11 @@ it delivers the raster-to-vector multiscale join that Track A actually names.
 
 ## 5. Critical facilities — `facilities`
 
-- **UNVERIFIED from this session** (standard endpoint, widely used).
+- **VERIFIED 28 Aug 2026** — the POST returned HTTP 200,
+  `Content-Type: application/json`, 477 elements over the study bbox (253 nodes
+  and 224 ways, every way carrying a `center`), across hospitals, schools,
+  community centres and fire stations. Vintage and licence are read out of
+  `osm3s.timestamp_osm_base` and `osm3s.copyright`, not composed.
 - `https://overpass-api.de/api/interpreter`, POST, body is Overpass QL.
 
 ```
@@ -329,9 +361,24 @@ out center tags;
   one place, in `acquire.fetch_osm`, and nowhere else.
 - Send a descriptive `User-Agent`. The public instance rate-limits; a 429 is a
   normal outcome and the retry path must handle it rather than treating it as
-  fatal.
+  fatal. 429 is already in `acquire._RETRYABLE_STATUS`, so the single retry
+  policy covers it — but the backoff budget is a few seconds and `/api/status`
+  reports slots freeing in tens of seconds, so what actually carries this dataset
+  under load is the caller's degradation path, not the retry.
 - `out center` gives ways a representative point, so nodes and ways can be
   treated uniformly as points.
+- **A `remark` in the body means the answer is truncated, and it arrives under
+  HTTP 200.** Measured 28 Aug: a memory-starved query returned 200, valid JSON,
+  zero elements and `remark: runtime error: Query ran out of memory`; a
+  time-limited one returned 133,069 elements *and* a remark. Nothing but the
+  remark separates a complete answer from a partial one, and a silently truncated
+  facilities layer reads as a county with fewer schools.
+  `acquire._raise_for_overpass_remark` refuses any response carrying one.
+- The tag filter is a **parameter** (`fetch_osm(bbox, tags)`), not a literal in
+  the retrieval layer; `acquire.FACILITY_TAGS` at the call site is the policy
+  choice. Values are Overpass regexes and are refused, not escaped, if they carry
+  a quote, a backslash or a control character — a tag value can reach the query
+  builder from a dataset attribute rather than from a person.
 
 ## 6. Hazard polygons — `flood_zones` *(optional, and useful precisely because it might fail)*
 
@@ -351,6 +398,17 @@ out center tags;
   raster hazard alone and the failure is logged. A pipeline that degrades
   gracefully and *says so* is criterion RB evidence; make sure the degradation
   path is exercised at least once on purpose.
+- **It failed for real on 28 Aug, and the run continued.** The bbox query matches
+  13,963 polygons, and the service answered
+  `HTTP 200 ... code 500: Error performing query operation`. `acquire` registered
+  an empty layer whose Provenance carries that sentence verbatim, and the other
+  six datasets landed. `--check` also forces the same path against an unresolvable
+  host so the recovery is tested rather than merely observed.
+- The cause is the same shape as section 4's: layer 28 publishes
+  `maxRecordCount: 2000` and cannot serve it. Measured at the same bbox —
+  2000 per page fails in 16 s, 500 fails in 14 s, **100 succeeds in 4 s**. A later
+  session that wants this layer should walk it at 100 per page (about 140 pages);
+  it is not worth nine minutes of every acquisition run for a supporting layer.
 
 ---
 
