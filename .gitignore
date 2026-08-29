@@ -25,3 +25,4 @@ data/snapshot/
 
 # mutation harness backup, written and removed by mutate.py
 *.mutation-backup
+data/snapshot-backup/
