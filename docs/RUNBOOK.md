@@ -8,30 +8,38 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Fri 28 Aug 12:33.
+Checked Sat 29 Aug 11:50, at the end of S6.
 
 | | |
 | --- | --- |
-| Plan | Day 1 = Thu 27 Aug, S1–S5. Day 2 = Fri 28 Aug, S6–S8. |
-| Reality | S1 only, committed Thu 18:25. S2–S5 not started. |
-| Built | `config`, `contracts`, `schemas`, `llm_client`, `agent`, `trace`, `tools` (empty) |
-| Missing | `provenance`, `registry`, `acquire`, `align`, `hazard`, `vulnerability`, `risk`, `pipeline`, `sandbox`, `critic`, `scenarios`, `faults`, `figures` |
+| Plan | Day 3 = Sat 29 Aug, S9-S11. |
+| Reality | S1-S6 committed. S6 finished Sat 29 Aug 11:50. |
+| Built | `config`, `contracts`, `schemas`, `llm_client`, `agent`, `trace`, `tools` (empty), `provenance`, `registry`, `acquire`, `align` |
+| Missing | `hazard`, `vulnerability`, `risk`, `sandbox`, `critic`, `scenarios`, `faults`, `figures` |
 
-**You are four sessions behind, on the afternoon of Day 2.** The plan told you to
-say this out loud rather than slide, so: at the end of Day 1 `python -m src.acquire`
-was supposed to produce a real snapshot. It does not exist yet.
+**You are two calendar days behind, on the morning of Day 3.** Eight sessions and
+18 hours remain (S7 2, S8 2.5, S9 2, S10 2.5, S11 2.5, S12 2, S13 2.5, S14 2),
+against 1.5 days to Sun 30 Aug. That does not fit, and the plan says to decide
+rather than slide.
 
-Re-phased, the four days become:
+**Decision: spend one paper day. Mon 31 Aug becomes a build day.** Compressing 18
+hours into 1.5 days is not real, and cutting a session is worse -- S6 and S7 are
+criterion RB and the plan gives them no cut line, S13's transfer run is a quarter
+of RB on its own, and S12's fault runs are criterion IR. The paper is a short
+paper and two days is enough for it.
 
 | Day | Sessions | Hours |
 | --- | --- | --- |
-| Fri 28 (today, from 12:30) | S2, S3, S4, S5, S6 | 7.5 |
-| Sat 29 | S7, S8, S9, S10 | 9 |
-| Sun 30 | S11, S12, S13, S14 | 9 |
+| Sat 29 (from 12:00) | S7, S8, S9 | 6.5 |
+| Sun 30 | S10, S11, S12 | 7 |
+| Mon 31 (was paper day 1) | S13, S14 | 4.5 |
+| Tue 1 - Wed 2 Sep | paper | -- |
+| Wed 3 Sep | submit | -- |
 
-Nothing is dropped, but the slack is gone and **S13's transfer run is the thing
-that dies first** if Saturday slips. Decide that on Saturday evening, not Sunday
-night.
+Deadline is Fri 4 Sep 11:59 PM AoE, so submitting Wed 3 keeps a full day of
+margin. **The next thing that dies is S14's figures, not S13's transfer run** --
+figures can be cut to the two the paper cannot do without. Decide that on Monday
+morning, not Monday night.
 
 ---
 
