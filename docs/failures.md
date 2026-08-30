@@ -895,3 +895,268 @@ county-independent.
 
 **Kept as a paper failure case?** Yes — §3.7, as the counterexample to the assumption
 that "runs on a second county" only needs to hold of the analysis code.
+
+## 2026-08-30 — the coordinate guard refused two keys in the tool it was written to protect (S9)
+
+**What happened.** `tools --check` failed on its first run, on the check that walks
+every tool's serialised result looking for a coordinate:
+
+```
+  [FAIL] no serialised result carries a coordinate, by key, by value or by shape
+    describe_alignment: result.geometry: key could name a coordinate
+    describe_alignment: result.geoid_audit.unmatched_geometry_side: key could name a coordinate
+```
+
+Neither key carried a coordinate. `result.geometry` held four repair counts, and
+`unmatched_geometry_side` held the GEOIDs that have a boundary and no attributes. But
+`pipeline.COORDINATE_PATTERN` matches `geometry` on an underscore boundary wherever it
+appears, and the rule the guard enforces is about what a key could name, not about what
+this particular key happens to hold today. A reviewer reading a model message cannot
+tell the two apart, and neither can the next person to put something in that field.
+
+**Where.** `describe_alignment` in `src/tools.py`; the pattern is
+`pipeline.COORDINATE_PATTERN`, imported rather than rewritten.
+
+**Why.** The keys were named after the thing they describe, which is the natural way to
+name them, and the guard had been written twenty minutes earlier by the same hand. This
+is the third session running in which a scan fired on its own author: S8's CRS scan
+caught a fixture that reprojected for itself, and the same session's study-area scan is
+what would have caught the county name that had been written into a docstring in this
+module — found by running that scan's own grep by hand before the check did.
+
+**Did the agent recover?** Yes, by renaming rather than by exempting. `geometry` became
+`repairs` and `unmatched_geometry_side` became `unmatched_boundary_side`, which say what
+the fields hold more precisely than the originals did. An exemption list would have
+reintroduced exactly the hole the guard closes, and would have had to be maintained by
+whoever adds the next field.
+
+**Kept as a paper failure case?** Yes — §3.7, filed with the S8 CRS-scan entry. The
+pattern worth reporting is that a mechanical guard written from an invariant catches its
+author before it catches anybody else, and that this is evidence the guard is real
+rather than decorative.
+
+## 2026-08-30 — a tool result was thirty-one kilobytes of provenance notes (S9)
+
+**What happened.** The same run failed a second check:
+
+```
+  [FAIL] no result is large enough to crowd the run's remaining turns
+  list_datasets           31,427 bytes serialised
+```
+
+`list_datasets` is the tool the system prompt tells the model to call first. It returned
+every registered dataset with its full `Provenance`, including the free-text `notes`
+each retrieval accumulates — which service paged short of its advertised
+`maxRecordCount`, which ACS variable was resolved by matching which label, what the
+error body said when FEMA answered HTTP 200 with an ArcGIS error. Across seven datasets
+that is thirty-one kilobytes, spent before the model has asked anything, out of a loop
+bounded at six iterations.
+
+Nothing about it is wrong. Every note is true, retrieved rather than written, and
+exactly the provenance invariant 6 exists to preserve. It was still a defect: the first
+tool call would have consumed most of the context the run had to reason in.
+
+**Where.** `_provenance` and `list_datasets` in `src/tools.py`.
+
+**Why.** Invariant 6 says every dataset carries a provenance record and criterion TU
+says the model must be able to cite its sources, so the obvious implementation returns
+the record. What neither says is that a model message has a budget, and that an index
+and a detail view are different things. No check in this project had ever measured the
+size of a tool result, because until this session there were no tool results.
+
+**Did the agent recover?** Yes. `_provenance` takes `with_notes`; `list_datasets` is an
+index and returns a note count, `describe_layer` is the detail view and returns the
+notes capped at six with the number withheld named beside them. Measured effect:
+`list_datasets` fell from 31,427 bytes to 3,491, and a check now asserts that no tool
+result exceeds twenty-four kilobytes, printing every result's size beside it so the
+figure is visible rather than merely asserted.
+
+**Kept as a paper failure case?** Yes — §3.7, as the one failure in this build that is
+about the interface between the analysis and the model rather than about the analysis.
+The honest form of the lesson is that "return the provenance" and "return a citable
+summary of the provenance" look like the same requirement and are not.
+
+## 2026-08-30 — a check demanded that two presets differ in the half they are designed to share (S9)
+
+**What happened.** Two more checks failed on the same run, both because the check was
+wrong and the code was right:
+
+```
+  [FAIL] naming a weighting on risk_scenario reaches the score, not only the label
+  [FAIL] the weights that were used are reported, whatever their source
+```
+
+The first picked "some preset other than the default" and asserted that its component
+weights differed. It picked `svi_themes`, which carries *identical* objective weights to
+`svi_equal` on purpose — that is the entire point of the pair, and the property S8's
+trade-off fix depends on. The assertion demanded a difference in the one place the two
+presets are built to agree.
+
+The second summed the reported weights and required them to equal one within 1e-9. The
+weights reported to the model are rounded to six decimal places for the message, and
+five rounded weights sum to 1.000002. The check was asserting that the reported number
+is the unrounded one, which it deliberately is not.
+
+**Where.** `_weighting_checks` in `src/tools.py`.
+
+**Why.** Both were written by reasoning about what ought to be true rather than by
+naming which property was under test. This is the third time in three sessions that a
+hand-written expected value has been the thing that was wrong — the S8 tie-rule entry
+and the S7 independent-check entry are the other two — and the direction of the failure
+is the same each time: the check failed loudly rather than passing vacuously, because
+each asserts that something must EXIST or must EQUAL a stated number.
+
+**Did the agent recover?** Yes, and by splitting the first check rather than loosening
+it. The presets are now selected by the property under test: the one whose objective
+weights match the default proves that a difference in indicator weights alone still
+moves the score, and the one whose objective weights differ proves that the moved
+weights are reported. Together they pin both halves of a weighting, which one comparison
+against one preset could not. The tolerance on the second is now 1e-5 with the rounding
+named beside it.
+
+**Kept as a paper failure case?** Yes — §3.7, beside the S8 entry. The count worth
+quoting is that of the five checks that failed on this module's first run, three were
+defects in the checks and two were defects in the code.
+
+## 2026-08-30 — four mutations survived, and three of them survived the same way (S9)
+
+**What happened.** `src/tools.py` reached 95 checks and `src/schemas.py` 36, all PASS,
+exit 0 on both. `python mutate.py tools schemas` then reported **30 of 34 caught**:
+
+```
+  SURVIVOR: tools:   a source URL is written here instead of quoted from the retrieval
+  SURVIVOR: schemas: a tool description is a placeholder rather than a sentence
+  SURVIVOR: schemas: every tool is marked pending, including the ones that work
+  SURVIVOR: schemas: the default weighting is no longer named as the default
+```
+
+Three of the four are one defect wearing three hats: **the assertion compared a function
+against itself**, so the mutation moved both sides and the comparison stayed true.
+
+1. *the source URL.* The check read `list_datasets`'s output and compared it against
+   `_provenance(record)` — the very helper that produced that output. Replacing
+   `source.source_url` with a literal changes both sides identically. Fixed by reading
+   the fields off the frozen `Provenance` dataclass instead, and keeping a second,
+   separate assertion for the SHAPE of the reported record so a dropped field still
+   fails.
+2. *every tool marked pending.* The check compared `build_tool_specs([one])` against
+   `TOOL_SPECS`, which is itself `build_tool_specs()`. A build that marks every tool
+   marks both, and "no other tool's description changed" passes. Fixed with two absolute
+   assertions: nothing carries the pending marker when nothing is pending, and only the
+   named tool carries it when one is.
+3. *the default weighting.* The check asked whether `DEFAULT_PRESET.name` appeared in the
+   argument's help text. It always does — the help lists every legal preset name, and
+   the default is one of them. Deleting the sentence that says WHICH one is the default
+   left the name in the list and the check passed. Fixed by asserting the phrase
+   `"<name> is the default"` against the serialised specs.
+
+The fourth was not a defect in a check. The mutation replaced the first of five
+implicitly concatenated string literals in one tool description, leaving a description
+still far longer than the length the check tests. **A mutation that does not make the
+module wrong is not a mutation**, and this one was too weak rather than uncaught. It now
+replaces the whole entry.
+
+**Where.** `_provenance_checks` in `src/tools.py`; `_pending_checks` and
+`_derivation_checks` in `src/schemas.py`; one entry in `mutate.py`.
+
+**Why.** Comparing a tool's output to the helper that built it is the natural thing to
+write, because the helper is right there and the comparison is exact. It tests that the
+two call sites agree, which they always will. What it does not test is whether either is
+right. This is the same shape as every other entry in this file — a guard that is real,
+and a fixture or a comparison that cannot observe it failing — and it is the fourth
+session in a row in which the mutation sweep, not the check suite, is what found it.
+
+**Did the agent recover?** Yes, all four, and re-measured rather than argued: 13 of 13 in
+`schemas` on a fresh sweep, and the one surviving `tools` mutation re-run individually
+and caught by the new assertion. The counts are now 108 checks in `tools` and 38 in
+`schemas`.
+
+**What the sweep still cannot reach, stated rather than implied.** No mutation here can
+break the rule that degradation is read through `align.is_degraded` rather than through a
+row count, because on this county the one degraded layer is also the one empty layer, so
+both rules give the same answer everywhere. `align.py` owns that predicate and proves it
+against a fixture registry; `tools.py` only quotes it, and the quote is unmutated. Nor
+does any check here perform a live retrieval: `acquire_dataset` is exercised with a name
+nothing retrieves, and the real endpoints are covered by `acquire.py --check` and by
+`python -m src.demo`.
+
+**Kept as a paper failure case?** Yes — §3.7. The number worth quoting is that a green
+suite of 131 checks over two new modules hid four rules that could not fail, that three
+of the four failed the same way, and that the failure mode was a comparison against the
+implementation rather than against the contract.
+
+## 2026-08-30 — the study bounding box reached a model message inside a sentence (S9)
+
+**What happened.** Found by the `invariant-reviewer` run, behind 108 green checks in
+`tools.py`, 38 in `schemas.py`, and a mutation sweep with no survivors.
+
+`describe_layer` forwards a layer's `Provenance.notes` — the free text each retrieval
+writes to record what it had to work around. `acquire.fetch_osm` records the Overpass
+coordinate-order trap by printing the study extent in both orders:
+
+```
+bbox converted from (min_lon, min_lat, max_lon, max_lat)
+(-80.45355300027266, 32.48256499980578, -79.2218779995792, 33.215368999850845)
+to Overpass south,west,north,east (32.48256499980578, -80.45355300027266, ...)
+```
+
+Eight coordinates, to fifteen decimal places, in a tool result. Invariant 3 says geometry
+never goes into a model message.
+
+`coordinate_faults` — written this session, for exactly this — returned `[]`. Reproduced
+directly:
+
+```
+python -c "from src import tools; print(tools.coordinate_faults(tools.as_sent(tools.describe_layer(name='facilities'))))"
+[]
+```
+
+**Where.** `_provenance` and `coordinate_faults` in `src/tools.py`. The note itself is
+`acquire.fetch_osm` and is not a defect: it is honest provenance, it belongs in
+`data/snapshot/manifest.json`, and the verification it describes — that all 477 returned
+points fall inside the requested extent — is a real check. The defect is S9 deciding to
+pipe that text verbatim into a model-visible result.
+
+**Why the guard missed it.** It refused three shapes: a KEY matching
+`pipeline.COORDINATE_PATTERN`, a LIST holding a number or a list, and a bare-token string
+VALUE matching the pattern. A sentence with floats in it is none of the three. The
+bare-token rule was written deliberately narrow, because the pattern matches on
+underscore boundaries and applying it to prose produces false positives — and narrowing
+it to identifiers left the entire category of *coordinates written as numbers* uncovered.
+Three shapes were enumerated and the fourth was never thought of.
+
+There was a second, independent reason no check could have caught it: `SAMPLE_ARGUMENTS`
+called `describe_layer` on the tract layer only. `facilities` is the one layer carrying
+the leak, and nothing described it. The scan was as wide as the set it was pointed at.
+
+**Did the agent recover?** Yes, and by widening both. `COORDINATE_TEXT` matches a signed
+number with four or more decimal places next to another one — narrow enough that this
+project's populations, depths, fractions and percentages do not trip it, which is
+asserted with a fixture carrying real reported figures. Every string value is now tested
+against it, not only bare tokens. `_provenance` withholds a note that carries a
+coordinate and reports the count, the same policy `describe_layer` already applied to
+column names, and says the full text remains in the manifest on disk — invariant 3 is
+about what reaches a model, not about what the record holds. The coordinate check now
+describes **every registered layer, enumerated from the registry**, and asserts the
+withheld count reconciles against the record for each. Measured after: 7 of 7 layers
+described, no faults, 1 note withheld on `facilities`.
+
+**A second finding from the same review.** `acquire_dataset` calls `invalidate()` so the
+next tool rebuilds from the snapshot the retrieval just replaced. The check called
+`invalidate()` directly, which proved the function works and never reached the call site:
+the reviewer replaced that line with `pass` and `python -m src.tools --check` printed
+`all checks passed`. A stale answer after a live retrieval is the worst failure this
+module can produce, and deleting the line that prevents it was invisible. `_cache_checks`
+now drives `acquire_dataset` itself, with the retrieval and the registry replaced by
+stubs so nothing reaches the network and nothing writes into `data/` — asserted by
+comparing the snapshot manifest's modification time across the check. A mutation for the
+call site is now in `mutate.py` beside the one for the function.
+
+**Kept as a paper failure case?** Yes — §3.7, and it is the strongest entry in the file
+for the reviewer argument specifically. It is the fourth session running in which an
+independent reviewer holding the invariants found something a green suite and a
+zero-survivor mutation sweep did not, and the first in which the defect was in a guard
+written that same session to enforce the exact invariant it then failed to enforce. The
+honest form of the claim is that enumerating the shapes a violation can take is not the
+same as covering them, and that nothing inside the suite can tell you which shape you
+forgot.

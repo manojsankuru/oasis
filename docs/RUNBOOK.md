@@ -8,60 +8,67 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Sat 29 Aug, at the end of S8.
+Checked Sun 30 Aug, at the end of S9.
 
 | | |
 | --- | --- |
 | Plan | Mon 31 Aug converted from a paper day to a build day: S8-S9 Sat 29, S10-S12 Sun 30, S13-S14 Mon 31, paper Tue 1 - Wed 2, submit Wed 3, deadline Fri 4. |
-| Reality | S1-S8 done. |
-| Built | `config`, `contracts`, `schemas`, `llm_client`, `agent`, `trace`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline` |
-| Missing | `tools` (empty, guarded), `sandbox`, `critic`, `scenarios`, `faults`, `figures` |
+| Reality | S1-S9 done. |
+| Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace` |
+| Missing | `sandbox` (S10), `critic` (S11), `scenarios`, `faults`, `figures` |
 
-**The deterministic spine is finished.** `python -m src.pipeline` runs the whole
-analysis with no API key, no model and no network, and writes a real tract-level
-risk table to `outputs/`. Each of the five analysis modules carries its own
-`--check`, and `python mutate.py` breaks each of those checks on purpose.
+**The agent answers a question.** `python -m src.demo` runs rather than refuses,
+and the numbers in its answer match `outputs/tradeoff.csv` line for line.
 
-What S9 inherits:
+What S10 inherits:
 
-- **`src/verify.py`** holds the scans every module's `--check` runs:
-  `metric_bypasses`, `reprojections`, `unannotated`, `study_area_tokens`, plus
-  `refuses` and `report`. They enumerate what they scan from the module object,
-  so a function added tomorrow is covered without anyone remembering to add it --
-  that is the fix for the S7 finding about hand-maintained inclusion lists. Call
-  `verify.discipline_checks(sys.modules[__name__])` from any new module's check.
-- **`hazard.HAZARD_SCENARIOS`** is three surge heights (1.5, 3.0, 5.0 m), defined
-  in `hazard.py` rather than `config.py`; `config.py` says of itself that it holds
-  settings, paths, CRS constants and the study-area parameter.
-  `Hazard.derive_surface` writes two rasters per scenario into `data/derived/`
-  (gitignored, always recomputed) and `Hazard.measure` returns
-  `Col.INUNDATED_FRACTION`, `Col.INUNDATION_MEAN_M` and `Col.INUNDATION_MAX_M`.
-- **`vulnerability.WEIGHT_PRESETS`** is three named weightings. Two carry
-  `origin="published_index"` with a verified CDC/ATSDR SVI url; one is
-  `origin="authors"` and says so. Each carries weights for all five indicators
-  AND all four objective terms, so one preset is one complete value position.
-  `INDICATOR_RATIONALE` has a sentence per indicator and a check fails without it.
-- **`risk.OBJECTIVE_TERMS`** is `Col.INUNDATED_FRACTION`, `Col.EXPOSED_POPULATION`,
-  `Col.VULNERABILITY`, `Col.RESILIENCE` -- four columns `Col` already publishes, so
-  nothing invented a name. All four are percentile-ranked before weighting, which
-  makes the score COUNTY-RELATIVE; the raw values sit beside it.
-- **Exposure is computed per block group and rolled up**, and `align.apportion`
-  compares it against the tract-uniform estimate. That gap is a granularity
-  result, reported, not tuned away.
-- **`tools.surface_faults()`** makes the empty tool surface loud. `python -m
-  src.demo` now refuses to start and lists what does work. S9 empties that list by
-  implementing `contracts.TOOL_NAMES` and rewriting `schemas.py` to match.
+- **The eleven names in `contracts.TOOL_NAMES` are implemented** in `src/tools.py`
+  and advertised by `src/schemas.py`. `tools.surface_faults()` returns nothing;
+  the guard was kept and its reason removed.
+- **No tool computes anything.** `tools.analysis()` builds one `PipelineResult`
+  per process -- about 40 s for three scenarios -- and every tool reads from it.
+  A tool that recomputed a number would be a second answer for `critic.py` to
+  trace to. `_agreement_checks` asserts on the real county that the tool route
+  and the pipeline route return the same units in the same order.
+- **`run_spatial_code` is already wired for you.** It is advertised, executable,
+  and returns a refusal naming `src/sandbox.py`. `tools.BACKING_MODULES` maps the
+  tool to the module and `tools.pending_tools()` probes for it with
+  `importlib.util.find_spec`, so **the day `src/sandbox.py` exists the tool stops
+  being pending with no edit in `tools.py` or `schemas.py`**. What S10 must
+  provide is a class named `Sandbox` with `run(source, *, timeout_s) -> CodeRun`,
+  which is the frozen `contracts.Sandbox` protocol. Same for `validate_answer`
+  and `src/critic.py` in S11: a `Critic` with
+  `check(answer, steps, cycle) -> CriticReport`. `tools.logged_calls()` is the
+  in-process list of every tool result, which is what the critic traces against.
+- **Argument schemas are flat scalars with sentinel defaults**, never
+  `float | None`: an Optional emits `anyOf` with no plain `type`, and a server
+  strict enough to reject `$ref` rejects that too. `schemas.UNSET_WEIGHT` is
+  `-1.0` and works as "unset" only because `vulnerability.normalised_weights`
+  refuses a negative weight, which a check proves rather than assumes.
+- **`agent.system_prompt()` is generated** from `TOOL_NAMES` and
+  `schemas.TOOL_DESCRIPTIONS`. Do not hand-write a tool list into it again; the
+  old one still named `list_layers` and shelters eight sessions after they were
+  deleted.
+- **`MAX_ITERATIONS` is still 6.** S11 raises it to 15. The demo's two questions
+  finish in 3 and 2 LLM calls.
 
-Measured on this county, S8:
+Measured on this county, S9:
 
-- 420,264 residents in 99 tracts and 261 block groups. At 3.0 m of surge,
-  187,349 residents live on land the bathtub floods; at 5.0 m, 303,839.
-- One tract -- a 9900-series water tract with no residents -- has no vulnerability
-  index and therefore no risk score. It is counted and named in every report.
-  98 of 99 tracts are scored, and every percentile rank divides by 98.
-- The elevation raster carries **zero** nodata cells, so the rule that a hole
-  stays a hole is untestable on real data and is proven on a synthetic raster
-  only. See `failures.md`.
+- 420,264 residents in 99 tracts and 261 block groups. Exposed population
+  99,037 / 187,349 / 303,839 at 1.5 / 3.0 / 5.0 m of surge -- the block-group
+  rollup; the tract-uniform estimate at 3.0 m is 125,533 and the gap is reported
+  as a granularity result, not tuned away.
+- 98 of 99 tracts scored. The unscored one is `45019990100`, a 9900-series water
+  tract with no residents. Every ranking tool names it and says why.
+- The raw `tracts` layer carries `CENTLAT`, `CENTLON`, `INTPTLAT`, `INTPTLON` and
+  a geometry column. `describe_layer` withholds all five and reports the count.
+- 525 checks across seven modules, all PASS. 166 mutations, zero survivors --
+  after four survived the first S9 sweep, three of them because a check compared
+  a function against itself. See `failures.md`.
+- The `facilities` provenance carries a note spelling the study extent out in
+  prose. `describe_layer` withholds it and counts it; `tools.COORDINATE_TEXT` is
+  the rule, and the reviewer found it because no check looked at prose. Any new
+  tool that forwards free text needs to go through that filter.
 - `flood_zones` is still DEGRADED. `hazard.vector_hazard_status` reports the
   hazard as elevation-only rather than as an absence of flood risk.
 

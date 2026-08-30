@@ -496,12 +496,175 @@ PIPELINE_MUTATIONS: list[tuple[str, str, str]] = [
      "        scenarios = HAZARD_SCENARIOS"),
 ]
 
+SCHEMAS_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- the frozen surface --------------------------------------------------
+    ("a tool is advertised under a name the contract does not carry",
+     '    "validate_answer": ValidateAnswerArgs,',
+     '    "validate_answer_typo": ValidateAnswerArgs,'),
+    # Replaces the WHOLE entry. An earlier version replaced only the first of the
+    # five implicitly concatenated strings, which left a description still well
+    # over the length the check tests -- a mutation too weak to be wrong, reported
+    # as a survivor.
+    ("a tool description is a placeholder rather than a sentence",
+     '    "list_datasets": (\n'
+     '        "List every retrieved dataset with its source URL, retrieval timestamp, "\n'
+     '        "vintage, feature count, licence, declared and working CRS, and whether "\n'
+     '        "its retrieval was degraded. Call this first: it is the only way to learn "\n'
+     '        "which layer names the other tools accept, and it is where the citations "\n'
+     '        "for your answer come from."\n'
+     "    ),",
+     '    "list_datasets": "tbd",'),
+
+    # -- invariant 4 ---------------------------------------------------------
+    ("the forbidden-keyword list is empty, so the flatness scan looks for nothing",
+     'FORBIDDEN_KEYWORDS: tuple[str, ...] = ("$ref", "$defs", "anyOf", "allOf", "oneOf")',
+     "FORBIDDEN_KEYWORDS: tuple[str, ...] = ()"),
+    ("the emitted spec drops the list of required arguments",
+     '    schema.setdefault("properties", {})',
+     '    schema.pop("required", None)\n    schema.setdefault("properties", {})'),
+
+    # -- the unset sentinel --------------------------------------------------
+    ("the unset sentinel is a weight the index would accept",
+     "UNSET_WEIGHT = -1.0",
+     "UNSET_WEIGHT = 0.5"),
+    ("a weight argument is named the same thing for every indicator",
+     '    return f"{WEIGHT_ARG_PREFIX}{indicator}"',
+     '    return f"{WEIGHT_ARG_PREFIX}weight"'),
+    ("an argument name reads back as the wrong indicator",
+     "    return argument[len(WEIGHT_ARG_PREFIX):]",
+     "    return argument[len(WEIGHT_ARG_PREFIX) + 1:]"),
+
+    # -- bounds and defaults -------------------------------------------------
+    ("a default is outside the bound declared beside it",
+     "DEFAULT_TOP_N = 10",
+     "DEFAULT_TOP_N = 100"),
+    ("the upper bound on a ranking length is dropped",
+     "class HazardExposureArgs(BaseModel):\n"
+     "    scenario: str = Field(default=UNSET_NAME, description=_SCENARIO_HELP)\n"
+     "    top_n: int = Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)",
+     "class HazardExposureArgs(BaseModel):\n"
+     "    scenario: str = Field(default=UNSET_NAME, description=_SCENARIO_HELP)\n"
+     "    top_n: int = Field(default=DEFAULT_TOP_N, ge=1, description=_TOP_N_HELP)"),
+
+    # -- what the model is told ----------------------------------------------
+    ("a pending tool is not marked, so the model learns it by wasting a turn",
+     "    unavailable = set(pending)",
+     "    unavailable = set()"),
+    ("every tool is marked pending, including the ones that work",
+     '+ (PENDING_SUFFIX if name in unavailable else "")',
+     "+ PENDING_SUFFIX"),
+    ("the legal scenario names are written down instead of read from the module",
+     "SCENARIO_NAMES: tuple[str, ...] = tuple(item.name for item in HAZARD_SCENARIOS)",
+     'SCENARIO_NAMES: tuple[str, ...] = ("surge_1_5m",)'),
+    ("the default weighting is no longer named as the default",
+     'f"{DEFAULT_PRESET.name} is the default and is the one with a published origin. "',
+     '"one of them is the default. "'),
+]
+
+
+TOOLS_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- invariant 3: no coordinate reaches a model message ------------------
+    ("a key that names a coordinate passes the guard",
+     "            if COORDINATE_PATTERN.search(str(key)):",
+     "            if COORDINATE_PATTERN.search(str(key)) and False:"),
+    ("a column name that names a coordinate passes inside a value",
+     "        if BARE_TOKEN.match(payload) and COORDINATE_PATTERN.search(payload):",
+     "        if BARE_TOKEN.match(payload) and COORDINATE_PATTERN.search(payload) and False:"),
+    ("a list of numbers is allowed, which is the shape of a coordinate list",
+     '                faults.append(f"{here}: list holds a number, which is a coordinate shape")',
+     "                pass"),
+    ("describe_layer lists the coordinate columns TIGERweb ships instead of withholding them",
+     "        (withheld if COORDINATE_PATTERN.search(name) else kept).append(name)",
+     "        kept.append(name)"),
+    # Found by the invariant reviewer, not by a check: a retrieval note spells the
+    # study bounding box out in prose, which is neither a key, a bare token, nor a
+    # list of numbers. These two break the rule that closed it.
+    ("a coordinate spelled out inside a sentence passes the guard",
+     "        if COORDINATE_TEXT.search(payload):",
+     "        if COORDINATE_TEXT.search(payload) and False:"),
+    ("a retrieval note carrying a coordinate is forwarded into a model message",
+     "        safe = [note for note in source.notes if not COORDINATE_TEXT.search(note)]",
+     "        safe = list(source.notes)"),
+    ("only one layer is scanned for a coordinate instead of every registered one",
+     "    every = {name: describe_layer(name=name) for name in found.names()}",
+     "    every = {acquire.DATASET_TRACTS: describe_layer(name=acquire.DATASET_TRACTS)}"),
+
+    # -- the surface guard itself --------------------------------------------
+    ("a tool is registered under a name nothing advertises",
+     "    TOOL_FUNCTIONS[fn.__name__] = logged",
+     '    TOOL_FUNCTIONS[fn.__name__ + "_"] = logged'),
+    ("the guard stops reporting a tool the model is offered and nothing can run",
+     "    unrunnable = sorted(advertised - executable)",
+     "    unrunnable = []"),
+    ("the probe reports every module as present, so nothing is ever pending",
+     '        return importlib.util.find_spec(f"{__package__}.{name}") is not None',
+     "        return True"),
+    ("pending is reported as empty while a backing module is still missing",
+     "        if not module_present(module)",
+     "        if False"),
+
+    # -- one weighting, both halves ------------------------------------------
+    ("the trade-off table drops the units argument and compares half of each weighting",
+     "            units=state.units,",
+     "            units=None,"),
+    ("the score is combined under the default weighting whatever was asked for",
+     "        frame, scenario=scenario, preset=preset, dataset=TRACT_KEY",
+     "        frame, scenario=scenario, preset=DEFAULT_PRESET, dataset=TRACT_KEY"),
+    ("the index is taken under the default weighting whatever was asked for",
+     "        state.units, preset=preset, weights=weights, dataset=TRACT_KEY",
+     "        state.units, preset=DEFAULT_PRESET, weights=weights, dataset=TRACT_KEY"),
+    ("the unset sentinel is applied as though it were a weight somebody chose",
+     "        if value != schemas.UNSET_WEIGHT",
+     "        if True"),
+
+    # -- reporting the pipeline's number, not another one --------------------
+    ("the headline exposed population is the coarse estimate, not the reported one",
+     '                "exposed_population": exposure.fine_total,',
+     '                "exposed_population": exposure.coarse_total,'),
+    ("the ranking is ordered worst-last",
+     "    ordered = usable.sort_values(by, ascending=False)",
+     "    ordered = usable.sort_values(by, ascending=True)"),
+    ("a source URL is written here instead of quoted from the retrieval",
+     '        "source_url": source.source_url,',
+     '        "source_url": "https://example.invalid/service",'),
+
+    # -- saying what was left out --------------------------------------------
+    ("a unit with no value is ranked rather than counted as unscored",
+     "    usable = frame.dropna(subset=[by])",
+     "    usable = frame"),
+    ("the scored and unscored counts are transposed",
+     '        "units_scored": evidence_units - unscored,',
+     '        "units_scored": unscored,'),
+    ("a truncated list reports nothing truncated",
+     '        "not_listed": max(0, len(listed) - limit),',
+     '        "not_listed": 0,'),
+    ("a missing value is rendered as a zero",
+     "    if value is None:\n        return None",
+     "    if value is None:\n        return 0"),
+
+    # -- the shared run ------------------------------------------------------
+    ("a live retrieval leaves the previous analysis in place, so answers go stale",
+     "    _ANALYSIS = None",
+     "    pass"),
+    # The call site as well as the function. Deleting this one line left the whole
+    # suite green until the check was rewritten to drive acquire_dataset itself.
+    ("acquire_dataset stops invalidating the run it just made stale",
+     "    invalidate()",
+     "    pass"),
+    ("a tool result is not recorded, so no number can be traced back to it",
+     "        CALLS.append(",
+     "        [].append("),
+]
+
+
 TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "align": ALIGN_MUTATIONS,
     "hazard": HAZARD_MUTATIONS,
     "vulnerability": VULNERABILITY_MUTATIONS,
     "risk": RISK_MUTATIONS,
     "pipeline": PIPELINE_MUTATIONS,
+    "schemas": SCHEMAS_MUTATIONS,
+    "tools": TOOLS_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
 

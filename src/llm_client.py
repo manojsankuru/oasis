@@ -1,11 +1,20 @@
+"""The only file that talks to a model or parses a tool call.
+
+Two backends, one shape. `config` decides which; nothing above this line knows
+there is a choice, which is what keeps `agent.py` free of backend details.
+"""
+
+from __future__ import annotations
+
 import json
+from typing import Any
 
 from openai import OpenAI
 
 from . import config
 
 
-def vertex_access_token():
+def vertex_access_token() -> str:
     import google.auth
     import google.auth.transport.requests
 
@@ -16,7 +25,7 @@ def vertex_access_token():
     return credentials.token
 
 
-def make_client():
+def make_client() -> OpenAI:
     missing = config.missing_settings()
     if missing:
         raise RuntimeError(
@@ -27,16 +36,21 @@ def make_client():
     return OpenAI(base_url=config.API_BASE_URL, api_key=config.API_KEY or "not-needed")
 
 
-def chat(client, messages, tools=None, model=None):
-    request = {"model": model or config.MODEL, "messages": messages}
+def chat(
+    client: OpenAI,
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
+    model: str | None = None,
+) -> Any:
+    request: dict[str, Any] = {"model": model or config.MODEL, "messages": messages}
     if tools:
         request["tools"] = tools
         request["tool_choice"] = "auto"
     return client.chat.completions.create(**request)
 
 
-def parse_tool_calls(message):
-    calls = []
+def parse_tool_calls(message: Any) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
     for call in getattr(message, "tool_calls", None) or []:
         raw = call.function.arguments or "{}"
         try:
@@ -47,8 +61,8 @@ def parse_tool_calls(message):
     return calls
 
 
-def message_to_dict(message):
-    payload = {"role": "assistant", "content": message.content or ""}
+def message_to_dict(message: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {"role": "assistant", "content": message.content or ""}
     if getattr(message, "tool_calls", None):
         payload["tool_calls"] = [
             {

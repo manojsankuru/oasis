@@ -13,23 +13,41 @@ See `CLAUDE.md` for the hard invariants, `src/contracts.py` for the frozen inter
 
 ## Status
 
-Session S8 of 14 complete. The **deterministic spine runs end to end with no API key and
-no model**: live retrieval, cleaning, a bathtub inundation model over 3DEP elevation, a
-weighted percentile vulnerability index, and a four-component risk table with a trade-off
-report naming who each weighting drops.
+Session S9 of 14 complete. **The agent answers a question.** On top of the deterministic
+spine there is now a tool surface: the eleven names in `contracts.TOOL_NAMES`, each
+returning a small JSON result, and flat scalar argument schemas with no `$ref`, `$defs`
+or `anyOf` anywhere in the emitted JSON.
 
 ```powershell
 python -m src.pipeline          # writes outputs/risk_*.csv and outputs/tradeoff.csv
+python -m src.demo              # ask the agent; needs .env and a model
+python -m src.tools             # the tool surface, printed
+python -m src.schemas           # the emitted specs, printed
 ```
+
+The deterministic spine still runs end to end with **no API key and no model**: live
+retrieval, cleaning, a bathtub inundation model over 3DEP elevation, a weighted
+percentile vulnerability index, and a four-component risk table with a trade-off report
+naming who each weighting drops. Every number the agent quotes comes from there.
+
+**No tool computes anything.** `pipeline.run()` takes about 40 seconds for three
+scenarios; one result is built per process and every tool reads from it. A tool that
+recomputed a number would be a second answer to one question, and `critic.py` in S11
+traces every reported number back to a logged tool result. A check asserts on the real
+county that the tool route and the pipeline route return the same units in the same
+order.
+
+Two of the eleven are backed by modules that do not exist yet — `run_spatial_code` by
+`src/sandbox.py` (S10) and `validate_answer` by `src/critic.py` (S11). They are probed
+for at run time, advertised to the model as unavailable so no turn is spent discovering
+it, and return a refusal naming the missing module. Nothing about that state is written
+down: the day the module lands, the tool works.
 
 Every module carries its own `--check` that verifies its results against an
 independently computed value, and `python mutate.py` breaks each of those checks on
-purpose and reports any that did not notice.
-
-Not yet: the LLM-visible tool surface (S9), so `python -m src.demo` currently refuses to
-start and says why. `src/schemas.py` still advertises four prototype tools that nothing
-can execute; `tools.surface_faults()` is the guard that makes that loud instead of
-letting the demo exit 0 whenever the model declines to call one.
+purpose and reports any that did not notice. As of S9: **525 checks across seven
+modules, all passing, and 166 mutations with no survivors.** What that number does not
+reach is stated in `docs/failures.md` rather than left implied.
 
 ## Setup
 
@@ -88,6 +106,7 @@ Never write a key into `.env.example`, a test, a log, or a commit. Before any pu
 python -m src.test_api          # does the endpoint work, and does it tool-call
 python -m src.acquire           # live retrieval -> data/snapshot/ + manifest.json   (S5)
 python -m src.demo              # run the agent on the built-in questions            (S9)
+python -m src.demo "question"   # or on one of your own
 python -m src.experiments.faults    # robustness runs                                (S12)
 python -m src.experiments.transfer  # second-county run                              (S13)
 ```
@@ -100,14 +119,17 @@ python -m src.hazard            # bathtub inundation per tract, per scenario
 python -m src.vulnerability     # the index and every weight preset's provenance
 python -m src.risk              # the four components, the score, and who loses
 python -m src.pipeline          # all of it -> outputs/
+python -m src.tools             # the tool surface and what is pending a module
+python -m src.schemas           # the emitted tool specs, as sent to the model
 ```
 
 ### Verification
 
 ```powershell
-python -m src.align --check     # and --check on hazard, vulnerability, risk, pipeline
+python -m src.align --check     # and --check on hazard, vulnerability, risk,
+                                #   pipeline, schemas, tools
 python mutate.py                # break every check on purpose; survivors are reported
-python mutate.py risk           # one module at a time
+python mutate.py tools schemas  # one or more modules at a time
 ```
 
 A `--check` verifies against a value computed a different way — a hand-built synthetic
@@ -142,8 +164,8 @@ reason.
 | `src/risk.py` | the four components, the score, the trade-off table |
 | `src/pipeline.py` | the deterministic spine: snapshot in, risk table out |
 | `src/verify.py` | check helpers shared by every module's `--check` |
-| `src/tools.py` | the LLM-visible tool surface (filled in S9) |
-| `src/schemas.py` | pydantic arg models to tool specs, flat, no `$ref` |
+| `src/tools.py` | the eleven LLM-visible tools; reports the pipeline's numbers, computes none |
+| `src/schemas.py` | flat scalar pydantic arg models to tool specs, no `$ref` |
 | `src/trace.py` | terminal formatting |
 | `src/robustness.py` | four adversarial scenarios (ported to `experiments/` in S12) |
 | `mutate.py` | applies one wrong edit at a time and reports any check that did not notice |
