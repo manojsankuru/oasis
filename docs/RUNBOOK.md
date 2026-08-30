@@ -8,73 +8,62 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Sat 29 Aug, at the end of S7.
+Checked Sat 29 Aug, at the end of S8.
 
 | | |
 | --- | --- |
-| Plan | Day 3 = Sat 29 Aug, S9-S11. |
-| Reality | S1-S7 done. S7 finished Sat 29 Aug, inside its 2 h. |
-| Built | `config`, `contracts`, `schemas`, `llm_client`, `agent`, `trace`, `tools` (empty), `provenance`, `registry`, `acquire`, `align` (complete) |
-| Missing | `hazard`, `vulnerability`, `risk`, `sandbox`, `critic`, `scenarios`, `faults`, `figures` |
+| Plan | Mon 31 Aug converted from a paper day to a build day: S8-S9 Sat 29, S10-S12 Sun 30, S13-S14 Mon 31, paper Tue 1 - Wed 2, submit Wed 3, deadline Fri 4. |
+| Reality | S1-S8 done. |
+| Built | `config`, `contracts`, `schemas`, `llm_client`, `agent`, `trace`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline` |
+| Missing | `tools` (empty, guarded), `sandbox`, `critic`, `scenarios`, `faults`, `figures` |
 
-**`src/align.py` is finished.** Every method of the frozen `Aligner` protocol is
-implemented and no `AlignmentReport` field is a placeholder. `python -m src.align
---check` reports 145 checks, all PASS, exit 0, and `python mutate.py` reports
-70 of 70 mutations caught. The `invariant-reviewer` run found seven defects behind
-those numbers and all seven are fixed; read that entry in `failures.md` before
-trusting a green suite in S8. What S8 inherits:
+**The deterministic spine is finished.** `python -m src.pipeline` runs the whole
+analysis with no API key, no model and no network, and writes a real tract-level
+risk table to `outputs/`. Each of the five analysis modules carries its own
+`--check`, and `python mutate.py` breaks each of those checks on purpose.
 
-- `tracts_joined` is 99 x 12 and `block_groups_joined` is 261 x 7. Both now carry
-  `Col.ELEV_MIN_M`, `Col.ELEV_MEAN_M` and `Col.RASTER_CELLS` beside GEOID, the
-  canonical columns and geometry. S8 does not need to run zonal statistics over
-  elevation again.
-- `zonal_stats` returns GENERIC statistic names -- "min", "mean", "max", "count"
-  -- and the caller maps them onto `Col`. `RASTER_STAT_COLUMNS` is that map for
-  elevation; S8 writes the matching one for inundation. Do not add `ELEV_MAX_M`
-  to `contracts.py` unless something actually needs it: `Col` publishes no such
-  column and the generic-name design is why that is not a problem.
-- `zonal_stats` RAISES on a raster whose CRS differs from the working CRS rather
-  than warping it. `acquire.fetch_arcgis_raster` takes `out_sr`, so retrieve in
-  the working CRS. A derived depth raster S8 writes must carry EPSG:5070.
-- Cell geometry, measured: 39.8161 m cells, 1585.3 m2 each. The 10 m request was
-  capped by the service and both numbers are in the elevation `Provenance`.
-  Smallest tract covers 286 cells, smallest block group 87; `MIN_RASTER_CELLS`
-  is 10, so nothing on this county is below the threshold.
-- `apportion` aggregates by GEOID string prefix, reading the prefix width from
-  the coarse frame. `method="sum"` for counts, `"population_weighted"` for rates;
-  weighting a population by itself is refused.
-- `Col.RASTER_CELLS` is already filled from the elevation grid. S8 should not
-  remap `"count"` onto it for inundation unless that raster's grid genuinely
-  differs from elevation's, or the two will fight over one column.
-- Add every new mutation to `mutate.py` and keep it at zero survivors. It is
-  self-contained now -- it takes its own backup and restores in a `finally`.
-  One line it cannot reach on this county is written up in `failures.md`.
+What S9 inherits:
 
-**You are two calendar days behind, on the morning of Day 3.** Eight sessions and
-18 hours remain (S7 2, S8 2.5, S9 2, S10 2.5, S11 2.5, S12 2, S13 2.5, S14 2),
-against 1.5 days to Sun 30 Aug. That does not fit, and the plan says to decide
-rather than slide.
+- **`src/verify.py`** holds the scans every module's `--check` runs:
+  `metric_bypasses`, `reprojections`, `unannotated`, `study_area_tokens`, plus
+  `refuses` and `report`. They enumerate what they scan from the module object,
+  so a function added tomorrow is covered without anyone remembering to add it --
+  that is the fix for the S7 finding about hand-maintained inclusion lists. Call
+  `verify.discipline_checks(sys.modules[__name__])` from any new module's check.
+- **`hazard.HAZARD_SCENARIOS`** is three surge heights (1.5, 3.0, 5.0 m), defined
+  in `hazard.py` rather than `config.py`; `config.py` says of itself that it holds
+  settings, paths, CRS constants and the study-area parameter.
+  `Hazard.derive_surface` writes two rasters per scenario into `data/derived/`
+  (gitignored, always recomputed) and `Hazard.measure` returns
+  `Col.INUNDATED_FRACTION`, `Col.INUNDATION_MEAN_M` and `Col.INUNDATION_MAX_M`.
+- **`vulnerability.WEIGHT_PRESETS`** is three named weightings. Two carry
+  `origin="published_index"` with a verified CDC/ATSDR SVI url; one is
+  `origin="authors"` and says so. Each carries weights for all five indicators
+  AND all four objective terms, so one preset is one complete value position.
+  `INDICATOR_RATIONALE` has a sentence per indicator and a check fails without it.
+- **`risk.OBJECTIVE_TERMS`** is `Col.INUNDATED_FRACTION`, `Col.EXPOSED_POPULATION`,
+  `Col.VULNERABILITY`, `Col.RESILIENCE` -- four columns `Col` already publishes, so
+  nothing invented a name. All four are percentile-ranked before weighting, which
+  makes the score COUNTY-RELATIVE; the raw values sit beside it.
+- **Exposure is computed per block group and rolled up**, and `align.apportion`
+  compares it against the tract-uniform estimate. That gap is a granularity
+  result, reported, not tuned away.
+- **`tools.surface_faults()`** makes the empty tool surface loud. `python -m
+  src.demo` now refuses to start and lists what does work. S9 empties that list by
+  implementing `contracts.TOOL_NAMES` and rewriting `schemas.py` to match.
 
-**Decision: spend one paper day. Mon 31 Aug becomes a build day.** Compressing 18
-hours into 1.5 days is not real, and cutting a session is worse -- S6 and S7 are
-criterion RB and the plan gives them no cut line, S13's transfer run is a quarter
-of RB on its own, and S12's fault runs are criterion IR. The paper is a short
-paper and two days is enough for it.
+Measured on this county, S8:
 
-| Day | Sessions | Hours |
-| --- | --- | --- |
-| Sat 29 (from 12:00) | ~~S7~~ done, S8, S9 | 6.5 |
-| Sun 30 | S10, S11, S12 | 7 |
-| Mon 31 (was paper day 1) | S13, S14 | 4.5 |
-| Tue 1 - Wed 2 Sep | paper | -- |
-| Wed 3 Sep | submit | -- |
-
-Deadline is Fri 4 Sep 11:59 PM AoE, so submitting Wed 3 keeps a full day of
-margin. **The next thing that dies is S14's figures, not S13's transfer run** --
-figures can be cut to the two the paper cannot do without. Decide that on Monday
-morning, not Monday night.
-
----
+- 420,264 residents in 99 tracts and 261 block groups. At 3.0 m of surge,
+  187,349 residents live on land the bathtub floods; at 5.0 m, 303,839.
+- One tract -- a 9900-series water tract with no residents -- has no vulnerability
+  index and therefore no risk score. It is counted and named in every report.
+  98 of 99 tracts are scored, and every percentile rank divides by 98.
+- The elevation raster carries **zero** nodata cells, so the rule that a hole
+  stays a hole is untestable on real data and is proven on a synthetic raster
+  only. See `failures.md`.
+- `flood_zones` is still DEGRADED. `hazard.vector_hazard_status` reports the
+  hazard as elevation-only rather than as an absence of flood risk.
 
 ## The ritual — identical every session
 

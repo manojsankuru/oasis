@@ -27,6 +27,7 @@ load_dotenv(PROJECT_ROOT / ".env", encoding="utf-8-sig")
 
 DATA_DIR = PROJECT_ROOT / "data"
 SNAPSHOT_DIR = DATA_DIR / "snapshot"
+DERIVED_DIR = DATA_DIR / "derived"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 PAPER_DIR = OUTPUTS_DIR / "paper"
 LOGS_DIR = PROJECT_ROOT / "logs"
@@ -34,7 +35,7 @@ MANIFEST_PATH = SNAPSHOT_DIR / "manifest.json"
 
 
 def ensure_dirs() -> None:
-    for directory in (DATA_DIR, SNAPSHOT_DIR, OUTPUTS_DIR, PAPER_DIR, LOGS_DIR):
+    for directory in (DATA_DIR, SNAPSHOT_DIR, DERIVED_DIR, OUTPUTS_DIR, PAPER_DIR, LOGS_DIR):
         directory.mkdir(parents=True, exist_ok=True)
 
 

@@ -1,13 +1,34 @@
 import sys
 
-from . import agent, config
+from . import agent, config, tools
 
 QUESTIONS = [
     "Find schools within 3 km of hospitals.",
 ]
 
 
-def main():
+def main() -> int:
+    faults = tools.surface_faults()
+    if faults:
+        print("REFUSING TO RUN -- the tool surface is not wired up yet.")
+        for fault in faults:
+            print(f"  - {fault}")
+        print()
+        print(
+            "Session S9 implements contracts.TOOL_NAMES in src/tools.py and rewrites\n"
+            "src/schemas.py to match. Until then this command would start an agent that\n"
+            "can be offered tools nothing can run, and would exit 0 whenever the model\n"
+            "declined to call one -- which reads as a working system."
+        )
+        print()
+        print("What does work today, with no API key and no model:")
+        print("  python -m src.align --check")
+        print("  python -m src.hazard --check")
+        print("  python -m src.vulnerability --check")
+        print("  python -m src.risk --check")
+        print("  python -m src.pipeline          # writes the real risk table")
+        return 1
+
     missing = config.missing_settings()
     if missing:
         print("Missing settings: " + ", ".join(missing))

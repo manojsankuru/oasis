@@ -576,3 +576,322 @@ for the second feedback cycle. The number worth quoting is not 145 checks or 70
 mutations. It is that a reviewer holding the invariants found seven defects behind
 both of those, that two of them made a *reported zero* untrustworthy, and that the
 fix for every one was a check that could fail.
+
+## 2026-08-29 — a check asserted the wrong tie rule, and the code was right (S8)
+
+**What happened.** `vulnerability --check` failed on its first run:
+
+```
+  [FAIL] a column with one repeated value ranks every unit the same, not by row order
+```
+
+The check asserted that four identical values percentile-rank to `0.5` each. Pandas
+returns `0.625`: the average rank of four ties is 2.5, and 2.5/4 is 0.625. The rule
+under test — that a repeated value must not be ordered by row position — was correct
+and the module implemented it correctly. The number written into the check was wrong.
+
+**Where.** `_rank_checks` in `src/vulnerability.py`.
+
+**Why.** The expected value was reasoned about rather than computed. "All tied, so
+they all sit in the middle" is true of the *rank*, not of *rank over n*, and the two
+differ by exactly the off-by-one that `(n+1)/2n` carries.
+
+**Did the agent recover?** Yes, in one turn, and by checking rather than by
+re-reasoning: `pd.Series([7.0]*4).rank(pct=True)` was run directly before the
+expectation was changed. The assertion now states `(n+1)/2n = 0.625` with the
+arithmetic written beside it, so a reader can see where the number comes from.
+
+**Kept as a paper failure case?** Yes — §3.7, beside the S7 entry where the
+independent check was wrong rather than the code. That is now twice in two sessions.
+The pattern worth reporting is that a hand-written expected value is itself code that
+can be wrong, and the only defence is that it fails loudly when it is, which is an
+argument for stating arithmetic in a check rather than reading a number off a run.
+
+## 2026-08-29 — the fixture agreed with itself, so a trade-off check could not discriminate (S8)
+
+**What happened.** The same run also failed:
+
+```
+  [FAIL] at least one pair of presets ranks the same units differently
+```
+
+The four-unit fixture had four of its five indicators rising together, so every
+weighting produced the same order. The check is the one that proves weights are
+parameters rather than decoration, and on that fixture no weighting could have moved
+anything.
+
+**Where.** `_fixture` and `_preset_checks` in `src/vulnerability.py`.
+
+**Why.** The fixture was written to make individual ranks easy to read by eye, and
+easy-to-read meant monotone. A trade-off cannot appear in data that has no trade-off
+in it. Note the failure direction: the check failed rather than passing vacuously,
+because it asserts that a difference EXISTS. The same property asserted the other way
+round — "the presets agree" — would have passed and proved nothing.
+
+**Did the agent recover?** Yes. The fixture now moves poverty and no-vehicle against
+the other three, which is exactly the axis `svi_themes` weights differently from
+`svi_equal`: the two presets order those four units in opposite directions. The real
+county was already discriminating — all three preset pairs differ in their top ten —
+so the live check would have passed while the fixture check could not fail.
+
+**Kept as a paper failure case?** Yes — §3.7, as the cheapest available illustration
+of the difference between a check that can fail and a check that happens to pass.
+
+## 2026-08-29 — the new CRS scan caught the person writing it (S8)
+
+**What happened.** `risk --check` failed on its first run:
+
+```
+  metric operation outside the CRS helper: _resilience_checks: ['to_crs', 'buffer'] without to_working_crs
+  [FAIL] every metric operation routes through to_working_crs
+  [FAIL] the module never reprojects for itself
+```
+
+The offending code was in the self check, not the implementation: a fixture built its
+unit polygons with `Point(...).buffer(1.0)` and produced a geographic frame with
+`units.to_crs(...)` to prove that `resilience` reprojects what it is handed.
+
+**Where.** `_resilience_checks` in `src/risk.py`; the scan is `verify.metric_bypasses`
+and `verify.reprojections` in `src/verify.py`.
+
+**Why.** The scan in `align.py` greps a hand-maintained tuple of implementation parts,
+which the S7 review showed exempts whatever nobody remembers to add. The replacement
+enumerates every function and method from the module object itself, so nothing is
+exempt by omission — including check code. That is the intended behaviour and it fired
+on its first real use, against its own author.
+
+**Did the agent recover?** Yes, and by fixing the fixture rather than by exempting it.
+The unit geometries are now built in EPSG:4326 and routed through `to_working_crs`,
+which yields both the geographic frame the check needs and the projected one, with no
+`.to_crs(` anywhere in the module. Adding an exemption would have reintroduced exactly
+the hole the scan was written to close.
+
+**Kept as a paper failure case?** Yes — §3.7. It is the clearest evidence available
+that the guard is mechanical rather than decorative: it caught a violation the author
+had just written and did not notice.
+
+## 2026-08-29 — this county's raster has no nodata, so the rule protecting it is untestable on real data (S8)
+
+**What happened.** Not a break. A limitation found while building `hazard.py`, recorded
+because the check counts would otherwise overstate what is covered.
+
+The bathtub is `depth = max(0, surge - elevation)`. The elevation nodata sentinel is
+-9999.0, so a cell that is nodata and treated as ground reports ten kilometres of
+water and becomes the deepest inundation in the county. Every derived raster therefore
+carries the source nodata forward.
+
+Measured directly off `3depelevation.tif`: **0 nodata cells and 0 non-finite cells of
+7,997,535.** So deleting the entire nodata branch changes no number this county
+produces. Every per-unit count, every fraction and every mean is identical with the
+rule and without it.
+
+**Where.** `Hazard._bathtub` and `Hazard._write` in `src/hazard.py`.
+
+**Why.** A rule can only be exercised by data that violates the condition it guards.
+The retrieved extent has no holes, so no amount of check-writing against this county
+reaches that code — the same shape as the S7 entry on `units_below_cell_threshold`,
+one session later and in a different module.
+
+**What covers it instead.** A synthetic raster, and only that. `_bathtub_checks` puts a
+-9999.0 cell and a NaN cell into a 3x3 grid and asserts that both are carried forward
+into the depth raster AND into the wet mask, and `_surface_checks` writes a 10x10
+fixture through the real `derive_surface`, reads both rasters back off disk, and
+asserts that the holes read back as nodata and that the usable, nodata and non-finite
+counts add up to the whole grid. Two mutations target the branch and are caught only
+there.
+
+**Kept as a paper failure case?** Yes — §3.7, filed with the S7 entry it repeats. The
+honest form of the claim is: the nodata rule is proven on synthetic data and unproven
+on Charleston, because Charleston cannot prove it. A transfer county with a coverage
+gap would be the first real test.
+
+## 2026-08-29 — eight of fifty-two mutations survived the first sweep (S8)
+
+**What happened.** The five analysis modules reached 145 + 58 + 57 + 53 + 31 checks,
+all PASS, exit 0. `python mutate.py` then reported **44 of 52 caught** on the four new
+modules. The eight survivors, and what each turned out to be:
+
+1. *"the two rasters' cell counts are compared in total rather than per unit"* — the
+   `torn` fixture had ONE polygon, and with one unit a total and a per-unit comparison
+   are the same comparison. The check could not express the failure it was written
+   for. Fixed with two bands whose counts disagree in opposite directions: 20 vs 19
+   and 19 vs 20, totalling 39 = 39.
+2. *"the degraded flood layer is recognised by its row count instead of its flag"* — on
+   this county `flood_zones` is degraded AND holds zero features, so the two rules give
+   the same answer everywhere. Fixed with a fixture registry holding a layer that
+   retrieved cleanly and found nothing.
+3. *"deriving a surface from a degraded raster is allowed"* — the check passed
+   `flood_zones`, which trips the earlier `kind != "raster"` guard, so the refusal it
+   observed was not the one it named. Fixed with a degraded *raster* fixture, and the
+   two refusals are now asserted separately by message.
+4. *"the incomplete unit is scored anyway"* — **not a defect.** A Float64 weighted sum
+   already propagates `pd.NA`, so deleting `.where(complete)` returns byte-identical
+   answers. The entry was a no-op, which the harness's own rule says does not belong in
+   it. Replaced with `.fillna(0.0)`, which is the edit the line actually defends
+   against and is caught.
+5, 6. *"exposed population is the population NOT on flooded land"* and *"...is the whole
+   population wherever any of the unit floods"* — both survived behind bounds. "Exposed
+   never exceeds population" and "the two estimates disagree" stay true under both
+   errors. Nothing pinned the value. Fixed with a synthetic county whose block groups
+   are fully wet, half wet and dry by construction and whose exposed population is
+   stated as 3,500 and 1,250 before the call is made.
+7. *"a tract reporting more exposed residents than residents is allowed through"* — the
+   guard cannot fire on real data, because block-group population is Census-controlled
+   to sum to the tract estimate. Fixed by handing the same fixture a tract frame whose
+   published population is smaller than its children's.
+8. *"the written table carries whatever columns the frame happened to hold"* — the risk
+   frame happens to carry exactly the reported columns in exactly the reported order,
+   so selecting them and not selecting them are indistinguishable. The guard is real —
+   it stops a column added upstream reaching the deliverable — and needed a fixture
+   with a spare column to become observable.
+
+**Where.** `_surface_checks`, `_degradation_checks` in `src/hazard.py`;
+`_exposure_checks` (new) in `src/risk.py`; `_refusal_checks` in `src/pipeline.py`;
+one entry in `mutate.py`.
+
+**Why.** Six of the eight are the same cause in different clothes: a check written
+against the county in front of it. Charleston has one degraded layer that is also
+empty, block-group populations that are controlled to agree exactly, a raster with no
+holes, and a risk frame whose columns already match the deliverable. On that data a
+wrong rule and a right one produce the same table. The other two are a fixture too
+small to express the failure, and a mutation that was not a mutation.
+
+**Did the agent recover?** Yes, all eight, and the count is now 122 of 122 across five
+modules. Every fix was a fixture that makes the rule falsifiable, not a loosened
+assertion.
+
+**Kept as a paper failure case?** Yes — §3.7, and it is the strongest single piece of
+evidence for the verification argument. The number worth quoting is not that the suite
+was green. It is that a green suite of 344 checks hid eight rules that could not fail,
+that six of the eight were invisible because the study county cannot express the
+error, and that the fix in every case was synthetic data built to disagree.
+
+## 2026-08-29 — the trade-off table compared half of each weighting (S8)
+
+**What happened.** Found by reading, not by a failing check. Each `WeightPreset`
+carries two halves: weights over the five indicators, which produce
+`Col.VULNERABILITY`, and weights over the four objective terms, which decide how that
+column trades off against hazard, exposure and resilience. `compare_presets` took a
+frame whose vulnerability index had ALREADY been computed under one preset, so only
+the objective half could vary.
+
+`svi_equal` and `svi_themes` carry identical objective weights and differ only in how
+they weight the indicators — that is the whole point of the pair, since they are two
+published rules from one source. They returned identical rows. Two of the three
+presets were indistinguishable in the deliverable, while the report presented them as
+compared.
+
+The gate still passed: `evacuation_capacity` moves the objective weights, so "the
+ranking changes when a weight changes" was satisfied by one preset out of three.
+
+**Where.** `Risk.compare_presets` in `src/risk.py`, and both its callers.
+
+**Why.** The components are expensive to recompute and the frame is the natural thing
+to pass, so the frame was passed. Nothing in the signature said that the frame already
+had a weighting baked into it.
+
+**Did the agent recover?** Yes. `compare_presets` now takes the units the frame was
+built from and recomputes the index per preset; only the vulnerability column depends
+on the indicator weights, so the rasters are not touched again. Measured effect on the
+real county: `svi_equal` and `svi_themes` differ in **2 of their top 10 tracts** with
+the units passed and **0** without, and the county-wide displacement count rose from
+15 to 24. Two checks now assert exactly that contrast, and `pipeline` asserts
+generically that a preset pair differing ONLY in indicator weights ranks the county
+differently in every scenario.
+
+**Kept as a paper failure case?** Yes — §3.7. It is the clearest example in the build
+of a criterion-SG failure that every mechanical check passed: the trade-off table
+existed, was populated, and reported three weightings, two of which had not actually
+been varied.
+
+## 2026-08-29 — the CRS scan is satisfied by one mention, and one argument went unchecked (S8)
+
+**What happened.** The `invariant-reviewer` run found this behind 366 green checks and
+a 125-of-125 mutation sweep. `Risk.resilience` reprojects two arguments:
+
+```python
+placed = self.aligner.to_working_crs(units)
+points = self.aligner.to_working_crs(facilities)
+```
+
+`verify.metric_bypasses` asks whether a function that performs a metric operation
+mentions `to_working_crs` **anywhere in its source**. Both calls are in the same
+function, so either one alone satisfies the scan. The fixture in `_resilience_checks`
+handed a geographic frame to `units` only; `facilities` was always built pre-projected.
+
+The reviewer confirmed it empirically: patching the `facilities` line to `points =
+facilities` and running `python -m src.risk --check` exits 0 with everything PASS,
+including "every metric operation routes through to_working_crs". A mutation for that
+exact line had been written into `mutate.py` earlier in the session with a comment
+claiming the geographic-frame fixture would notice. It would not have. It would have
+been reported as a survivor on the next sweep.
+
+**Where.** `Risk.resilience` and `_resilience_checks` in `src/risk.py`;
+`verify.metric_bypasses` in `src/verify.py`.
+
+**Why.** The scan is a per-function string test, and a function with two frames to
+project has two obligations and one observable. This is the same shape as every other
+entry in this file: the guard is real, and the thing that would have caught its failure
+is a fixture nobody wrote.
+
+The practical consequence is worse than a style violation. `gpd.sjoin` does not raise
+on a CRS mismatch — it warns and returns no rows — so every unit would have read as
+reaching zero facilities, ranked identically on resilience, and the risk table would
+have looked entirely plausible. A sandbox script in S10 calling `resilience` with
+facilities straight from `acquire.fetch_osm`, which returns EPSG:4326 per the frozen
+`Acquirer` protocol, is exactly how that would happen.
+
+**Did the agent recover?** Yes. The fixture now defines BOTH frames in degrees and
+projects them here, then calls `resilience` three more times — geographic units,
+geographic facilities, and both at once — asserting each matches the projected result.
+The mutation is now caught, and the misleading comment in `mutate.py` is replaced with
+what actually happened.
+
+**Kept as a paper failure case?** Yes — §3.7. It is the third session running in which
+a reviewer holding the invariants found something a green suite and a zero-survivor
+sweep did not, and the first in which the defect was in a guard rather than in the code
+the guard watches.
+
+## 2026-08-29 — the verification harness was hardcoded to this county's tract count (S8)
+
+**What happened.** Same review. Five assertions across three modules compared against
+Charleston's live tract count rather than deriving it:
+
+```
+src/vulnerability.py   evidence.units == 99, set(denominators.values()) == {98},
+                       int(scored.notna().sum()) == 98, ranks... == 98
+src/risk.py            len(frame) == 99
+src/pipeline.py        len(frame) == 99, compared == 99 * len(result.tables)
+```
+
+These are not county names or FIPS codes, so `verify.study_area_tokens` does not see
+them — it scans for the tokens `config` publishes, and "99" is not one of them.
+
+**Where.** `_county_checks` in `src/vulnerability.py` and `src/risk.py`;
+`_written_checks` and `_gate_checks` in `src/pipeline.py`.
+
+**Why.** Every one was written while reading a real report, and 99 was on the screen.
+Criterion RB asks the system to run on a second county with no code change; nothing
+asked the same of the thing that verifies it.
+
+The consequence is specific and bad: `mutate.py`'s `mutate_module` refuses to run a
+single mutation if the baseline `--check` is not green. On Chatham County the baseline
+would fail on tract count alone, so the entire mutation harness for three modules would
+stop working with no defect present — and the S13 transfer run is the session that
+would discover it.
+
+**Did the agent recover?** Yes. Every literal is now derived from the loaded frame:
+scored plus unscored must account for every unit, each rank denominator must equal the
+count publishing that indicator, and the pipeline's comparison denominator is summed
+from the tables it actually built. The county-specific numbers are still PRINTED, so
+the report reads the same; they are no longer asserted.
+
+Two checks were deliberately weakened in the process and it is worth saying so. "Exactly
+one tract is unscored" became "no unscored tract carries any residents", and "every
+index lies in (0, 1] over 98 units" became "...over the units reported as scored". The
+discrimination that assertion used to provide has not been lost: `_null_checks` proves
+the null policy on a synthetic frame where the answer is stated, and that fixture is
+county-independent.
+
+**Kept as a paper failure case?** Yes — §3.7, as the counterexample to the assumption
+that "runs on a second county" only needs to hold of the analysis code.

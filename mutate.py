@@ -1,8 +1,12 @@
 """Break every check on purpose, and report any that did not notice.
 
 A check that cannot fail is worth less than no check, because it reads as
-coverage. This harness applies one wrong edit at a time to src/align.py, runs
-`python -m src.align --check`, and reports any mutation that still exits 0.
+coverage. This harness applies one wrong edit at a time to a module under src/,
+runs that module's own `--check`, and reports any mutation that still exits 0.
+
+Each module's checks are run against mutations of that module and no other. A
+defect in `hazard.py` that only `pipeline.py` notices is a hole in hazard's own
+suite, and running the downstream check would hide it rather than report it.
 
 Self-contained on purpose: it takes its own backup of the live file and restores
 it in a `finally`, so an interrupted run cannot leave a mutated module on disk.
@@ -23,13 +27,20 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent
-SOURCE = ROOT / "src" / "align.py"
-BACKUP = ROOT / "src" / "align.py.mutation-backup"
 PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
     PYTHON = pathlib.Path(sys.executable)
 
-MUTATIONS: list[tuple[str, str, str]] = [
+
+def source_of(module: str) -> pathlib.Path:
+    return ROOT / "src" / f"{module}.py"
+
+
+def backup_of(module: str) -> pathlib.Path:
+    return ROOT / "src" / f"{module}.py.mutation-backup"
+
+
+ALIGN_MUTATIONS: list[tuple[str, str, str]] = [
     # -- the metric CRS choke point ----------------------------------------
     ("to_working_crs never reprojects",
      "        return obj.to_crs(target)",
@@ -270,10 +281,239 @@ MUTATIONS: list[tuple[str, str, str]] = [
      "                _r = value.groupby(parent).sum(min_count=1)\n                rolled = pd.Series(_r.to_numpy()[::-1], index=_r.index)"),
 ]
 
+HAZARD_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- the bathtub arithmetic ---------------------------------------------
+    ("depth is not clipped at zero, so dry ground reports negative water",
+     "        depth = np.where(usable, np.maximum(0.0, surge_height_m - elevation), np.nan)",
+     "        depth = np.where(usable, surge_height_m - elevation, np.nan)"),
+    ("the surge is subtracted the wrong way round",
+     "        depth = np.where(usable, np.maximum(0.0, surge_height_m - elevation), np.nan)",
+     "        depth = np.where(usable, np.maximum(0.0, elevation - surge_height_m), np.nan)"),
+    ("a cell exactly at the surge height counts as wet",
+     "        wet = np.where(usable, np.where(depth > 0.0, WET, DRY), np.nan)",
+     "        wet = np.where(usable, np.where(depth >= 0.0, WET, DRY), np.nan)"),
+    ("the wet mask is the depth itself, so the mean is not a fraction",
+     "        wet = np.where(usable, np.where(depth > 0.0, WET, DRY), np.nan)",
+     "        wet = np.where(usable, depth, np.nan)"),
+    ("a hole in the wet mask is filled with dry instead of carried forward",
+     "        wet = np.where(usable, np.where(depth > 0.0, WET, DRY), np.nan)",
+     "        wet = np.where(usable, np.where(depth > 0.0, WET, DRY), DRY)"),
+    # -- nodata is not sea level --------------------------------------------
+    ("the nodata sentinel is treated as ground at -9999 m",
+     "            usable &= elevation != source_nodata",
+     "            usable &= elevation == elevation"),
+    ("a non-finite elevation is treated as usable",
+     "        usable = np.isfinite(elevation)",
+     "        usable = np.ones(elevation.shape, dtype=bool)"),
+    ("the derived raster is written with no nodata, so a hole reads as -9999 m of water",
+     '        out["nodata"] = nodata',
+     '        out["nodata"] = None'),
+    # -- the column map -----------------------------------------------------
+    ("mean and max depth are mapped onto each other's columns",
+     '    "mean": Col.INUNDATION_MEAN_M,\n    "max": Col.INUNDATION_MAX_M,',
+     '    "mean": Col.INUNDATION_MAX_M,\n    "max": Col.INUNDATION_MEAN_M,'),
+    ("the inundation pass remaps count onto the column align already fills",
+     'WET_STAT_COLUMNS: dict[str, str] = {"mean": Col.INUNDATED_FRACTION}',
+     'WET_STAT_COLUMNS: dict[str, str] = {"mean": Col.INUNDATED_FRACTION, "count": Col.RASTER_CELLS}'),
+    # -- the denominators have to agree -------------------------------------
+    ("the two rasters' cell counts are compared in total rather than per unit",
+     "        matched = depth_counts.eq(wet_counts).fillna(False)",
+     "        matched = pd.Series(\n            depth_counts.sum() == wet_counts.sum(), index=depth_counts.index\n        )"),
+    ("the derived cell counts are never compared against the elevation pass",
+     "        if Col.RASTER_CELLS not in frame.columns:",
+     "        if True:"),
+    ("the inundated fraction is never bounds-checked",
+     "        outside = fraction.notna() & ((fraction < 0.0) | (fraction > 1.0))",
+     "        outside = fraction.notna() & (fraction < -1e30)"),
+    # -- a degraded layer is not an absent hazard ---------------------------
+    ("a failed flood-zone retrieval is reported as an absence of flood risk",
+     "            if align.is_degraded(record.provenance):\n                status[name] = (",
+     "            if False:\n                status[name] = ("),
+    ("the degraded flood layer is recognised by its row count instead of its flag",
+     "            if align.is_degraded(record.provenance):\n                status[name] = (\n                    f\"{name}: retrieval degraded, so the hazard in this table is the \"",
+     "            if record.provenance.feature_count == 0:\n                status[name] = (\n                    f\"{name}: retrieval degraded, so the hazard in this table is the \""),
+    # -- refusals -----------------------------------------------------------
+    ("a negative surge height is accepted and reports a dry county",
+     "        if scenario.surge_height_m < 0:",
+     "        if scenario.surge_height_m < -1e30:"),
+    ("deriving a surface from a degraded or non-raster dataset is allowed",
+     "        if align.is_degraded(record.provenance):\n            raise ValueError(",
+     "        if False:\n            raise ValueError("),
+]
 
-def run_check() -> tuple[int, list[str]]:
+VULNERABILITY_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- the percentile rule ------------------------------------------------
+    ("the stated direction is ignored and every indicator ranks ascending",
+     '    return numeric.rank(pct=True, ascending=direction == MORE_IS_WORSE).astype("Float64")',
+     '    return numeric.rank(pct=True, ascending=True).astype("Float64")'),
+    ("a missing value is ranked as a zero, making the unit the least vulnerable",
+     '    return numeric.rank(pct=True, ascending=direction == MORE_IS_WORSE).astype("Float64")',
+     '    return numeric.fillna(0).rank(pct=True, ascending=direction == MORE_IS_WORSE).astype("Float64")'),
+    ("the rank denominator is the row count rather than the published count",
+     '    return numeric.rank(pct=True, ascending=direction == MORE_IS_WORSE).astype("Float64")',
+     '    return (numeric.rank(ascending=direction == MORE_IS_WORSE) / len(numeric)).astype("Float64")'),
+    ("ties are broken by row order instead of sharing the average rank",
+     '    return numeric.rank(pct=True, ascending=direction == MORE_IS_WORSE).astype("Float64")',
+     '    return numeric.rank(pct=True, ascending=direction == MORE_IS_WORSE, method="first").astype("Float64")'),
+    # -- the null policy ----------------------------------------------------
+    ("a unit missing an indicator is scored on the ones it does publish",
+     "        complete = ranked.notna().all(axis=1)",
+     "        complete = ranked.notna().any(axis=1)"),
+    # Deleting `.where(complete)` outright is NOT a mutation: a Float64 weighted sum
+    # already propagates pd.NA, so removing it produces byte-identical answers and
+    # survives as a no-op rather than as a defect. What the line actually defends
+    # against is somebody deciding a null should score zero, so that is the edit.
+    ("a unit missing an indicator is scored zero instead of left unscored",
+     '        scored = pd.Series(weighted, index=frame.index, dtype="Float64").where(complete)',
+     '        scored = pd.Series(weighted, index=frame.index, dtype="Float64").fillna(0.0)'),
+    # -- weights are arguments, and are validated ---------------------------
+    ("weights are not normalised, so their units change the ranking",
+     "    return {key: value / total for key, value in used.items()}",
+     "    return dict(used)"),
+    ("a weighting missing an indicator silently drops it",
+     "    missing = [key for key in keys if key not in weights]",
+     "    missing = []"),
+    ("a misspelled weight key is ignored instead of refused",
+     "    unknown = [key for key in weights if key not in WEIGHT_KEYS]",
+     "    unknown = []"),
+    ("a negative weight smuggles a direction past INDICATOR_DIRECTION",
+     "    negative = {key: value for key, value in used.items() if value < 0}",
+     "    negative = {}"),
+    ("the preset's weights are ignored and every call uses the default",
+     "            dict(weights if weights is not None else preset.weights), self.indicators",
+     "            dict(DEFAULT_PRESET.weights), self.indicators"),
+    # -- the rationale friction ---------------------------------------------
+    ("an indicator can join the index without a sentence saying why",
+     "        unexplained = [name for name in indicators if name not in INDICATOR_RATIONALE]",
+     "        unexplained = []"),
+    ("a preset loses its published origin url",
+     '        origin_url=SVI_URL,\n    ),\n    WeightPreset(\n        name="svi_themes",',
+     '        origin_url="",\n    ),\n    WeightPreset(\n        name="svi_themes",'),
+    ("the two published presets are given identical indicator weights",
+     "            Col.PCT_POVERTY: 1 / 3,\n            Col.PCT_AGE_65_PLUS: 1 / 9,\n            Col.PCT_DISABILITY: 1 / 9,\n            Col.PCT_LIMITED_ENGLISH: 1 / 9,\n            Col.PCT_NO_VEHICLE: 1 / 3,",
+     "            Col.PCT_POVERTY: 0.2,\n            Col.PCT_AGE_65_PLUS: 0.2,\n            Col.PCT_DISABILITY: 0.2,\n            Col.PCT_LIMITED_ENGLISH: 0.2,\n            Col.PCT_NO_VEHICLE: 0.2,"),
+]
+
+RISK_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- the four components ------------------------------------------------
+    ("resilience raises the risk score instead of lowering it",
+     "    Col.RESILIENCE: MORE_IS_BETTER,",
+     "    Col.RESILIENCE: MORE_IS_WORSE,"),
+    ("exposed population is the population NOT on flooded land",
+     "        fine[Col.EXPOSED_POPULATION] = (\n            fine[Col.POPULATION] * fine[Col.INUNDATED_FRACTION]\n        )",
+     "        fine[Col.EXPOSED_POPULATION] = (\n            fine[Col.POPULATION] * (1.0 - fine[Col.INUNDATED_FRACTION])\n        )"),
+    ("exposure is the whole population wherever any of the unit floods",
+     "        fine[Col.EXPOSED_POPULATION] = (\n            fine[Col.POPULATION] * fine[Col.INUNDATED_FRACTION]\n        )",
+     "        fine[Col.EXPOSED_POPULATION] = fine[Col.POPULATION] * (\n            fine[Col.INUNDATED_FRACTION] > 0\n        ).astype(float)"),
+    ("the coarse tract-uniform estimate is reported instead of the block-group rollup",
+     "        exposed = pd.to_numeric(\n            aggregated[Col.EXPOSED_POPULATION].reindex(coarse[Col.GEOID].to_numpy()),\n            errors=\"coerce\",\n        ).astype(\"Float64\")",
+     "        exposed = pd.to_numeric(\n            coarse[Col.EXPOSED_POPULATION], errors=\"coerce\"\n        ).astype(\"Float64\")"),
+    ("a tract reporting more exposed residents than residents is allowed through",
+     "        if evidence.units_over_population:",
+     "        if False:"),
+    # -- resilience ---------------------------------------------------------
+    # The metric-bypass scan cannot see either of these: `resilience` mentions
+    # to_working_crs twice, so removing ONE call leaves the name in the function and
+    # the scan satisfied. Only a fixture that hands the frame over in degrees
+    # notices, and the review found there was one for `units` and none for
+    # `facilities` -- so this second entry survived until _resilience_checks grew
+    # the matching case. gpd.sjoin does not raise on a CRS mismatch; it warns and
+    # returns nothing, which reads as every unit reaching no facility.
+    ("the units are buffered in whatever CRS they arrive in, not the metric one",
+     "        placed = self.aligner.to_working_crs(units)",
+     "        placed = units"),
+    ("the facilities are joined in whatever CRS they arrive in",
+     "        points = self.aligner.to_working_crs(facilities)",
+     "        points = facilities"),
+    ("the reach radius is applied in kilometres, so every unit reaches almost nothing",
+     "            reach, geometry=placed.geometry.buffer(radius_m), crs=placed.crs",
+     "            reach, geometry=placed.geometry.buffer(radius_m / 1000.0), crs=placed.crs"),
+    ("the facility count is ranked as though more facilities were worse",
+     "        ranked = percentile_rank(counts, direction=MORE_IS_WORSE)",
+     "        ranked = percentile_rank(counts, direction=MORE_IS_BETTER)"),
+    ("the facility tag is written here instead of read from the retrieval",
+     "        keys = [key for key in tags if isinstance(key, str)]",
+     '        keys = ["shop"]'),
+    ("a zero or negative reach radius is accepted",
+     "        if radius_m <= 0:",
+     "        if radius_m < -1e30:"),
+    ("a metric operation is written into combine, which never routes through the helper",
+     "        absent = [name for name in components if name not in frame.columns]",
+     '        _bypass = "".buffer(1) if False else 0\n        absent = [name for name in components if name not in frame.columns]'),
+    # -- the score ----------------------------------------------------------
+    # The sibling of the vulnerability entry above, and for the same reason:
+    # deleting `.where(complete)` is a no-op because a Float64 weighted sum already
+    # propagates pd.NA. Scoring the null as zero is the edit the line defends against.
+    ("a unit missing a component is scored zero instead of left unscored",
+     '        out[Col.RISK_SCORE] = pd.Series(score, index=frame.index, dtype="Float64").where(complete)',
+     '        out[Col.RISK_SCORE] = pd.Series(score, index=frame.index, dtype="Float64").fillna(0.0)'),
+    ("a unit missing a component is scored on the components it has",
+     "        complete = ranks.notna().all(axis=1)",
+     "        complete = ranks.notna().any(axis=1)"),
+    ("priority rank 1 goes to the lowest risk score",
+     '            out[Col.RISK_SCORE].rank(ascending=False, method="min").astype("Int64")',
+     '            out[Col.RISK_SCORE].rank(ascending=True, method="min").astype("Int64")'),
+    ("every preset is scored under the default weighting, so the ranking cannot move",
+     "            dict(weights if weights is not None else preset.weights), components",
+     "            dict(vulnerability.DEFAULT_PRESET.weights), components"),
+    ("the index is not recomputed per preset, so indicator weights cannot move anything",
+     "            if units is not None:",
+     "            if False:"),
+    ("every preset is compared under the first preset's index",
+     "                index, _ = self.index.index(units, preset=preset)",
+     "                index, _ = self.index.index(units, preset=vulnerability.DEFAULT_PRESET)"),
+
+    # -- who loses ----------------------------------------------------------
+    ("the trade-off table reports that no weighting displaces anybody",
+     "                    displaced_geoids=tuple(sorted(elsewhere - set(top))),",
+     "                    displaced_geoids=(),"),
+    ("who loses is the units this preset picked rather than the ones it dropped",
+     "                    displaced_geoids=tuple(sorted(elsewhere - set(top))),",
+     "                    displaced_geoids=tuple(sorted(set(top))),"),
+]
+
+PIPELINE_MUTATIONS: list[tuple[str, str, str]] = [
+    ("the written table carries whatever columns the frame happened to hold",
+     "    return frame[list(REPORTED_COLUMNS)]",
+     "    return frame"),
+    ("a promised column missing upstream writes a shorter file instead of failing",
+     "    if absent:",
+     "    if False:"),
+    ("a coordinate-bearing column is written into the deliverable",
+     "    if leaking:",
+     "    if False:"),
+    ("every scenario is scored against the shallowest surface",
+     "        surface = hazard_report.surfaces[scenario.name]",
+     "        surface = list(hazard_report.surfaces.values())[0]"),
+    ("the trade-off comparison uses one preset rather than every one",
+     "                presets=presets,\n                priority_units=priority_units,",
+     "                presets=presets[:1],\n                priority_units=priority_units,"),
+    ("the trade-off comparison forgets the layer the index has to be rebuilt from",
+     "                units=tracts,",
+     "                units=None,"),
+    ("running with no scenario at all is allowed and writes nothing",
+     '        raise ValueError("the pipeline was given no hazard scenario to run")',
+     "        scenarios = HAZARD_SCENARIOS"),
+]
+
+TARGETS: dict[str, list[tuple[str, str, str]]] = {
+    "align": ALIGN_MUTATIONS,
+    "hazard": HAZARD_MUTATIONS,
+    "vulnerability": VULNERABILITY_MUTATIONS,
+    "risk": RISK_MUTATIONS,
+    "pipeline": PIPELINE_MUTATIONS,
+}
+"""Which module each mutation edits, and therefore which `--check` runs.
+
+A module listed here with no mutations is a module whose checks have never been
+broken on purpose, which is the state this harness exists to make visible. The
+run prints a per-module count so an empty list reads as `0/0 caught` rather than
+disappearing into a healthy-looking total."""
+
+
+def run_check(module: str) -> tuple[int, list[str]]:
     proc = subprocess.run(
-        [str(PYTHON), "-m", "src.align", "--check"],
+        [str(PYTHON), "-m", f"src.{module}", "--check"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -289,42 +529,64 @@ def run_check() -> tuple[int, list[str]]:
     return proc.returncode, failing
 
 
-def main() -> int:
-    original = SOURCE.read_text(encoding="utf-8")
-    BACKUP.write_text(original, encoding="utf-8")
+def mutate_module(module: str) -> list[tuple[str, object, list[str]]]:
+    """Apply every mutation for one module, restoring the file in a finally."""
+    source = source_of(module)
+    backup = backup_of(module)
+    original = source.read_text(encoding="utf-8")
+    backup.write_text(original, encoding="utf-8")
 
-    baseline_code, baseline_failing = run_check()
+    baseline_code, baseline_failing = run_check(module)
     if baseline_code != 0:
-        print("BASELINE IS NOT GREEN -- fix that before mutating")
-        for line in baseline_failing:
-            print(f"  {line}")
-        BACKUP.unlink(missing_ok=True)
-        return 2
+        backup.unlink(missing_ok=True)
+        raise SystemExit(
+            f"BASELINE IS NOT GREEN for src/{module}.py -- fix that before mutating\n"
+            + "\n".join(f"  {line}" for line in baseline_failing)
+        )
 
     results: list[tuple[str, object, list[str]]] = []
     try:
-        for label, needle, replacement in MUTATIONS:
+        for label, needle, replacement in TARGETS[module]:
             if needle not in original:
                 results.append((label, "NEEDLE NOT FOUND", []))
                 continue
-            SOURCE.write_text(original.replace(needle, replacement, 1), encoding="utf-8")
-            code, failing = run_check()
+            source.write_text(original.replace(needle, replacement, 1), encoding="utf-8")
+            code, failing = run_check(module)
             results.append((label, code, failing))
     finally:
-        SOURCE.write_text(original, encoding="utf-8")
-        BACKUP.unlink(missing_ok=True)
+        source.write_text(original, encoding="utf-8")
+        backup.unlink(missing_ok=True)
+    return results
+
+
+def main() -> int:
+    wanted = [arg for arg in sys.argv[1:] if not arg.startswith("-")] or list(TARGETS)
+    unknown = [module for module in wanted if module not in TARGETS]
+    if unknown:
+        print(f"no mutations defined for {unknown}; known modules: {list(TARGETS)}")
+        return 2
 
     print("MUTATION RESULTS -- a mutation that exits 0 is a check that cannot fail\n")
     survivors: list[str] = []
-    for label, code, failing in results:
-        caught = code == 1 and bool(failing)
-        print(f"[{'CAUGHT  ' if caught else 'SURVIVED'}] exit={code}  {label}")
-        for line in failing[:2]:
-            print(f"           {line}")
-        if not caught:
-            survivors.append(label)
+    total = 0
+    for module in wanted:
+        results = mutate_module(module)
+        total += len(results)
+        module_survivors = 0
+        print(f"-- src/{module}.py, checked by `python -m src.{module} --check`")
+        for label, code, failing in results:
+            caught = code == 1 and bool(failing)
+            print(f"[{'CAUGHT  ' if caught else 'SURVIVED'}] exit={code}  {label}")
+            for line in failing[:2]:
+                print(f"           {line}")
+            if not caught:
+                survivors.append(f"{module}: {label}")
+                module_survivors += 1
+        print(
+            f"   {len(results) - module_survivors}/{len(results)} caught in {module}\n"
+        )
 
-    print(f"\n{len(results) - len(survivors)}/{len(results)} mutations caught")
+    print(f"{total - len(survivors)}/{total} mutations caught across {len(wanted)} module(s)")
     for label in survivors:
         print(f"  SURVIVOR: {label}")
     return 0 if not survivors else 1
