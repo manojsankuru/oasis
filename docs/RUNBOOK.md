@@ -8,19 +8,63 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Sun 30 Aug, at the end of S9.
+Checked Sun 30 Aug, at the end of S10.
 
 | | |
 | --- | --- |
 | Plan | Mon 31 Aug converted from a paper day to a build day: S8-S9 Sat 29, S10-S12 Sun 30, S13-S14 Mon 31, paper Tue 1 - Wed 2, submit Wed 3, deadline Fri 4. |
-| Reality | S1-S9 done. |
-| Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace` |
-| Missing | `sandbox` (S10), `critic` (S11), `scenarios`, `faults`, `figures` |
+| Reality | S1-S10 done. |
+| Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace`, `sandbox` |
+| Missing | `critic` (S11), `scenarios`, `faults`, `figures` |
 
-**The agent answers a question.** `python -m src.demo` runs rather than refuses,
-and the numbers in its answer match `outputs/tradeoff.csv` line for line.
+**The agent writes and repairs its own code.** `python -m src.demo` runs rather
+than refuses, the numbers in its answer match `outputs/tradeoff.csv` line for
+line, and `run_spatial_code` now executes rather than returning a refusal.
 
-What S10 inherits:
+What S11 inherits:
+
+- **`src/sandbox.py` is built and `run_spatial_code` is live.** `tools.py` and
+  `schemas.py` were not edited: `pending_tools()` probes for the module, so the
+  tool started working the moment the file existed. The one remaining pending
+  tool is `validate_answer`, backed by `src/critic.py` — S11's job, and the same
+  probe will pick it up. What it must provide is a class named `Critic`,
+  constructible with no arguments, with
+  `check(answer, steps, cycle) -> CriticReport`. `tools.logged_calls()` is the
+  in-process list of every tool result, which is what the critic traces against.
+- **The sandbox is a timeout and working-directory boundary, not a security
+  boundary**, and says so in its own docstring. Model-written Python runs in a
+  child with a deadline; the whole process tree is killed when it expires. Every
+  subprocess writes stdout and stderr to FILES rather than pipes, because a
+  killed child's surviving grandchild holding an inherited pipe is what hangs
+  `mutate.py` — whose `run_check` still has no timeout of its own.
+- **How the layers reach model-written code**, decided in S10 and written into
+  the module docstring: the parent dumps `tools.analysis()`'s frames to parquet
+  in a temp directory it owns, once per process, and the child reads them back by
+  name. The dump is keyed on the identity of the `Analysis` object, so a live
+  retrieval that calls `tools.invalidate()` invalidates the dump too, with no
+  edit in `tools.py`. The child cannot import `src`, so rebuilding the pipeline
+  in the child is unreachable rather than merely discouraged.
+- **`CodeRun.error_type` carries the taxonomy.** `Timeout`, `SyntaxError`,
+  `NonZeroExit`, `ShapeMismatch`, `CRSError`, `GeometryInOutput` and whatever the
+  traceback ends with. `sandbox.metrics()` reports attempts per request,
+  first-run failure rate, repair rate and the taxonomy; `format_metrics()` prints
+  it. That is the instrumentation criterion IR asks for and the critic's half of
+  it is S11.
+- **`repair_loop` is not reachable from the tool surface.** `run_spatial_code`
+  calls `run` only, and the agent's own loop is the repair there. Drive the
+  bounded loop directly with `python -m src.sandbox "<request>"`, which takes an
+  optional `author` on `Sandbox(...)` so the loop mechanics can be checked with a
+  scripted author offline.
+- **A failed run tells the model what names it had.** `sandbox.available_names()`
+  is generated from the dump and appended to the stderr of any non-zero run. It
+  is there because the first demo run had the model invent `CONTEXT.layers`, get
+  a true and useless `NameError`, and report the tool as broken. If you add a
+  tool that hands the model a capability, check that something tells it the
+  interface — 95 green checks did not. See `failures.md`.
+- **`MAX_ITERATIONS` is still 6.** S11 raises it. A question that needs a tool
+  call, a preference, a failed code run and a repair uses five of the six.
+
+What S10 inherited from S9:
 
 - **The eleven names in `contracts.TOOL_NAMES` are implemented** in `src/tools.py`
   and advertised by `src/schemas.py`. `tools.surface_faults()` returns nothing;
@@ -71,6 +115,29 @@ Measured on this county, S9:
   tool that forwards free text needs to go through that filter.
 - `flood_zones` is still DEGRADED. `hazard.vector_hazard_status` reports the
   hazard as elevation-only rather than as an absence of flood risk.
+
+Measured in S10, on the real model (`google/gemini-2.5-pro` through Vertex):
+
+- Seven `repair_loop` requests the eleven tools cannot answer. Five succeeded on
+  the first attempt; two failed and both repaired on the second. First-attempt
+  failure rate 29%, repair rate 100%, mean 1.29 attempts.
+- Three agent questions the eleven tools cannot answer, through
+  `python -m src.demo`. All three answered, in 3, 6 and 4 LLM calls of the six
+  allowed. One shows the repair in the agent's own loop: `KeyError` on `tracts`,
+  then `tracts_joined`, then the answer. Two of the three answers match a
+  `repair_loop` session run separately — 0.659 and 15 tracts / 48,192 residents.
+- The two real failures were `TypeError` — `AREALAND` arrives as an Arrow string
+  under pandas 3, so `area - AREALAND` raises, and the fix is `pd.to_numeric` —
+  and `ModuleNotFoundError` for `libpysal`, which the model replaced with a
+  hand-written contiguity matrix. Neither was staged; both transcripts are the
+  trace-figure material for criterion TU.
+- A run costs about 0.6 s. Layers are bound lazily in the child, so a program
+  that touches no layer pays interpreter start only, and one that touches all
+  eight pays about half a second of parquet.
+- The output guard withheld a coordinate on every one of eight shapes tried
+  against the real layers, including a layer projected back to EPSG:4326 and
+  printed at three decimal places — the shape the reviewer found and no rule in
+  the first version could see.
 
 ## The ritual — identical every session
 

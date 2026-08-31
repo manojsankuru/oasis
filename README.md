@@ -13,16 +13,20 @@ See `CLAUDE.md` for the hard invariants, `src/contracts.py` for the frozen inter
 
 ## Status
 
-Session S9 of 14 complete. **The agent answers a question.** On top of the deterministic
-spine there is now a tool surface: the eleven names in `contracts.TOOL_NAMES`, each
-returning a small JSON result, and flat scalar argument schemas with no `$ref`, `$defs`
-or `anyOf` anywhere in the emitted JSON.
+Session S10 of 14 complete. **The agent writes, runs and repairs its own code.** On top
+of the deterministic spine there is a tool surface — the eleven names in
+`contracts.TOOL_NAMES`, each returning a small JSON result, with flat scalar argument
+schemas carrying no `$ref`, `$defs` or `anyOf` — and behind `run_spatial_code` there is
+now a sandbox: model-written Python in a child process, with the traceback brought back
+as the thing the model repairs from. That is the first of the two feedback cycles the
+architecture names.
 
 ```powershell
 python -m src.pipeline          # writes outputs/risk_*.csv and outputs/tradeoff.csv
 python -m src.demo              # ask the agent; needs .env and a model
 python -m src.tools             # the tool surface, printed
 python -m src.schemas           # the emitted specs, printed
+python -m src.sandbox "<request>"   # one repair session, printed; needs a model
 ```
 
 The deterministic spine still runs end to end with **no API key and no model**: live
@@ -37,17 +41,34 @@ traces every reported number back to a logged tool result. A check asserts on th
 county that the tool route and the pipeline route return the same units in the same
 order.
 
-Two of the eleven are backed by modules that do not exist yet — `run_spatial_code` by
-`src/sandbox.py` (S10) and `validate_answer` by `src/critic.py` (S11). They are probed
-for at run time, advertised to the model as unavailable so no turn is spent discovering
-it, and return a refusal naming the missing module. Nothing about that state is written
-down: the day the module lands, the tool works.
+One of the eleven is still backed by a module that does not exist — `validate_answer` by
+`src/critic.py` (S11). It is probed for at run time, advertised to the model as
+unavailable so no turn is spent discovering it, and returns a refusal naming the missing
+module. Nothing about that state is written down, which is why `run_spatial_code` started
+working the moment `src/sandbox.py` landed, with no edit in `tools.py` or `schemas.py`.
+
+**The sandbox is a timeout and working-directory boundary, not a security boundary.** It
+runs model-written Python in a subprocess with the same interpreter and packages as the
+parent. It bounds the run and kills the whole process tree when the bound expires, gives
+the code a scratch directory so it cannot reach `data/`, and refuses to carry a
+coordinate back into a model message. It does not sandbox the filesystem, the network or
+the process table, and the paper's limitations say so. The cleaned layers reach the child
+as a parquet dump the sandbox writes once per process and rebuilds when a live retrieval
+replaces the snapshot — the child cannot import the pipeline, so a second computation of
+a reported number is not merely discouraged but unreachable.
 
 Every module carries its own `--check` that verifies its results against an
 independently computed value, and `python mutate.py` breaks each of those checks on
-purpose and reports any that did not notice. As of S9: **525 checks across seven
-modules, all passing, and 166 mutations with no survivors.** What that number does not
+purpose and reports any that did not notice. As of S10: **624 checks across eight
+modules, all passing, and 192 mutations with no survivors.** What that number does not
 reach is stated in `docs/failures.md` rather than left implied.
+
+`failures.md` is the honest half of this and it grew by three entries in S10, two of them
+found after the suite was green. The one worth reading is the last: the sandbox passed 95
+checks and a zero-survivor sweep, and the first real agent run had the model invent an API
+that does not exist, get a correct and useless `NameError`, and report the tool as broken.
+A capability whose interface cannot be discovered is not a capability, and no test written
+by the person who built it could see that.
 
 ## Setup
 

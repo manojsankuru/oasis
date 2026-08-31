@@ -657,6 +657,115 @@ TOOLS_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+SANDBOX_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- the deadline, and what is left running behind it --------------------
+    # Every entry here breaks the KILL or the VERDICT, never the WAIT. `run_check`
+    # above calls subprocess.run with no timeout of its own, so a mutation that
+    # lengthened a deadline would hang this harness silently rather than being
+    # reported. These all fail inside the fixture's own settle window.
+    ("a run that outlives its deadline is abandoned rather than killed",
+     "            if timed_out:\n                kill_tree(process)",
+     "            if timed_out:\n                pass"),
+    ("the kill stops at the child, so a grandchild survives it",
+     '                ["taskkill", "/F", "/T", "/PID", str(process.pid)],',
+     '                ["taskkill", "/F", "/PID", str(process.pid)],'),
+    ("a run that ran out of time is not recognised as one",
+     "            timed_out = process.poll() is None",
+     "            timed_out = False"),
+    ("a killed run reports exit zero, so a timeout reads as a success",
+     "            exit_code = process.returncode if process.returncode is not None else TIMEOUT_EXIT_CODE",
+     "            exit_code = 0"),
+
+    # -- invariant 3 on the child's stdout -----------------------------------
+    ("the output guard passes every line through untouched",
+     "        faults = output_faults(line)",
+     "        faults = []"),
+    # The three rules the invariant reviewer added. Each was invisible to the
+    # first rule set and each has one fixture that only it can catch.
+    ("the rule that sees a bare coordinate pair is dropped",
+     '    ("two decimal numbers side by side", BARE_PAIR),',
+     '    ("two decimal numbers side by side", GEOMETRY_TEXT),'),
+    ("the rule that sees a labelled projected pair is dropped",
+     '    ("two large decimal numbers with a label between them", LABELLED_PAIR),',
+     '    ("two large decimal numbers with a label between them", BARE_PAIR),'),
+    ("a name that labels a coordinate stops being tested",
+     '            faults.append("a name that could label a coordinate, in front of a number")',
+     "            pass"),
+    ("a quoted coordinate column name stops being tested",
+     '            faults.append("a quoted name that could be a coordinate column")',
+     "            pass"),
+    ("the child stops guarding what it prints",
+     "builtins.print = guarded_print",
+     "pass"),
+    ("a stream longer than the bound is sent whole, crowding the run's turns",
+     "    if len(joined) <= STREAM_LIMIT:",
+     "    if True:"),
+
+    # -- the traceback the model repairs from --------------------------------
+    ("the traceback is reduced to its last line, so no frame reaches the model",
+     '        sys.stderr.write("".join(traceback.format_exception(kind, value, tb.tb_next or tb)))',
+     '        sys.stderr.write("".join(traceback.format_exception(kind, value, None)))'),
+    ("the sandbox's own frame is left on top of the model's traceback",
+     '        sys.stderr.write("".join(traceback.format_exception(kind, value, tb.tb_next or tb)))',
+     '        sys.stderr.write("".join(traceback.format_exception(kind, value, tb)))'),
+
+    # -- what a failure tells the model ---------------------------------------
+    # The S10 demo failed here: the tool ran, the model did not know what the
+    # layers were called, and a true and complete NameError was useless.
+    ("a failed run stops saying what names it had bound",
+     '            raw_err = raw_err + "\\n" + available_names(space) + "\\n"',
+     "            pass"),
+    ("the failure is classified after the inventory, so the last line is not the error",
+     '        failed_as = classify(int(exit_code), raw_err, timed_out)\n'
+     '        if exit_code != 0:\n'
+     '            raw_err = raw_err + "\\n" + available_names(space) + "\\n"',
+     '        if exit_code != 0:\n'
+     '            raw_err = raw_err + "\\n" + available_names(space) + "\\n"\n'
+     '        failed_as = classify(int(exit_code), raw_err, timed_out)'),
+
+    # -- the error taxonomy, which is the half of criterion IR worth reporting -
+    ("every failure is classified as the same thing",
+     "    return short",
+     '    return "Error"'),
+    ("a shape mismatch is reported as a bare ValueError",
+     '    if short == "ValueError" and SHAPE_MISMATCH.search(stderr):',
+     "    if False:"),
+
+    # -- the dump the child reads --------------------------------------------
+    ("the dump survives a retrieval that replaced the snapshot it came from",
+     "    if _WORKSPACE is None or _WORKSPACE.built_from is not state:",
+     "    if _WORKSPACE is None:"),
+    ("only the head of each layer is dumped, so the child measures a sample",
+     "    frame.to_parquet(path)",
+     "    frame.head(5).to_parquet(path)"),
+    ("a degraded layer is offered to the model as an ordinary one",
+     '        layers[name]["degraded"] = base in degraded',
+     '        layers[name]["degraded"] = False'),
+    ("the child runs outside the scratch directory the sandbox owns",
+     "                        cwd=run_directory,",
+     "                        cwd=tempfile.gettempdir(),"),
+
+    # -- the repair loop, at its call sites -----------------------------------
+    ("the loop asks again without showing the model the traceback",
+     '            messages.append({"role": "user", "content": repair_message(run)})',
+     '            messages.append({"role": "user", "content": "try again"})'),
+    ("every attempt is reported as the first one",
+     "            run.attempt = attempt",
+     "            run.attempt = 1"),
+    ("the loop keeps going after the code works",
+     "            if run.exit_code == 0:",
+     "            if False:"),
+
+    # -- the instrumentation --------------------------------------------------
+    ("a run is not recorded, so nothing can be measured over it",
+     "    RUNS.append(run)",
+     "    [].append(run)"),
+    ("the repair rate is taken over every session, not the ones that failed first",
+     "            round(len(repaired) / len(first_failed), 3) if first_failed else 0.0",
+     "            round(len(repaired) / len(sessions), 3) if sessions else 0.0"),
+]
+
+
 TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "align": ALIGN_MUTATIONS,
     "hazard": HAZARD_MUTATIONS,
@@ -665,6 +774,7 @@ TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "pipeline": PIPELINE_MUTATIONS,
     "schemas": SCHEMAS_MUTATIONS,
     "tools": TOOLS_MUTATIONS,
+    "sandbox": SANDBOX_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
 
