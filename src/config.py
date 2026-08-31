@@ -118,7 +118,10 @@ REQUEST_TIMEOUT_S = 60.0
 MAX_RETRIES = 3
 RETRY_BACKOFF_S = 2.0
 
-MAX_ITERATIONS = 6
+MAX_ITERATIONS = 15
+"""Turns one question may take. Raised from six in S11: the revision cycle spends
+a turn per critic firing, and a question that needs a tool call, a preference, a
+failed code run, a repair and two revisions used every one of the old six."""
 
 CENSUS_API_KEY = _setting("CENSUS_API_KEY")
 

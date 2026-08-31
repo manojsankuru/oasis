@@ -8,29 +8,73 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Sun 30 Aug, at the end of S10.
+Checked Mon 31 Aug, at the end of S11.
 
 | | |
 | --- | --- |
-| Plan | Mon 31 Aug converted from a paper day to a build day: S8-S9 Sat 29, S10-S12 Sun 30, S13-S14 Mon 31, paper Tue 1 - Wed 2, submit Wed 3, deadline Fri 4. |
-| Reality | S1-S10 done. |
-| Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace`, `sandbox` |
-| Missing | `critic` (S11), `scenarios`, `faults`, `figures` |
+| Plan | S11 and S12 Mon 31 with S13 and S14, paper Tue 1 - Wed 2, submit Wed 3, deadline Fri 4. |
+| Reality | S1-S11 done. |
+| Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace`, `sandbox`, `critic` |
+| Missing | `scenarios`, `faults`, `figures`, `src/experiments/` |
 
-**The agent writes and repairs its own code.** `python -m src.demo` runs rather
-than refuses, the numbers in its answer match `outputs/tradeoff.csv` line for
-line, and `run_spatial_code` now executes rather than returning a refusal.
+**Both feedback cycles now exist.** Code repair around the sandbox, and critic
+revision around the answer. `python -m src.tools` lists no tool as `[PENDING]`,
+`tools.pending_tools()` is empty and `tools.surface_faults()` is empty: the
+eleven names in `contracts.TOOL_NAMES` are all advertised, all executable, and
+all backed by a module that exists.
 
-What S11 inherits:
+What S12 inherits:
 
-- **`src/sandbox.py` is built and `run_spatial_code` is live.** `tools.py` and
-  `schemas.py` were not edited: `pending_tools()` probes for the module, so the
-  tool started working the moment the file existed. The one remaining pending
-  tool is `validate_answer`, backed by `src/critic.py` — S11's job, and the same
-  probe will pick it up. What it must provide is a class named `Critic`,
-  constructible with no arguments, with
-  `check(answer, steps, cycle) -> CriticReport`. `tools.logged_calls()` is the
-  in-process list of every tool result, which is what the critic traces against.
+- **`src/critic.py` is built and `validate_answer` is live.** `tools.py` and
+  `schemas.py` were not edited for it either — `pending_tools()` probes for the
+  module, so the tool started working the moment the file existed, which is now
+  the second time that design has paid. `Critic()` takes no arguments and
+  implements the frozen protocol.
+- **How a number is matched, decided in S11 and written into the module
+  docstring.** Every numeral is extracted from the answer and from each logged
+  result — walking the JSON values *and* the stdout strings `run_spatial_code`
+  returns — and matched within a tolerance stated as the rounding rather than as
+  slack: a claim written to `d` decimal places matches anything within half of
+  `10**-d`, and an integer written with three or more trailing zeros is read as
+  rounded to that power of ten. Exact string matching was rejected (`0.659` does
+  not appear in `0.659430`) and asking the model to cite itself was rejected as
+  circular. **A number is never traced to a tool ARGUMENT**, only to what came
+  back; tracing to the arguments would be the circular option wearing the other
+  one's clothes.
+- **Identifiers are masked before any number is read.** A GEOID is eleven
+  digits, a markdown list marker is a numeral at the start of a line, a scenario
+  name spells its own surge height, a vintage is a year range, and a backtick
+  span is a name. Without those masks a perfect answer produces a dozen
+  untraceable numbers and the revision cycle rewrites a right answer into a wrong
+  one. This is the single most important thing in the module and every mask has
+  its own check.
+- **`invariants(frame)` holds the WITHIN-unit rules only** — exposure never
+  exceeds population, an index that claims a percentile lies in [0, 1], a rank is
+  dense over the *scored* units, mean depth never exceeds max depth, minimum
+  elevation never exceeds mean. The cross-scenario rules stay in
+  `pipeline._monotonic_checks` and are deliberately not called from here: one
+  frame cannot reach them, and calling them would compare the pipeline against
+  itself. The rules run over four real frames, because they do not all live on
+  one — the elevation pair is only on `tracts_joined` and never reaches a risk
+  table. `applicable()` returns what it SKIPPED as well as what it ran, which is
+  the only reason that was noticed.
+- **The revision cycle is in `agent.py`, bounded at `MAX_REVISIONS = 2`.** A
+  final answer is checked, findings go back as a user turn, the model rewrites.
+  Every firing is its own step type (`critic_report`, `revision_request`) so
+  `trace.py` and the paper can count them. `stop_reason` is `revision_limit`
+  when the bound ends it. **Set `MAX_REVISIONS = 0` for report-only mode** — the
+  critic still runs and still publishes findings, and nothing is rewritten. That
+  was S11's cut line and it did not have to be taken.
+- **`MAX_ITERATIONS` is now 15.** A revision spends a turn.
+- **`ask_user_preferences` really asks.** It blocks on `input()` only when
+  `sys.stdin.isatty()` AND `tools.ELICIT` are both true, and falls back to the
+  menu otherwise, so no non-interactive harness can hang on it —
+  `mutate.py`'s `run_check` still has no timeout of its own. `elicited` says
+  whether a person answered, never whether a choice was made. The chosen
+  weighting is then **re-scored through the same `scored()` call `risk_scenario`
+  makes**, so the preference reaches the ranking rather than the transcript.
+  `_self_check` closes the channel around `_every_result` and reopens it for the
+  one check that drives the real prompt with a scripted reader.
 - **The sandbox is a timeout and working-directory boundary, not a security
   boundary**, and says so in its own docstring. Model-written Python runs in a
   child with a deadline; the whole process tree is killed when it expires. Every
@@ -48,8 +92,10 @@ What S11 inherits:
   `NonZeroExit`, `ShapeMismatch`, `CRSError`, `GeometryInOutput` and whatever the
   traceback ends with. `sandbox.metrics()` reports attempts per request,
   first-run failure rate, repair rate and the taxonomy; `format_metrics()` prints
-  it. That is the instrumentation criterion IR asks for and the critic's half of
-  it is S11.
+  it. The critic's half of that instrumentation now exists too: every run reports
+  `cycles_run`, `revisions_requested`, `findings_per_cycle`, `findings_by_kind`,
+  `answers_changed_after_revision` and `revisions_that_made_it_worse` under
+  `totals.revision` in the transcript, and the tracer prints them.
 - **`repair_loop` is not reachable from the tool surface.** `run_spatial_code`
   calls `run` only, and the agent's own loop is the repair there. Drive the
   bounded loop directly with `python -m src.sandbox "<request>"`, which takes an
@@ -61,8 +107,6 @@ What S11 inherits:
   a true and useless `NameError`, and report the tool as broken. If you add a
   tool that hands the model a capability, check that something tells it the
   interface — 95 green checks did not. See `failures.md`.
-- **`MAX_ITERATIONS` is still 6.** S11 raises it. A question that needs a tool
-  call, a preference, a failed code run and a repair uses five of the six.
 
 What S10 inherited from S9:
 
@@ -138,6 +182,55 @@ Measured in S10, on the real model (`google/gemini-2.5-pro` through Vertex):
   against the real layers, including a layer projected back to EPSG:4326 and
   printed at three decimal places — the shape the reviewer found and no rule in
   the first version could see.
+
+Measured in S11:
+
+- **789 checks across nine modules, all PASS. 225 mutations, zero survivors.**
+  align 145, hazard 65, vulnerability 57, risk 68, pipeline 34, schemas 38,
+  tools 135, sandbox 99, critic 148. `tools` went from 118 to 135 when
+  `validate_answer` stopped being pending and the elicitation checks landed.
+- **The `tools` pending checks are now partly vacuous and the gate says so.**
+  With no tool pending, `refusals` is an empty dict and three of the five
+  assertions in `_pending_checks` pass over an empty set. They are not wrong.
+  They cannot fail, which is a different thing, and quoting five green checks
+  there would be quoting a guard that has nothing left to guard. The branch is
+  still exercised by `_fault_checks`, which feeds `faults_between` sets that
+  disagree one way at a time.
+
+Measured in S11, on the real model (`google/gemini-2.5-pro` through Vertex):
+
+- **The critic fires on real answers and the revision fixes them.** Asked what
+  share of the county is exposed at three metres, the model called
+  `hazard_exposure` twice and then did the division in its head, reporting
+  "44.6%" and "23.6%". Neither number was in any tool result. The critic caught
+  both — 7 of 9 traced — the loop sent the findings back, and the model answered
+  the revision by calling `run_spatial_code` twice to compute the two
+  percentages, then reported 44.579% and 23.565%. Cycle 2: 9 of 9 traced,
+  passed. One question, both feedback cycles, four LLM calls.
+- **It stays quiet on a correct answer.** The trade-off question answered in two
+  LLM calls with one `compare_scenarios` call; the critic traced 6 of 6 and
+  raised nothing. The six numbers were the population and vulnerable-population
+  counts. The thirty GEOIDs, the three weighting names and the markdown list
+  markers in that answer were all correctly read as identifiers rather than
+  claims — which is the failure mode that would have mattered, because firing
+  there would have had the loop rewrite a correct answer.
+- The trade-off rule stayed quiet on that answer for the right reason: it named
+  all three weightings *and* said which units each one drops. An answer that
+  ranks communities and does neither raises an `unsupported_claim`.
+- On the real county every domain rule holds, on all four frames, which is why
+  every one of them has a hand-built violating fixture.
+- **The first `mutate.py critic` sweep caught 26 of 30, and the survivors were
+  the point.** Three were checks that could not fail — one fixture standing in
+  for two rules, one asserting about a function that does not run on the path
+  under test, and one satisfied by a different finding carrying the same word.
+  The fourth was not a defect and was removed, but investigating it turned up a
+  lookbehind that dropped every number after the first in a comma-separated run.
+  After the fixes: **33 mutations, zero survivors.** Read the last two entries of
+  `failures.md` before writing S12's checks; the harness earned its runtime here.
+- The `invariant-reviewer` found the one that mattered most and no suite could
+  have: a span in backticks was masked unconditionally, so a fabricated figure
+  written as `` `48200` `` was erased rather than reported, and the count is taken
+  after masking so the report claimed full coverage of a set it had shrunk.
 
 ## The ritual — identical every session
 

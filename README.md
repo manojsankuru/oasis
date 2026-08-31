@@ -13,13 +13,13 @@ See `CLAUDE.md` for the hard invariants, `src/contracts.py` for the frozen inter
 
 ## Status
 
-Session S10 of 14 complete. **The agent writes, runs and repairs its own code.** On top
-of the deterministic spine there is a tool surface — the eleven names in
-`contracts.TOOL_NAMES`, each returning a small JSON result, with flat scalar argument
-schemas carrying no `$ref`, `$defs` or `anyOf` — and behind `run_spatial_code` there is
-now a sandbox: model-written Python in a child process, with the traceback brought back
-as the thing the model repairs from. That is the first of the two feedback cycles the
-architecture names.
+Session S11 of 14 complete. **Both feedback cycles now exist.** Behind
+`run_spatial_code` there is a sandbox — model-written Python in a child process, with the
+traceback brought back as the thing the model repairs from. Around the answer there is now
+a critic: every number the agent reports is traced back to a logged tool result, and an
+answer that cannot support one is sent back to be rewritten, bounded at two revision
+cycles. All eleven names in `contracts.TOOL_NAMES` are advertised, executable and backed
+by a module that exists; `python -m src.tools` lists none as `[PENDING]`.
 
 ```powershell
 python -m src.pipeline          # writes outputs/risk_*.csv and outputs/tradeoff.csv
@@ -27,7 +27,21 @@ python -m src.demo              # ask the agent; needs .env and a model
 python -m src.tools             # the tool surface, printed
 python -m src.schemas           # the emitted specs, printed
 python -m src.sandbox "<request>"   # one repair session, printed; needs a model
+python -m src.critic            # replay the newest run through the critic
 ```
+
+**How the critic decides a number is real.** Every numeral is extracted from the answer
+and from every logged tool result — walking the JSON values and the stdout strings
+`run_spatial_code` returns — and matched within a tolerance stated as the rounding rather
+than as slack: a claim written to three decimal places matches anything within half a
+thousandth, so `0.659` traces to a table printing `0.659430` and `48,192` traces to a line
+printing `48192`. Exact string matching fails every real answer; asking the model to cite
+its own sources asks the thing under test. A number is never traced to a tool *argument*,
+only to what came back. Identifiers are masked before any number is read — a GEOID is
+eleven digits, a scenario name spells its own surge height, a markdown list marker is a
+numeral at the start of a line — because a critic that fires on a correct answer is worse
+than no critic: the revision cycle would then rewrite a right answer into a wrong one and
+log it as a success.
 
 The deterministic spine still runs end to end with **no API key and no model**: live
 retrieval, cleaning, a bathtub inundation model over 3DEP elevation, a weighted
@@ -36,16 +50,22 @@ naming who each weighting drops. Every number the agent quotes comes from there.
 
 **No tool computes anything.** `pipeline.run()` takes about 40 seconds for three
 scenarios; one result is built per process and every tool reads from it. A tool that
-recomputed a number would be a second answer to one question, and `critic.py` in S11
-traces every reported number back to a logged tool result. A check asserts on the real
-county that the tool route and the pipeline route return the same units in the same
-order.
+recomputed a number would be a second answer to one question, and `critic.py` traces every
+reported number back to a logged tool result. A check asserts on the real county that the
+tool route and the pipeline route return the same units in the same order.
 
-One of the eleven is still backed by a module that does not exist — `validate_answer` by
-`src/critic.py` (S11). It is probed for at run time, advertised to the model as
-unavailable so no turn is spent discovering it, and returns a refusal naming the missing
-module. Nothing about that state is written down, which is why `run_spatial_code` started
-working the moment `src/sandbox.py` landed, with no edit in `tools.py` or `schemas.py`.
+Neither `sandbox.py` nor `critic.py` required an edit in `tools.py` or `schemas.py` to go
+live. `tools.pending_tools()` probes for the backing module with `importlib.util.find_spec`
+rather than reading a list somebody maintains, so each tool stopped being pending the
+moment its file existed — the same property twice, and the reason `agent.system_prompt()`
+builds its tool inventory from the frozen names instead of prose.
+
+**The human is asked, and the answer scores.** `ask_user_preferences` blocks on `input()`
+when there is a terminal and falls back to the published menu when there is not, so no
+batch harness can hang on it, and `elicited` says which happened rather than implying one.
+The chosen weighting is then re-scored through the same call `risk_scenario` makes, and
+the result names which units each *other* weighting would have prioritised and this one
+drops — so the preference reaches the ranking rather than the transcript.
 
 **The sandbox is a timeout and working-directory boundary, not a security boundary.** It
 runs model-written Python in a subprocess with the same interpreter and packages as the
@@ -59,16 +79,28 @@ a reported number is not merely discouraged but unreachable.
 
 Every module carries its own `--check` that verifies its results against an
 independently computed value, and `python mutate.py` breaks each of those checks on
-purpose and reports any that did not notice. As of S10: **624 checks across eight
-modules, all passing, and 192 mutations with no survivors.** What that number does not
-reach is stated in `docs/failures.md` rather than left implied.
+purpose and reports any that did not notice. As of S11: **789 checks across nine modules,
+all passing, and 225 mutations with no survivors** — `align` 145, `hazard` 65,
+`vulnerability` 57, `risk` 68, `pipeline` 34, `schemas` 38, `tools` 135, `sandbox` 99,
+`critic` 148. What that number does not reach is stated in
+`docs/failures.md` rather than left implied — and in S11 it reached three things, which is
+the strongest argument in this repository for running the harness rather than trusting the
+suite. The first `mutate.py critic` sweep caught 26 of 30, and three of the four survivors
+were checks that could not fail: one fixture standing in for two rules, one asserting about
+a function that does not run on the path under test, and one satisfied by a different
+finding that happened to contain the same word. The fourth was not a defect but led to
+one — investigating why it survived turned up a lookbehind that silently dropped every
+number after the first in a comma-separated run, which is an asserted number the critic
+would never have checked.
 
-`failures.md` is the honest half of this and it grew by three entries in S10, two of them
-found after the suite was green. The one worth reading is the last: the sandbox passed 95
-checks and a zero-survivor sweep, and the first real agent run had the model invent an API
-that does not exist, get a correct and useless `NameError`, and report the tool as broken.
-A capability whose interface cannot be discovered is not a capability, and no test written
-by the person who built it could see that.
+`failures.md` is the honest half of this and it grew by five entries in S11, two of them
+found after the suite was green and one found by an independent reviewer. The one worth
+reading is the backtick entry: `critic.py` masks identifiers out of an answer before
+reading any number, and a span in backticks was masked unconditionally on the assumption
+that it is always a name. A fabricated figure written as `` `48200` `` was therefore erased
+rather than reported — and because the count is taken after masking, the report said every
+number traced while holding a set it had silently shrunk. A hole in invariant 8 that reads
+as compliance, in the module written to enforce invariant 8.
 
 ## Setup
 

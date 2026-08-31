@@ -1368,3 +1368,243 @@ unusable, and the only instrument that could see it was running the thing end to
 reading what the model said. The honest form of the lesson is that a tool surface has two
 halves — what it does and how a model finds out — and a test suite written by the person
 who built it can only ever exercise the first.
+
+## 2026-08-31 — the domain rules had never been run on a real frame (S11)
+
+**What happened.** Eleven fixture frames, each built by hand to break one rule, each
+asserted to produce exactly one finding. All green. Then `invariants()` was pointed at the
+county the pipeline really produces, and it did not return a finding — it raised:
+
+```
+  File "src/critic.py", line 454, in <listcomp>
+    positions = [index for index, bad in enumerate(flags.to_numpy()) if bool(bad)]
+  File "pandas/_libs/missing.pyx", line 415, in pandas._libs.missing.NAType.__bool__
+TypeError: boolean value of NA is ambiguous
+```
+
+**Where.** `offending_units` in `src/critic.py`, which turns a boolean mask into a list of
+offending units.
+
+**Why.** The fixture frames are built with `pd.DataFrame({...})` from Python floats, so
+every column is `float64` and a comparison returns plain `True` or `False`. The real
+tables carry pandas' nullable dtypes — `risk.py` writes `Float64` — and a comparison
+against a missing value there is `pd.NA`, which raises rather than answering when read as
+a boolean. One unscored water tract is enough. The guard was written against the frames
+the *fixtures* produce and the channel is the frame the *pipeline* produces, which is the
+S10 lesson with the nouns changed.
+
+**The second finding, same act.** With the crash fixed, the rules ran and one of the ten
+applied to no real frame at all. The elevation pair lives on the joined layer and never
+reaches a risk table, so `elev_min_m <= elev_mean_m` was skipped on every table the critic
+was pointed at — silently, because a skipped rule and a satisfied rule both return
+nothing. It was visible only because `applicable()` returns what it skipped as well as
+what it ran, and a check asserted the skipped list was empty. Both are now held: the
+critic reads the joined units frame and every scenario table, and the check is that no
+rule is skipped by *every* real frame rather than by none.
+
+**Why no fixture caught either.** Every fixture frame was built in the same function from
+the same literals, so all eleven shared one dtype and one column set. Eleven fixtures
+written from one template are one fixture.
+
+**Did the agent recover?** Yes. `offending_units` fills missing comparisons with `False`
+and says why in its docstring — a unit with no value has not broken the rule, it has not
+been measured. `real_frames()` names the four frames the rules are held against, and
+`_real_frame_checks` asserts on each that it breaks no rule and, over all of them, that
+every rule reached at least one. Measured after: 129 checks PASS, exit 0.
+
+**Kept as a paper failure case?** Yes — §3.7. It is the third session running in which the
+defect was not in the rule but in the frame the rule was pointed at, and it is worth
+quoting because the fixtures were exactly what the S8 lesson asked for — one violating
+frame per rule, built by hand — and were still all one fixture, because one function built
+them all.
+
+## 2026-08-31 — three checks about a coordinate leak, on a report with no findings (S11)
+
+**What happened.** `_guard_checks` was written to prove invariant 3 holds on a
+`CriticReport`: feed the critic an answer carrying a coordinate pair, then scan every
+finding for a surviving coordinate. It passed on the first run, and the printed line
+underneath it said:
+
+```
+  a report on an answer carrying a coordinate pair: 0 finding(s), 90 bytes
+```
+
+Zero findings. The fixture put the coordinate pair in the answer **and** in the stdout the
+critic traced against, so both halves of the pair traced cleanly, the report was empty,
+and three assertions about what a finding may not carry ran over no findings at all.
+
+**Where.** `_guard_checks` in `src/critic.py`.
+
+**Why.** The fixture was built to make the coordinate *present*, and traceability was not
+the property under test, so the same blob was used for both sides without noticing that a
+traced number produces no finding and a finding is the only thing the scan reads.
+
+**Why it matters more than it looks.** This is the S9 and S10 shape one more time: a scan
+is only as wide as the set it is pointed at, and here the set was empty. The check was not
+wrong. It could not fail. The project has now shipped that shape five times, and the only
+thing that caught it this time was printing the finding count beside the verdict.
+
+**Did the agent recover?** Yes. The coordinate pair is now in the answer and *not* in the
+log, so it is untraceable, so it produces findings whose evidence quotes the answer around
+it — which is the path a coordinate would really take into a model message. A new
+assertion runs first and requires that the report carry findings with evidence at all,
+before anything scans them, so the scan can never again pass over nothing. Same fix as
+S10's, one level up: a check that cannot fail is reported as a fault rather than as a pass.
+
+**Kept as a paper failure case?** Yes — §3.7, and it belongs beside the S10 entry rather
+than after it. S10's checks exempted the one line the leak could be on. These scanned every
+line of a set that was empty. Both are the same defect wearing different clothes, and both
+were written by somebody who had just read the other one.
+
+## 2026-08-31 — a number in backticks was erased before it was ever checked (S11)
+
+**What happened.** Found by the `invariant-reviewer` run, behind 129 green checks in
+`critic.py` and 135 in `tools.py`. The critic masks identifiers out of an answer before it
+reads any number, and one of the masks was:
+
+```python
+CODE_SPAN = re.compile(r"`[^`\n]*`")
+```
+
+with the stated reason that "a backtick span is a name — a tool, a layer, a scenario, a
+preset". Nothing in the rule checked that. A span holding nothing but digits is erased
+too:
+
+```
+'The exposed population is `48200` residents, above the `31337` threshold.'
+  claims -> []
+```
+
+Both numbers gone. Without the backticks, both are claims.
+
+**Why it is worse than a miss.** `numbers_checked` is taken **after** the masks run. So the
+report does not say "two numbers could not be traced" — it says every number traced, over
+a set it silently shrank. `revision_request` then tells the model "3 of 3 number(s) in it
+traced back to a logged tool result" about an answer asserting four. A hole in invariant 8
+that reads as compliance is the worst shape this module can have, and it reached the final
+answer on both call paths: `validate_answer` and the loop's own end-of-run check.
+
+**Why it was plausible rather than theoretical.** The model already backticks numeric
+tokens throughout its real answers — 37 backticked GEOIDs in one transcript on disk. Those
+particular spans were correctly exempt for a different reason (eleven digits, caught by the
+identifier mask), which is precisely what made the hole invisible: every backticked number
+in the corpus was already meant to be masked, so the corpus could not distinguish the rule
+from the accident.
+
+**The check that should have caught it, and could not.** `_claim_checks` had one fixture
+for the rule that stops a scenario name donating its own surge height as a quantity, and it
+was written as `` `s_1_5m` `` — in backticks. `CODE_SPAN` erased the span before the
+digit-bearing-token rule ever saw it, so the assertion was satisfied by a rule it was not
+written for. Forcing the token rule to `if False:` changed nothing. Two rules, one fixture,
+and it only ever reached one of them. The mutation sweep agreed: `a scenario name spelling
+its own surge height is read as a quantity` **survived**.
+
+**Did the agent recover?** Yes. `CODE_SPAN` now requires a letter inside the span, so a
+name is still masked and a number is not. The fixture is split: the scenario name is bare
+so only the token rule can reach it, and a separate check asserts a backticked number is
+still checked. Measured after: 148 checks PASS, exit 0.
+
+**Kept as a paper failure case?** Yes — §3.7. It is the sixth session running in which an
+independent reviewer holding the invariants found something a green suite did not, and the
+first in which the defect was in the module written to enforce the invariant it broke.
+
+## 2026-08-31 — three mutations survived, and none of them for the same reason (S11)
+
+**What happened.** The first `python mutate.py critic` sweep caught 26 of 30. All four
+survivors were real, and only one had been predicted by the reviewer.
+
+**1. `a scenario name spelling its own surge height is read as a quantity`.** The
+backtick entry above. One fixture standing in for two rules.
+
+**2. `a number the model passed as an argument becomes evidence for it`.** The mutation
+edits `normalise_steps` to carry a call's `arguments` through beside its `result`, which
+would let a number be traced to what the model *asked for* rather than to what came back —
+the circular option the module docstring rejects. The fixture written to catch it called
+`candidates([asked_for])` directly and never went through `normalise_steps` at all, so it
+was asserting about a function that does not run on that path.
+
+**3. `an ordering that names no weighting stops being a finding`.** Two `unsupported_claim`
+rules fire on an ordering: one for naming no weighting, one for not saying who loses. The
+check for the first was
+
+```python
+any(item.kind == "unsupported_claim" and "weighting" in item.detail for item in bare.findings)
+```
+
+and the *second* rule's message tells the model to "name the units another **weighting**
+would have prioritised". So deleting the first rule outright left the check green, satisfied
+by the finding it was not about.
+
+**4. `a number is traced to any substring of a longer one` — not a defect, and removed.**
+This one survived because it is not a mutation. The guarantee that `192` does not trace to
+a line printing `48192` comes from `finditer` scanning left to right without overlapping,
+not from the lookbehind: the pattern consumes the digit run greedily, so the scan resumes
+after it. Dropping the lookbehind changes nothing any check can see.
+
+**What that investigation turned up instead.** The lookbehind was `(?<![\d.,])`, and
+excluding the comma had a cost nobody had looked for:
+
+```
+values 0.5,0.75,0.9   ->  ['0.5']
+```
+
+Every number after the first in a comma-separated run was dropped. On the answer side that
+is a second hole in invariant 8 — an asserted number never checked. On the result side it
+is worse than a hole, because a real number that stops being a candidate makes a *correct*
+answer fail, and a critic that fires on a correct answer has the revision cycle rewrite a
+right answer into a wrong one. The comma bought nothing: a comma inside a number is
+consumed by `[\d,]*` before the scan can resume on it.
+
+**Did the agent recover?** Yes. The lookbehind is `(?<![\d.])`, which still refuses
+`1.5.3` and now reads all three numbers in a comma-separated run. The three checks above
+are rewritten to reach what they claim to test, and the non-mutation is replaced by three
+that are real: a version string donating its components, a comma-run losing everything
+after the first, and a backticked number being erased. Measured after: 148 checks PASS.
+
+**Kept as a paper failure case?** Yes — §3.7, and it is the clearest evidence in the
+repository for why the mutation harness earns its runtime. Three of the four survivors were
+checks that could not fail, sitting in a suite written the same afternoon by somebody who
+had just read two `failures.md` entries about checks that could not fail. Reading about the
+failure mode does not confer immunity to it. Running the harness does.
+
+## 2026-08-31 — a mask replaced a number with a different number and passed (S11)
+
+**What happened.** Found while printing the gate output, after 147 green checks, a
+zero-survivor sweep and the reviewer's findings fixed. The gate item for invariant 3 feeds
+the critic an answer carrying a coordinate pair and prints every finding. One line read:
+
+```
+[untraceable_number] detail: the answer reports -80 and no logged tool result produced a
+                             number that rounds to it.
+```
+
+The answer says `-80.4535530002726`. The critic said `-80`.
+
+**Why.** The identifier mask was `LONG_DIGITS = re.compile(r"(?<!\d)\d{10,}(?!\d)")`,
+written for a GEOID — eleven digits for a tract, twelve for a block group. The fractional
+part of `-80.4535530002726` is thirteen digits, and nothing in the rule said an identifier
+cannot follow a decimal point. So the fraction was masked and `NUMBER` matched the integer
+part alone.
+
+**Why it is a hole in invariant 8 and not a display bug.** The claim is not dropped, it is
+*replaced*. `0.1234567890123` becomes a claim of `0`, and a zero appears in nearly every
+tool result this system produces — `exit_code`, a count, a fraction — so the substituted
+claim traces immediately and the report says every number checked out. The number the
+answer actually asserts was never compared to anything.
+
+**Why no check caught it.** Every fixture asserted that a masked thing is *absent* from the
+claim list. Not one asserted that an unmasked thing survives *as itself*. `0.829855` and
+`477` pass either rule, so the whole suite was blind to a mask that truncates rather than
+removes. The new check asserts the text, not the absence: `precise == ["0.1234567890123"]`.
+
+**Did the agent recover?** Yes. The lookbehind is `(?<![\d.])`, so a digit run after a
+decimal point is precision rather than an identifier, and a GEOID is still masked. Measured
+after: 148 checks PASS, exit 0, 33 mutations, zero survivors.
+
+**Kept as a paper failure case?** Yes — §3.7, and it is the third mask hole in this module
+in one session, each found by a different instrument: the reviewer found the backtick span,
+the mutation harness led to the comma run, and this one fell out of *reading the gate
+output* rather than running anything. Three tools, three holes, one shape — a mask written
+from a picture of what it should catch, never asked what else it catches. The lesson worth
+quoting is narrower than "test your masks": a check that a mask removed something proves
+nothing about what it left behind, and the assertion has to name the value that survives.

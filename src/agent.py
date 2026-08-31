@@ -18,15 +18,32 @@ spending one of a small number of turns on it.
 
 from __future__ import annotations
 
+import importlib
 import json
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 from pydantic import ValidationError
 
 from . import config, llm_client, schemas, tools, trace
-from .contracts import TOOL_NAMES, ToolResult
+from .contracts import TOOL_NAMES, CriticReport, ToolResult
+
+MAX_REVISIONS = 2
+"""How many times a draft answer may be sent back to be rewritten.
+
+Bounded rather than run to convergence: a critic that never passes would
+otherwise spend every remaining turn, and the two feedback cycles criterion IR
+names are cycles, not a search. Set to zero to run the critic in report-only
+mode -- the findings are still logged and still published, and nothing is
+rewritten -- which is this session's cut line, decided in advance."""
+
+CRITIC_STEP = "critic_report"
+REVISION_STEP = "revision_request"
+"""Their own step types so `trace.py` and the paper can count them. A revision
+folded into the ordinary turn log would be invisible to anything counting the
+loop's own firings, which is the number criterion IR asks for."""
 
 ROLE = """You are an autonomous geospatial risk analyst supporting hurricane
 evacuation and mitigation planning. You answer questions about which communities
@@ -140,11 +157,80 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> ToolResult:
         return {"error": type(exc).__name__, "detail": str(exc)}
 
 
+def critic_module() -> Any | None:
+    """The module that backs the critic, or None if this checkout has none.
+
+    Probed through `tools.pending_tools()` rather than imported directly, so the
+    loop and the tool surface agree about whether the capability exists. A
+    checkout without `src/critic.py` runs the loop with no revision cycle and says
+    so in the log, rather than failing at import.
+    """
+    if "validate_answer" in tools.pending_tools():
+        return None
+    return importlib.import_module(f"{__package__}.critic")
+
+
+@dataclass(slots=True)
+class Revisions:
+    """What the revision cycle did, which is criterion IR's own number.
+
+    `made_worse` is the one a reviewer will not take on trust, so it is measured
+    the only honest way available offline: a revision made the answer worse if the
+    rewritten draft carries more findings than the draft it replaced.
+    """
+
+    available: bool = False
+    cycles: int = 0
+    revisions: int = 0
+    findings_per_cycle: list[int] = field(default_factory=list)
+    findings_by_kind: dict[str, int] = field(default_factory=dict)
+    answers_changed: int = 0
+    made_worse: int = 0
+    numbers_checked: int = 0
+    numbers_traceable: int = 0
+    first_draft_passed: bool | None = None
+    final_draft_passed: bool | None = None
+
+    def record(self, report: CriticReport, draft: str, previous: tuple[CriticReport, str] | None) -> None:
+        self.cycles += 1
+        self.findings_per_cycle.append(len(report.findings))
+        for item in report.findings:
+            self.findings_by_kind[item.kind] = self.findings_by_kind.get(item.kind, 0) + 1
+        self.numbers_checked = report.numbers_checked
+        self.numbers_traceable = report.numbers_traceable
+        if self.first_draft_passed is None:
+            self.first_draft_passed = report.passed
+        self.final_draft_passed = report.passed
+        if previous is None:
+            return
+        earlier_report, earlier_draft = previous
+        if draft.strip() != earlier_draft.strip():
+            self.answers_changed += 1
+        if len(report.findings) > len(earlier_report.findings):
+            self.made_worse += 1
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "critic_available": self.available,
+            "cycles_run": self.cycles,
+            "revisions_requested": self.revisions,
+            "findings_per_cycle": list(self.findings_per_cycle),
+            "findings_by_kind": dict(self.findings_by_kind),
+            "answers_changed_after_revision": self.answers_changed,
+            "revisions_that_made_it_worse": self.made_worse,
+            "numbers_checked": self.numbers_checked,
+            "numbers_traceable": self.numbers_traceable,
+            "first_draft_passed": self.first_draft_passed,
+            "final_draft_passed": self.final_draft_passed,
+        }
+
+
 def run_agent(
     question: str,
     model: str | None = None,
     max_iterations: int = config.MAX_ITERATIONS,
     verbose: bool = True,
+    max_revisions: int = MAX_REVISIONS,
 ) -> dict[str, Any]:
     """One question, up to `max_iterations` turns, everything logged."""
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -178,6 +264,10 @@ def run_agent(
     tool_calls_made = 0
     run_started = time.time()
 
+    critic = critic_module()
+    revisions = Revisions(available=critic is not None)
+    previous: tuple[CriticReport, str] | None = None
+
     for iteration in range(1, max_iterations + 1):
         started = time.time()
         response = llm_client.chat(client, messages, tools=specs, model=model)
@@ -203,11 +293,39 @@ def run_agent(
         messages.append(llm_client.message_to_dict(message))
 
         if not tool_calls:
-            final_answer = message.content
-            stop_reason = "final_answer"
-            logger.log("final_answer", {"content": final_answer}, iteration)
-            tracer.final(final_answer)
-            break
+            draft = message.content or ""
+            report = (
+                critic.Critic().check(draft, logger.steps, revisions.cycles + 1)
+                if critic is not None
+                else None
+            )
+            if report is not None and critic is not None:
+                revisions.record(report, draft, previous)
+                previous = (report, draft)
+                logger.log(CRITIC_STEP, critic.as_result(report), iteration)
+                tracer.critic(critic.as_result(report))
+
+            if report is None or report.passed or revisions.revisions >= max_revisions:
+                final_answer = draft
+                stop_reason = (
+                    "final_answer"
+                    if report is None or report.passed
+                    else "revision_limit"
+                )
+                logger.log("final_answer", {"content": final_answer}, iteration)
+                tracer.final(final_answer)
+                break
+
+            revisions.revisions += 1
+            request = critic.revision_request(report)
+            messages.append({"role": "user", "content": request})
+            logger.log(
+                REVISION_STEP,
+                {"cycle": report.cycle, "findings": len(report.findings), "request": request},
+                iteration,
+            )
+            tracer.revision(report.cycle, request)
+            continue
 
         for call in tool_calls:
             tool_started = time.time()
@@ -241,6 +359,7 @@ def run_agent(
         "llm_calls": llm_calls,
         "gis_tool_calls": tool_calls_made,
         "duration_seconds": round(duration, 2),
+        "revision": revisions.summary(),
     }
     logger.log("run_end", {"stop_reason": stop_reason, **totals})
 
@@ -259,7 +378,14 @@ def run_agent(
         json.dumps(transcript, indent=2, default=str), encoding="utf-8"
     )
 
-    tracer.summary(llm_calls, tool_calls_made, duration, logger.path, transcript_path)
+    tracer.summary(
+        llm_calls,
+        tool_calls_made,
+        duration,
+        logger.path,
+        transcript_path,
+        revisions.summary(),
+    )
 
     return {
         "run_id": run_id,

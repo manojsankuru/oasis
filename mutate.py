@@ -766,6 +766,131 @@ SANDBOX_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+CRITIC_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- what counts as a claim ----------------------------------------------
+    # Every entry here makes the critic fire on a correct answer, which is the
+    # worse of the two failure directions: the revision cycle then rewrites a
+    # right answer into a wrong one and logs it as a success.
+    ("a markdown list marker is read as a quantity",
+     '    ("a list marker", LIST_MARKER),',
+     '    # mutated: the list-marker mask is gone'),
+    ("an eleven-digit identifier is read as a quantity",
+     '    ("an identifier of ten digits or more", LONG_DIGITS),',
+     '    # mutated: the identifier mask is gone'),
+    ("a long fraction is masked as an identifier, so the claim becomes its integer part",
+     r'LONG_DIGITS = re.compile(r"(?<![\d.])\d{10,}(?!\d)")',
+     r'LONG_DIGITS = re.compile(r"(?<!\d)\d{10,}(?!\d)")'),
+    ("a dataset vintage is read as two quantities",
+     '    ("a dataset vintage", YEAR_RANGE),',
+     '    # mutated: the vintage mask is gone'),
+    ("a URL is read as a quantity",
+     '    ("a URL", URL_SPAN),',
+     '    # mutated: the URL mask is gone'),
+    ("a scenario name spelling its own surge height is read as a quantity",
+     "        if any(character.isdigit() for character in token):",
+     "        if False:"),
+
+    # -- what counts as a match ----------------------------------------------
+    # NOT a mutation, and removed after it survived: dropping the lookbehind from
+    # NUMBER changes nothing a check can see, because the substring guarantee comes
+    # from `finditer` scanning without overlapping rather than from the lookaround.
+    # Replaced with the two edits that DO change what is read as a number.
+    ("a version string donates its components as quantities",
+     'NUMBER = re.compile(r"(?<![\d.])-?\d[\d,]*(?:\.\d+)?(?!\d)(?!\.\d)")',
+     'NUMBER = re.compile(r"(?<![\d.])-?\d[\d,]*(?:\.\d+)?(?!\d)")'),
+    ("every number after the first in a comma-separated run stops being a claim",
+     'NUMBER = re.compile(r"(?<![\d.])-?\d[\d,]*(?:\.\d+)?(?!\d)(?!\.\d)")',
+     'NUMBER = re.compile(r"(?<![\d.,])-?\d[\d,]*(?:\.\d+)?(?!\d)(?!\.\d)")'),
+    ("a number written in backticks is erased instead of checked",
+     r'CODE_SPAN = re.compile(r"`[^`\n]*[A-Za-z][^`\n]*`")',
+     r'CODE_SPAN = re.compile(r"`[^`\n]*`")'),
+    ("the decimal places a claim is written to no longer set the tolerance",
+     '        return 10.0 ** -len(digits.split(".", 1)[1])',
+     '        return 1.0'),
+    ("the tolerance becomes slack rather than the rounding",
+     "    tolerance = 0.5 * unit + FLOAT_SLACK * max(1.0, abs(claim.value))",
+     "    tolerance = 5.0 * unit + FLOAT_SLACK * max(1.0, abs(claim.value))"),
+    ("an integer with two trailing zeros is read as rounded",
+     "SIGNIFICANT_ZEROS = 3",
+     "SIGNIFICANT_ZEROS = 2"),
+    ("a percent claim can no longer trace to the same quantity as a fraction",
+     "    return claim.percent and abs(value * PERCENT_SCALE - claim.value) <= tolerance",
+     "    return False"),
+
+    # -- the two step shapes, and what is evidence ---------------------------
+    ("the agent's own log shape stops being recognised",
+     '        if "payload" in step and "step" in step:',
+     "        if False:"),
+    ("any step carrying a result becomes evidence, not only a tool result",
+     '            if step.get("step") != TOOL_RESULT_STEP:',
+     "            if False:"),
+    ("a number the model passed as an argument becomes evidence for it",
+     '                "result": payload.get("result"),',
+     '                "result": [payload.get("result"), payload.get("arguments")],'),
+    ("a boolean in a result is counted as the number one",
+     "    if isinstance(payload, bool):\n        return",
+     "    if False:\n        return"),
+
+    # -- invariant 3 on the report -------------------------------------------
+    ("a finding quotes the answer without passing it through the output guard",
+     "    return sandbox.guard_stream(text[:MAX_EVIDENCE], GUARD_STREAM).strip()",
+     "    return text[:MAX_EVIDENCE].strip()"),
+
+    # -- the domain rules ----------------------------------------------------
+    # Each of these is invisible on the real county, where every rule already
+    # holds, and is reachable only from a fixture frame built to break it.
+    ("the exposure rule fires on the units that satisfy it",
+     "        (exposed > population + POPULATION_SLACK) & (population >= 0.0),",
+     "        (exposed < population + POPULATION_SLACK) & (population >= 0.0),"),
+    ("an index below zero stops being a violation",
+     "        (values < -UNIT_SLACK) | (values > 1.0 + UNIT_SLACK),",
+     "        (values > 1.0 + UNIT_SLACK),"),
+    ("an index above one stops being a violation",
+     "        (values < -UNIT_SLACK) | (values > 1.0 + UNIT_SLACK),",
+     "        (values < -UNIT_SLACK),"),
+    ("the rank is required to be dense over all units rather than the scored ones",
+     "    scored = int(numeric(frame, Col.RISK_SCORE).notna().sum())",
+     "    scored = len(frame)"),
+    ("two units sharing one rank stops being a violation",
+     "    if seen != expected:",
+     "    if False:"),
+    ("the depth rule fires on the units that satisfy it",
+     '        frame, mean > peak + UNIT_SLACK, "floods deeper on average than at its deepest"',
+     '        frame, mean < peak + UNIT_SLACK, "floods deeper on average than at its deepest"'),
+    ("the elevation rule fires on the units that satisfy it",
+     '        frame, lowest > mean + UNIT_SLACK, "sits lower on average than at its lowest point"',
+     '        frame, lowest < mean + UNIT_SLACK, "sits lower on average than at its lowest point"'),
+    ("a rule whose columns are absent is run anyway rather than skipped",
+     "            if not present.issuperset(rule.columns):",
+     "            if False:"),
+    ("check() stops consulting the frame, so the domain rules never reach the model",
+     "        if not tools.analysis_built():",
+     "        if True:"),
+
+    # -- the trade-off rule, which is criterion SG enforced -------------------
+    ("an answer that orders nothing is asked for a weighting anyway",
+     "        if not ORDERING_LANGUAGE.search(answer):",
+     "        if False:"),
+    ("an ordering that names no weighting stops being a finding",
+     "        if not WEIGHTING_LANGUAGE.search(answer):",
+     "        if False:"),
+    ("an ordering that hides who loses stops being a finding",
+     "        if not TRADEOFF_LANGUAGE.search(answer):",
+     "        if False:"),
+
+    # -- what the report says about itself -----------------------------------
+    ("a cleared call log costs one finding per number rather than one finding",
+     "        if found and not calls:",
+     "        if False:"),
+    ("the report counts every number as traceable rather than the traced ones",
+     "            numbers_traceable=len(self.traced),",
+     "            numbers_traceable=len(found),"),
+    ("a report grows without bound, so a finding crowds the turns that are left",
+     "        if len(findings) <= MAX_FINDINGS:",
+     "        if True:"),
+]
+
+
 TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "align": ALIGN_MUTATIONS,
     "hazard": HAZARD_MUTATIONS,
@@ -775,6 +900,7 @@ TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "schemas": SCHEMAS_MUTATIONS,
     "tools": TOOLS_MUTATIONS,
     "sandbox": SANDBOX_MUTATIONS,
+    "critic": CRITIC_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
 

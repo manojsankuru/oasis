@@ -96,6 +96,24 @@ class Tracer:
             self._out(line)
         self._out()
 
+    def critic(self, report: dict[str, Any]) -> None:
+        verdict = "PASSED" if report.get("passed") else "FOUND SOMETHING"
+        self._out(f"CRITIC — cycle {report.get('cycle')}  {verdict}")
+        self._out(
+            f"  {report.get('numbers_traceable')} of {report.get('numbers_checked')} "
+            "number(s) traced to a logged tool result"
+        )
+        for item in report.get("findings", []):
+            self._out(f"  [{item.get('kind')}] {_fmt(item.get('detail'))}")
+            if item.get("evidence"):
+                self._out(f"    evidence: {_fmt(item.get('evidence'))}")
+        self._out()
+
+    def revision(self, cycle: int, request: str) -> None:
+        self._out(f"REVISION {cycle} — sending the findings back for a rewrite")
+        self._out(f"  {len(request.splitlines())} line(s) of findings and instructions")
+        self._out()
+
     def final(self, answer: str | None) -> None:
         self._out("FINAL ANSWER")
         self._out(answer.strip() if answer else "(the model returned no answer)")
@@ -112,10 +130,22 @@ class Tracer:
         duration: float,
         log_path: Path,
         transcript_path: Path,
+        revision: dict[str, Any] | None = None,
     ) -> None:
         self._out("-" * WIDTH)
         self._out(f"TOTAL LLM CALLS:      {llm_calls}")
         self._out(f"TOTAL GIS TOOL CALLS: {tool_calls}")
+        if revision:
+            self._out(
+                f"CRITIC CYCLES:        {revision.get('cycles_run')} "
+                f"({revision.get('revisions_requested')} revision(s) requested, "
+                f"{revision.get('answers_changed_after_revision')} answer(s) changed, "
+                f"{revision.get('revisions_that_made_it_worse')} made it worse)"
+            )
+            self._out(
+                f"NUMBERS TRACED:       {revision.get('numbers_traceable')}"
+                f" of {revision.get('numbers_checked')}"
+            )
         self._out(f"TOTAL DURATION:       {duration:.1f}s")
         self._out(f"JSONL LOG:            {log_path}")
         self._out(f"TRANSCRIPT:           {transcript_path}")

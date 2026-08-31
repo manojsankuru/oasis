@@ -44,6 +44,7 @@ from __future__ import annotations
 import functools
 import importlib
 import importlib.util
+import io
 import json
 import re
 import sys
@@ -1018,25 +1019,147 @@ def compare_scenarios(
     }
 
 
+ELICIT = True
+"""Whether `ask_user_preferences` may block on `input()`.
+
+A second guard beside `isatty`, and it exists because of where the tool is
+called. `SAMPLE_ARGUMENTS` runs every tool in the check suite, and a check suite
+run from a real terminal would sit on `input()` forever -- green when nobody is
+watching and hung when somebody is. `_self_check` closes the channel around
+`_every_result` and reopens it for the one check that drives the real prompt with
+a scripted reader, so the interactive path is exercised rather than skipped."""
+
+PROMPT_LABEL = "[ask_user_preferences]"
+NO_CHANNEL = "this run has no interactive channel, so nobody was asked"
+
+
+def interactive_channel() -> bool:
+    """Is there a person at a terminal to put the choice to?
+
+    Both guards are needed and neither is redundant. `isatty` is false in a batch
+    run, under `mutate.py` and in CI, which is the case that would hang. `ELICIT`
+    is what lets a check suite running in a real terminal stay non-interactive
+    without lying about the channel.
+    """
+    if not ELICIT:
+        return False
+    try:
+        return bool(sys.stdin is not None and sys.stdin.isatty())
+    except (AttributeError, ValueError, OSError):
+        return False
+
+
+def elicit(question: str, options: list[str], default: str) -> tuple[str, str]:
+    """Put the choice to the person and read what they say back.
+
+    The reply is never echoed into the result. A tool result is a model message
+    and the person is typing free text into it; quoting an unrecognised reply back
+    is how S10's coordinate guard leaked through its own refusal message. What
+    comes back is a name from the menu or the default, and a sentence saying which.
+    """
+    print()
+    print(f"{PROMPT_LABEL} {question}")
+    for position, name in enumerate(options, start=1):
+        print(f"  {position}. {name}")
+    print(f"  press enter for the default ({default})")
+    try:
+        reply = input("  weighting> ").strip()
+    except (EOFError, KeyboardInterrupt, OSError):
+        return default, "the prompt was closed without a reply, so the default stands"
+    if not reply:
+        return default, "the person was asked and accepted the default"
+    if reply.isdigit() and 1 <= int(reply) <= len(options):
+        return options[int(reply) - 1], "the person was asked and chose by number"
+    for name in options:
+        if reply.lower() == name.lower():
+            return name, "the person was asked and chose by name"
+    return default, "the reply named no weighting on the menu, so the default stands"
+
+
+def weighting_effect(name: str) -> dict[str, Any]:
+    """What the chosen weighting does to the ranking, computed rather than promised.
+
+    This is the half of a preference that scores. A tool that recorded a choice
+    and returned a menu would have elicited a preference and left it in the
+    transcript; this runs the choice through the same `scored` call
+    `risk_scenario` makes, on the same shared analysis, so the weighting reaches
+    the score rather than the prose. Reported beside it: which units another
+    weighting would have prioritised and this one drops, which is who loses.
+    """
+    scenario = DEFAULT_SCENARIO
+    chosen = _preset(name)
+    frame, risk, _ = scored(scenario, chosen)
+    rows, _, _ = _ranking(
+        frame,
+        by=Col.RISK_SCORE,
+        columns=(Col.GEOID, Col.PRIORITY_RANK, Col.RISK_SCORE),
+        top_n=DEFAULT_PRIORITY_UNITS,
+    )
+    mine = [str(row[Col.GEOID]) for row in rows]
+    dropped: dict[str, Any] = {}
+    for other in WEIGHT_PRESETS:
+        if other.name == chosen.name:
+            continue
+        other_frame, _, _ = scored(scenario, other)
+        other_rows, _, _ = _ranking(
+            other_frame, by=Col.RISK_SCORE, columns=(Col.GEOID,), top_n=DEFAULT_PRIORITY_UNITS
+        )
+        theirs = [str(row[Col.GEOID]) for row in other_rows]
+        dropped[other.name] = _capped([unit for unit in theirs if unit not in mine])
+    return {
+        "recomputed": True,
+        "scenario": scenario.name,
+        "priority_units": DEFAULT_PRIORITY_UNITS,
+        "ranking": rows,
+        "weights_used": _numbers(risk.weights),
+        "weights_origin": risk.origin,
+        "dropped_against_each_other_weighting": dropped,
+        "note": (
+            "these units were re-scored under the weighting named above, through the "
+            "same call risk_scenario makes. Pass that name as the preset argument to "
+            "risk_scenario to work with the full table."
+        ),
+    }
+
+
 @tool
 def ask_user_preferences(question: str) -> ToolResult:
-    """Put a weighting choice to the human, with where each option came from.
+    """Put a weighting choice to the human, and score the county under their answer.
 
-    This run answers with the menu rather than with a person: there is no
-    interactive channel in a batch run, and a tool that blocked on `input()` would
-    hang any harness that runs the agent without a terminal. What it does NOT do
-    is invent an answer and present it as the human's -- `elicited` says plainly
-    that nobody was asked, and the default named below is a published weighting
-    with a citable origin rather than this system's opinion.
+    Asks for real when there is a terminal to ask at, and falls back to the menu
+    when there is not, because a tool that blocked on `input()` would hang every
+    harness that runs the agent without one -- `mutate.py` among them, which still
+    has no timeout of its own. `elicited` tells the truth either way: it says
+    whether a person answered, never whether a choice was made.
+
+    What it does NOT do is invent an answer and present it as the human's. The
+    fallback is the default, which is a published weighting with a citable origin
+    rather than this system's opinion, and the result says so.
     """
+    names = [item.name for item in WEIGHT_PRESETS]
+    asked = interactive_channel()
+    if asked:
+        chosen, how = elicit(question, names, DEFAULT_PRESET.name)
+    else:
+        chosen, how = DEFAULT_PRESET.name, NO_CHANNEL
+    try:
+        effect = weighting_effect(chosen)
+    except Exception as exc:
+        effect = {"recomputed": False, **_refusal(exc, "could not score under this weighting")}
     return {
         "question": question,
-        "elicited": False,
-        "channel": "none",
+        "elicited": asked,
+        "channel": "terminal" if asked else "none",
+        "chosen": chosen,
+        "how_it_was_chosen": how,
         "why": (
-            "this run has no interactive channel, so no human answered. The choice "
-            "below is the default, not a preference somebody expressed."
+            "a person at a terminal answered this and the county was re-scored under "
+            "what they chose"
+            if asked
+            else f"{NO_CHANNEL}. The choice is the default, not a preference "
+            "somebody expressed."
         ),
+        "effect": effect,
         "default": DEFAULT_PRESET.name,
         "options": [
             {
@@ -1942,9 +2065,129 @@ def _log_checks() -> list[tuple[str, bool]]:
     ]
 
 
+def _elicitation_checks() -> list[tuple[str, bool]]:
+    """That the human-in-the-loop tool really asks, and that the answer scores.
+
+    Driven through the real `input()` with a scripted reader rather than by
+    calling `elicit` with a string, because the thing that can break is the
+    channel: a guard that reads the wrong stream, or a prompt nobody sees. Only
+    the person is replaced, which is the same shape as the sandbox's scripted
+    author.
+
+    The batch path is checked in the same breath. A tool that asked for real and
+    hung a harness would be a worse tool than the menu it replaced.
+    """
+    global ELICIT
+    names = [item.name for item in WEIGHT_PRESETS]
+    other = [name for name in names if name != DEFAULT_PRESET.name][0]
+    real_stdin, real_elicit = sys.stdin, ELICIT
+
+    def scripted(reply: str, tty: bool) -> io.StringIO:
+        stream = io.StringIO(reply)
+        stream.isatty = lambda: tty  # type: ignore[method-assign]
+        return stream
+
+    def answered(reply: str, newline: bool = True) -> ToolResult:
+        global ELICIT
+        sys.stdin = scripted(reply + "\n" if newline else reply, True)
+        ELICIT = True
+        try:
+            return ask_user_preferences(question="which weighting should decide priority?")
+        finally:
+            sys.stdin = real_stdin
+
+    def channel_under(flag: bool, tty: bool) -> bool:
+        global ELICIT
+        sys.stdin, ELICIT = scripted("", tty), flag
+        try:
+            return interactive_channel()
+        finally:
+            sys.stdin, ELICIT = real_stdin, real_elicit
+
+    try:
+        by_name = answered(other)
+        by_number = answered(str(names.index(other) + 1))
+        by_default = answered("")
+        unknown = answered("not-a-weighting")
+        # No trailing newline, so `input()` really hits EOF and raises. With one
+        # appended this was byte-identical to the empty-reply case above, and the
+        # except branch that survives a closed prompt had no coverage at all --
+        # a real closed stdin would have raised EOFError out of a tool call.
+        closed = answered("", newline=False)
+        ELICIT = False
+        batch = ask_user_preferences(question="which weighting should decide priority?")
+    finally:
+        sys.stdin, ELICIT = real_stdin, real_elicit
+
+    scored_here = weighting_effect(other)
+    scored_default = weighting_effect(DEFAULT_PRESET.name)
+    print(f"  a person naming {other!r}: elicited={by_name['elicited']} "
+          f"chosen={by_name['chosen']} channel={by_name['channel']}")
+    print(f"  by number: chosen={by_number['chosen']}; "
+          f"empty reply: chosen={by_default['chosen']}; "
+          f"unrecognised reply: chosen={unknown['chosen']}")
+    print(f"  with no terminal: elicited={batch['elicited']} chosen={batch['chosen']}")
+    print(f"  the two weightings rank differently: "
+          f"{scored_here['ranking'] != scored_default['ranking']}")
+
+    return [
+        ("a person at a terminal is really asked", by_name["elicited"] is True),
+        ("the channel is named rather than assumed", by_name["channel"] == "terminal"),
+        ("a weighting named by the person is the one chosen",
+         by_name["chosen"] == other),
+        ("a weighting chosen by number is the same choice",
+         by_number["chosen"] == other),
+        ("an empty reply is the person accepting the default, and says so",
+         by_default["chosen"] == DEFAULT_PRESET.name
+         and by_default["elicited"] is True
+         and "accepted the default" in by_default["how_it_was_chosen"]),
+        ("a reply naming no weighting falls back rather than failing",
+         unknown["chosen"] == DEFAULT_PRESET.name and unknown["elicited"] is True),
+        ("an unrecognised reply is never quoted back into the result",
+         "not-a-weighting" not in json.dumps(unknown, default=str)),
+        ("a closed prompt is survivable and took the branch written for it",
+         closed["chosen"] == DEFAULT_PRESET.name
+         and "closed without a reply" in closed["how_it_was_chosen"]),
+        ("with no terminal nothing blocks and elicited tells the truth",
+         batch["elicited"] is False and batch["channel"] == "none"),
+        ("the fallback is the default, not a preference nobody expressed",
+         batch["chosen"] == DEFAULT_PRESET.name and NO_CHANNEL in batch["why"]),
+        ("the chosen weighting reaches the score rather than the transcript",
+         by_name["effect"]["recomputed"] is True
+         and by_name["effect"]["ranking"] == scored_here["ranking"]),
+        ("a different weighting really produces a different ranking",
+         scored_here["ranking"] != scored_default["ranking"]),
+        ("the recomputation runs the same call risk_scenario runs",
+         [row[Col.GEOID] for row in scored_here["ranking"]]
+         == [row[Col.GEOID] for row in _ranking(
+             scored(DEFAULT_SCENARIO, _preset(other))[0],
+             by=Col.RISK_SCORE,
+             columns=(Col.GEOID,),
+             top_n=DEFAULT_PRIORITY_UNITS)[0]]),
+        ("the result names who each other weighting would have prioritised instead",
+         set(by_name["effect"]["dropped_against_each_other_weighting"])
+         == {item.name for item in WEIGHT_PRESETS} - {other}),
+        ("both guards open together", channel_under(True, True)),
+        ("closing the flag closes the channel even at a terminal",
+         not channel_under(False, True)),
+        ("no terminal closes the channel even with the flag open",
+         not channel_under(True, False)),
+    ]
+
+
 def _self_check() -> int:
+    global ELICIT
     print("TOOLS -- the eleven names in contracts.TOOL_NAMES\n")
-    results = _every_result()
+
+    # `SAMPLE_ARGUMENTS` calls every tool, `ask_user_preferences` among them, and
+    # this suite is run from a real terminal as often as not. Closed here and
+    # reopened by `_elicitation_checks`, which drives the prompt with a scripted
+    # reader -- so the interactive path is exercised rather than merely skipped.
+    ELICIT = False
+    try:
+        results = _every_result()
+    finally:
+        ELICIT = True
 
     checks = _surface_checks(results)
     print()
@@ -1963,6 +2206,8 @@ def _self_check() -> int:
     checks += _tradeoff_checks()
     print()
     checks += _weighting_checks()
+    print()
+    checks += _elicitation_checks()
     print()
     checks += _omission_checks()
     print()
