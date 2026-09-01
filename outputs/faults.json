@@ -1,0 +1,1694 @@
+{
+  "generated": "2026-08-31T14:18:55",
+  "rates": [
+    0.25,
+    0.5
+  ],
+  "seeds": 20,
+  "max_retries": 3,
+  "request_timeout_s": 60.0,
+  "clean": {
+    "source": "fixture",
+    "kind": "none",
+    "rate": 0.0,
+    "runs": 20,
+    "completed": 20,
+    "correct": 20,
+    "recovery_rate": 1.0,
+    "recovery_rate_given_faulted": null,
+    "runs_with_an_injected_fault": 0,
+    "injected_faults": 0,
+    "not_applicable": 0,
+    "attempts": 40,
+    "mean_extra_calls": 0.0,
+    "features_seen": [
+      10
+    ],
+    "every_call_had_a_timeout": true,
+    "failure_kinds": []
+  },
+  "rows": [
+    {
+      "source": "fixture",
+      "kind": "timeout",
+      "rate": 0.25,
+      "runs": 20,
+      "completed": 20,
+      "correct": 20,
+      "recovery_rate": 1.0,
+      "recovery_rate_given_faulted": 1.0,
+      "runs_with_an_injected_fault": 8,
+      "injected_faults": 12,
+      "not_applicable": 0,
+      "attempts": 52,
+      "mean_extra_calls": 0.6,
+      "features_seen": [
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": []
+    },
+    {
+      "source": "fixture",
+      "kind": "timeout",
+      "rate": 0.5,
+      "runs": 20,
+      "completed": 16,
+      "correct": 16,
+      "recovery_rate": 0.8,
+      "recovery_rate_given_faulted": 0.714,
+      "runs_with_an_injected_fault": 14,
+      "injected_faults": 27,
+      "not_applicable": 0,
+      "attempts": 60,
+      "mean_extra_calls": 1.0,
+      "features_seen": [
+        0,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": [
+        "TransientError"
+      ]
+    },
+    {
+      "source": "fixture",
+      "kind": "server_error",
+      "rate": 0.25,
+      "runs": 20,
+      "completed": 20,
+      "correct": 20,
+      "recovery_rate": 1.0,
+      "recovery_rate_given_faulted": 1.0,
+      "runs_with_an_injected_fault": 8,
+      "injected_faults": 12,
+      "not_applicable": 0,
+      "attempts": 52,
+      "mean_extra_calls": 0.6,
+      "features_seen": [
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": []
+    },
+    {
+      "source": "fixture",
+      "kind": "server_error",
+      "rate": 0.5,
+      "runs": 20,
+      "completed": 16,
+      "correct": 16,
+      "recovery_rate": 0.8,
+      "recovery_rate_given_faulted": 0.714,
+      "runs_with_an_injected_fault": 14,
+      "injected_faults": 27,
+      "not_applicable": 0,
+      "attempts": 60,
+      "mean_extra_calls": 1.0,
+      "features_seen": [
+        0,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": [
+        "TransientError"
+      ]
+    },
+    {
+      "source": "fixture",
+      "kind": "empty",
+      "rate": 0.25,
+      "runs": 20,
+      "completed": 20,
+      "correct": 17,
+      "recovery_rate": 0.85,
+      "recovery_rate_given_faulted": 0.0,
+      "runs_with_an_injected_fault": 3,
+      "injected_faults": 3,
+      "not_applicable": 6,
+      "attempts": 40,
+      "mean_extra_calls": 0.0,
+      "features_seen": [
+        0,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": []
+    },
+    {
+      "source": "fixture",
+      "kind": "empty",
+      "rate": 0.5,
+      "runs": 20,
+      "completed": 20,
+      "correct": 14,
+      "recovery_rate": 0.7,
+      "recovery_rate_given_faulted": 0.0,
+      "runs_with_an_injected_fault": 6,
+      "injected_faults": 6,
+      "not_applicable": 12,
+      "attempts": 40,
+      "mean_extra_calls": 0.0,
+      "features_seen": [
+        0,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": []
+    },
+    {
+      "source": "fixture",
+      "kind": "wrong_crs",
+      "rate": 0.25,
+      "runs": 20,
+      "completed": 17,
+      "correct": 17,
+      "recovery_rate": 0.85,
+      "recovery_rate_given_faulted": 0.0,
+      "runs_with_an_injected_fault": 3,
+      "injected_faults": 3,
+      "not_applicable": 6,
+      "attempts": 40,
+      "mean_extra_calls": 0.0,
+      "features_seen": [
+        0,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": [
+        "CRSMismatch"
+      ]
+    },
+    {
+      "source": "fixture",
+      "kind": "wrong_crs",
+      "rate": 0.5,
+      "runs": 20,
+      "completed": 14,
+      "correct": 14,
+      "recovery_rate": 0.7,
+      "recovery_rate_given_faulted": 0.0,
+      "runs_with_an_injected_fault": 6,
+      "injected_faults": 6,
+      "not_applicable": 12,
+      "attempts": 40,
+      "mean_extra_calls": 0.0,
+      "features_seen": [
+        0,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": [
+        "CRSMismatch"
+      ]
+    },
+    {
+      "source": "fixture",
+      "kind": "truncated",
+      "rate": 0.25,
+      "runs": 20,
+      "completed": 20,
+      "correct": 17,
+      "recovery_rate": 0.85,
+      "recovery_rate_given_faulted": 0.0,
+      "runs_with_an_injected_fault": 3,
+      "injected_faults": 3,
+      "not_applicable": 6,
+      "attempts": 40,
+      "mean_extra_calls": 0.0,
+      "features_seen": [
+        5,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": []
+    },
+    {
+      "source": "fixture",
+      "kind": "truncated",
+      "rate": 0.5,
+      "runs": 20,
+      "completed": 20,
+      "correct": 14,
+      "recovery_rate": 0.7,
+      "recovery_rate_given_faulted": 0.0,
+      "runs_with_an_injected_fault": 6,
+      "injected_faults": 6,
+      "not_applicable": 12,
+      "attempts": 40,
+      "mean_extra_calls": 0.0,
+      "features_seen": [
+        5,
+        10
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": []
+    },
+    {
+      "source": "live",
+      "kind": "timeout",
+      "rate": 0.5,
+      "runs": 6,
+      "completed": 5,
+      "correct": 5,
+      "recovery_rate": 0.833,
+      "recovery_rate_given_faulted": 0.667,
+      "runs_with_an_injected_fault": 3,
+      "injected_faults": 6,
+      "not_applicable": 0,
+      "attempts": 16,
+      "mean_extra_calls": 0.67,
+      "features_seen": [
+        0,
+        99
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": [
+        "TransientError"
+      ]
+    },
+    {
+      "source": "live",
+      "kind": "wrong_crs",
+      "rate": 0.5,
+      "runs": 6,
+      "completed": 5,
+      "correct": 5,
+      "recovery_rate": 0.833,
+      "recovery_rate_given_faulted": 0.0,
+      "runs_with_an_injected_fault": 1,
+      "injected_faults": 1,
+      "not_applicable": 3,
+      "attempts": 12,
+      "mean_extra_calls": 0.0,
+      "features_seen": [
+        0,
+        99
+      ],
+      "every_call_had_a_timeout": true,
+      "failure_kinds": [
+        "CRSMismatch"
+      ]
+    }
+  ],
+  "events": [
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 3
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 3
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 3
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 3
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "none",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "tracts",
+      "recovered": false,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "tracts",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "tracts",
+      "recovered": true,
+      "extra_turns": 0
+    }
+  ]
+}

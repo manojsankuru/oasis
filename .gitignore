@@ -18,6 +18,8 @@ logs/*
 
 outputs/*
 !outputs/.gitkeep
+!outputs/faults.md
+!outputs/faults.json
 
 data/*.geojson
 data/snapshot/

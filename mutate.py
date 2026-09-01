@@ -9,9 +9,11 @@ defect in `hazard.py` that only `pipeline.py` notices is a hole in hazard's own
 suite, and running the downstream check would hide it rather than report it.
 
 Self-contained on purpose: it takes its own backup of the live file and restores
-it in a `finally`, so an interrupted run cannot leave a mutated module on disk.
-An earlier version kept its backup inside a scratch job directory, which meant
-the harness stopped working the moment that directory was cleaned up.
+it in a `finally`, covering ordinary exceptions and `KeyboardInterrupt`. A forced
+process kill cannot execute Python's `finally`; in that case the adjacent
+`.mutation-backup` deliberately survives for manual recovery. An earlier version
+kept its backup inside a scratch job directory, which meant the recovery copy
+disappeared when that directory was cleaned up.
 
     python mutate.py
 
@@ -891,6 +893,64 @@ CRITIC_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+FAULTS_MUTATIONS: list[tuple[str, str, str]] = [
+    ('the injector is armed at import, when nobody asked for it',
+     '_ACTIVE: FaultPlan | None = None\n',
+     '_ACTIVE: FaultPlan | None = FaultPlan(settings=FaultConfig(kind="empty", rate=1.0, seed=0))\n'),
+    ('the injector fires on every call regardless of the configured rate',
+     '        if not plan.decide(kwargs.get("timeout")):\n',
+     '        if False:\n'),
+    ('the guard reports the injector off while it is installed',
+     '    return _ACTIVE is not None\n',
+     '    return False\n'),
+    ("the block leaves acquire's session replaced after it exits",
+     '        acquire._SESSION = inner\n        _ACTIVE = None\n',
+     '        _ACTIVE = None\n'),
+    ('a second fault session may open inside the first',
+     '    if _ACTIVE is not None:\n        raise RuntimeError(\n',
+     '    if False:\n        raise RuntimeError(\n'),
+    ('the seed is ignored, so a run is not reproducible',
+     '        self.rng.seed(self.settings.seed)\n',
+     '        self.rng.seed()\n'),
+    ('every seed produces the same sequence, so the seed does nothing',
+     '        self.rng.seed(self.settings.seed)\n',
+     '        self.rng.seed(0)\n'),
+    ('an injected timeout is raised as a failure acquire will not retry',
+     '            raise requests.exceptions.Timeout(f"injected {kind} for {url}")\n',
+     '            raise acquire.ServiceError(f"injected {kind} for {url}")\n'),
+    ('the harness strips the timeout off every call it lets through',
+     '        if not plan.decide(kwargs.get("timeout")):\n',
+     '        kwargs.pop("timeout", None)\n        if not plan.decide(kwargs.get("timeout")):\n'),
+    ('the empty kind raises instead of returning a response',
+     '        payload[FEATURE_KEY] = []\n',
+     '        raise acquire.TransientError("injected empty")\n'),
+    ('a truncated page keeps every feature, so the fault is invisible',
+     '        payload[FEATURE_KEY] = features[: len(features) // 2]\n        payload.pop(LIMIT_KEY, None)\n',
+     '        payload[FEATURE_KEY] = features\n        payload.pop(LIMIT_KEY, None)\n'),
+    ('a truncated page keeps the transfer-limit flag, so paging notices',
+     '        payload[FEATURE_KEY] = features[: len(features) // 2]\n        payload.pop(LIMIT_KEY, None)\n',
+     '        payload[FEATURE_KEY] = features[: len(features) // 2]\n'),
+    ('the wrong-CRS substitute is the CRS that was requested',
+     '    return 4326 if requested != 4326 else 3857\n',
+     '    return requested\n'),
+    ('wrong_crs declares the requested reference back unchanged',
+     '        substitute = other_sr(out_sr)\n',
+     '        substitute = out_sr\n'),
+    ('a run that completed with the wrong numbers counts as recovered',
+     '        correct=completed and features == expect_features and crs == expect_crs,\n',
+     '        correct=completed,\n'),
+    ('extra turns are reported as zero however many attempts were spent',
+     '        extra_turns=max(0, attempts - clean_attempts),\n',
+     '        extra_turns=0,\n'),
+    ('an attempt no fault could corrupt is counted as an injection',
+     '        except FaultNotApplicable:\n            plan.not_applicable += 1\n',
+     '        except FaultNotApplicable:\n            plan.injected += 1\n'),
+    ('the choke-point scan looks for a pattern acquire does not contain',
+     '    call_sites = len(re.findall(r"_session\\(\\)\\.request\\(", source))\n',
+     '    call_sites = len(re.findall(r"_no_such_call_site\\(", source))\n'),
+]
+
+
 TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "align": ALIGN_MUTATIONS,
     "hazard": HAZARD_MUTATIONS,
@@ -901,6 +961,7 @@ TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "tools": TOOLS_MUTATIONS,
     "sandbox": SANDBOX_MUTATIONS,
     "critic": CRITIC_MUTATIONS,
+    "faults": FAULTS_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
 
