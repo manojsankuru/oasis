@@ -23,13 +23,13 @@ STUDY_AREA = StudyArea(
     county_fips="019",
     # bbox is DERIVED from the retrieved tract layer, never typed in
 )
-TRANSFER_AREA = StudyArea(name="...", state_fips="...", county_fips="...")
+# TRANSFER_AREA is defined only in src/config.py.
 ```
 
-Pick the transfer county on Day 1 and never touch it again until Day 4. Choose a
-coastal county in a *different state* — a different state means different local
-GIS conventions, which is the point. Somewhere with a known data gap is better
-than somewhere clean.
+`TRANSFER_AREA` is fixed in `src/config.py`; change it only there. S13 exercised
+that configured second area on 1 Sep 2026. Keeping the identity in one place is
+what lets acquisition, registry validation, and the pipeline share the same
+county-neutral path without duplicating a name or FIPS code here.
 
 ---
 

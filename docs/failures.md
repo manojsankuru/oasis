@@ -1804,3 +1804,145 @@ transcript as the wrong headline. Both belong in the paper.
 Every other entry in this file is a defect in the harness. This one is the system under
 test getting a question wrong in the way the rubric names — "survives missing data" — and
 it was found by the scenario built to look for it, on the first run, against real data.
+
+## 2026-09-01 — sandbox process-tree cleanup check failed once during the S13 baseline
+
+**What happened.** The required pre-S13 baseline stopped at
+`python -m src.sandbox --check`, which returned exit code 1 with 98 PASS and one
+exact failure: `[FAIL] the process the child started is dead too, which is what
+hangs mutate.py`. The preceding seven module checks all matched their recovered
+counts.
+
+**Where.** `src/sandbox.py`, the real timeout/process-tree cleanup check run by
+the module's `--check` entry point.
+
+**Why.** Not determined at the time of observation. The check exercises a real
+child and grandchild process, so the immediate possibilities are a cleanup race
+or a process-tree termination regression; neither is inferred as the cause until
+the same boundary is re-run and inspected.
+
+**Did the agent recover?** Not yet. S13 implementation was paused at the first
+baseline mismatch so the real boundary could be diagnosed before transfer work
+began.
+
+**Kept as a paper failure case?** Yes, in §3.7 if diagnosis confirms a real
+cleanup defect; otherwise it remains an honest record of a transient baseline
+failure at a subprocess boundary.
+
+**Resolution observed later in the same session.** The focused run exposed the
+operating-system error that the production helper deliberately suppresses on
+its fallback path: Windows `taskkill /F /T` returned exact stderr
+`ERROR: Access denied`. The same real timeout check was then run outside the
+managed command sandbox, where it returned in 2.56 seconds, both child markers
+remained absent after 12 seconds, and all eight timeout checks passed. This was
+an execution-environment permission restriction, not a repository cleanup
+regression; no sandbox source was changed.
+
+## 2026-09-01 — the first S13 portable-JSON self-check rejected its own fixture
+
+**What happened.** The first run of
+`python -m src.experiments.transfer --check` returned exit code 1 with 35 PASS
+and one exact failure: `[FAIL] portable JSON contains no Windows absolute path`.
+All isolation, restoration, exact-copy, provenance, dispatch, and source-
+discipline checks around it passed. No acquisition or model call was made.
+
+**Where.** `_serialisation_checks` in `src/experiments/transfer.py`, in the
+offline fixture used to prove that report paths are portable.
+
+**Why.** The immediate evidence is that a Windows drive-qualified string
+survived in the fixture report. The production serializer is supposed to make
+known `Path` values relative to the project or isolated work root, so the
+failure is being treated as a real boundary defect until the exact emitted
+field is inspected. No claim about the classifier or the assertion is accepted
+without reading the generated JSON.
+
+**Did the agent recover?** Not yet. The live transfer remains blocked while the
+emitted field is identified, the smallest correct fix is made, and the complete
+offline check is rerun.
+
+**Kept as a paper failure case?** Provisionally. If this is a production
+serializer defect, it belongs in §3.7; if it is only a malformed self-check
+fixture, this entry still records that the offline gate caught it before a live
+artifact was written.
+
+**Resolution observed immediately afterward.** The emitted field was the
+fixture provenance URL `https://example.invalid/source`, not a filesystem path.
+The assertion's regular expression matched the `s:/` suffix of the URL scheme
+as though it were a drive prefix. The check now requires a drive letter not to
+be immediately preceded by another alphanumeric character, so it still rejects
+`C:/...` and `C:\\...` strings without misclassifying `https://...`. The complete
+offline transfer check then passed all 36 assertions. The production serializer
+did not need to change, and no live artifact was involved.
+
+## 2026-09-01 — the first S13 live boundary hit the managed deny proxy
+
+**What happened.** The first normal invocation of
+`python -m src.experiments.transfer` entered the real `acquire.main()` boundary
+for the configured transfer area, then failed during acquisition before a
+manifest was produced. The canonical report recorded `status: "failed"`,
+`stage: "acquisition"`, restored all five config paths, and proved the complete
+primary snapshot unchanged. The exact exception was:
+
+```text
+TransientError: https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer: ProxyError: HTTPSConnectionPool(host='tigerweb.geo.census.gov', port=443): Max retries exceeded with url: /arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer?f=json (Caused by ProxyError('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=9): Failed to establish a new connection: [WinError 10061] No connection could be made because the target machine actively refused it")))
+```
+
+**Where.** The existing bounded request path in `src.acquire`, reached through
+`src.experiments.transfer`; run ID
+`20260901T165354053966Z-97fdf412`. The failure happened while requesting the
+TIGERweb service metadata, before any registered transfer snapshot existed.
+
+**Why.** The managed command environment routes restricted outbound traffic to
+the local deny proxy at `127.0.0.1:9`; that listener refused the connection.
+The exception therefore does not establish that TIGERweb itself was down.
+
+**Did the agent recover?** Not yet. The failed attempt remains durably isolated
+under its run-specific transfer-work directory, its structured report is on
+disk, and no primary file changed. The next diagnostic is the same unmodified
+runner outside the managed network restriction; no endpoint, timeout, retry,
+data, or analysis code will be changed.
+
+**Kept as a paper failure case?** Yes, as execution-boundary evidence if space
+permits. It shows that a network denial becomes a truthful structured failure
+rather than a reused snapshot or a false completed transfer, while clearly
+separating infrastructure refusal from endpoint behavior.
+
+## 2026-09-01 — the real S13 transfer stopped at the 3DEP image export
+
+**What happened.** The same unmodified transfer runner was allowed to reach the
+real public endpoints. It acquired enough transfer data to load 88 tract
+polygons and derive the configured county extent, then the elevation export
+failed after the existing bounded request policy. The exact final exception
+was:
+
+```text
+TransientError: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage: HTTP 500
+```
+
+The canonical report records `status: "failed"`, `stage: "acquisition"`, run
+ID `20260901T165757230230Z-aa13b0d4`, all five configuration paths restored,
+and the complete primary snapshot unchanged.
+
+**Where.** `acquire_elevation()` through the existing `src.acquire` request
+choke point, during the run-specific isolated acquisition under
+`outputs/transfer-work/20260901T165757230230Z-aa13b0d4/`. No transfer pipeline
+call occurred because `acquire.main()` did not return zero and did not write its
+end-of-run manifest.
+
+**Why.** The real 3DEP `exportImage` request returned HTTP 500 through the
+existing endpoint. The runner does not expose a reliable per-request retry
+counter, so the paper report correctly uses `retry_observability:
+"not_exposed"` and null attempt/retry counts rather than inventing zero or an
+exact number.
+
+**Did the agent recover?** The system recovered safely, not computationally.
+It retained the current attempt's files as explicitly unregistered partial
+output, restored configuration in `finally`, reloaded and fingerprinted the
+primary registry/snapshot, wrote a strict current-attempt report, and returned
+nonzero. Per the S13 cut line, it did not hand-edit data, weaken checks, change
+the endpoint, or launch a second real endpoint attempt.
+
+**Kept as a paper failure case?** Yes. This is the measured transfer result: the
+county-neutral system progressed on a second county without analysis-code
+changes, then failed honestly at an external raster service while preserving
+the primary dataset and enough structured evidence to diagnose the boundary.

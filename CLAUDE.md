@@ -96,9 +96,9 @@ question -> orchestrator (LLM) -> tools --------------------> answer
 | `src/faults.py` | injectable timeouts / 5xx / empty / wrong-CRS, for the robustness experiment |
 | `src/vulnerability.py` | percentile index, weights as parameters |
 | `src/hazard.py` | exposure from raster and vector hazard layers |
-| `src/accessibility.py` | network travel time (supporting measure) |
+| `src/experiments/transfer.py` | isolated second-area acquisition/pipeline evidence; never model-visible |
 | `src/risk.py` | hazard × exposure × vulnerability × resilience, components reported separately |
-| `src/scenarios.py` | weighting sweep, trade-off table |
+| `src/pipeline.py` / `src/risk.py` | scenario and weighting sweep; `ScenarioRow` trade-off table |
 | `src/sandbox.py` | subprocess execution of model-written code, traceback return |
 | `src/critic.py` | numeric traceability + domain invariants + revision cycle |
 | `src/schemas.py` | pydantic arg models → tool specs (flat, no `$ref`) |

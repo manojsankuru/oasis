@@ -33,13 +33,23 @@ PYTHON = ROOT / ".venv" / "Scripts" / "python.exe"
 if not PYTHON.exists():
     PYTHON = pathlib.Path(sys.executable)
 
+MODULE_IMPORTS: dict[str, str] = {
+    "transfer": "experiments.transfer",
+}
+
+
+def import_of(module: str) -> str:
+    """Resolve a mutation target name to its import path below ``src``."""
+    return MODULE_IMPORTS.get(module, module)
+
 
 def source_of(module: str) -> pathlib.Path:
-    return ROOT / "src" / f"{module}.py"
+    return (ROOT / "src").joinpath(*import_of(module).split(".")).with_suffix(".py")
 
 
 def backup_of(module: str) -> pathlib.Path:
-    return ROOT / "src" / f"{module}.py.mutation-backup"
+    source = source_of(module)
+    return source.with_name(source.name + ".mutation-backup")
 
 
 ALIGN_MUTATIONS: list[tuple[str, str, str]] = [
@@ -951,6 +961,38 @@ FAULTS_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+TRANSFER_MUTATIONS: list[tuple[str, str, str]] = [
+    (
+        "the isolated snapshot is redirected to the saved primary snapshot",
+        "        config.SNAPSHOT_DIR = paths.snapshot_dir\n",
+        '        config.SNAPSHOT_DIR = originals["SNAPSHOT_DIR"]\n',
+    ),
+    (
+        "the production transfer dispatch uses the primary study area",
+        "    area = config.TRANSFER_AREA\n",
+        "    area = config.STUDY_AREA\n",
+    ),
+    (
+        "the isolation context restores only four of the five config paths",
+        (
+            "    finally:\n"
+            "        for name in CONFIG_PATHS:\n"
+            "            setattr(config, name, originals[name])\n"
+        ),
+        (
+            "    finally:\n"
+            "        for name in CONFIG_PATHS[:-1]:\n"
+            "            setattr(config, name, originals[name])\n"
+        ),
+    ),
+    (
+        "a failed transfer attempt is declared completed",
+        '        report["status"] = "failed"\n',
+        '        report["status"] = "completed"\n',
+    ),
+]
+
+
 TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "align": ALIGN_MUTATIONS,
     "hazard": HAZARD_MUTATIONS,
@@ -962,6 +1004,7 @@ TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "sandbox": SANDBOX_MUTATIONS,
     "critic": CRITIC_MUTATIONS,
     "faults": FAULTS_MUTATIONS,
+    "transfer": TRANSFER_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
 
@@ -973,7 +1016,7 @@ disappearing into a healthy-looking total."""
 
 def run_check(module: str) -> tuple[int, list[str]]:
     proc = subprocess.run(
-        [str(PYTHON), "-m", f"src.{module}", "--check"],
+        [str(PYTHON), "-m", f"src.{import_of(module)}", "--check"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -994,13 +1037,21 @@ def mutate_module(module: str) -> list[tuple[str, object, list[str]]]:
     source = source_of(module)
     backup = backup_of(module)
     original = source.read_text(encoding="utf-8")
-    backup.write_text(original, encoding="utf-8")
+    try:
+        with backup.open("x", encoding="utf-8") as stream:
+            stream.write(original)
+    except FileExistsError:
+        raise SystemExit(
+            f"REFUSING TO OVERWRITE RECOVERY BACKUP {backup.relative_to(ROOT).as_posix()}\n"
+            "compare it with the live source and recover or remove it deliberately"
+        ) from None
 
     baseline_code, baseline_failing = run_check(module)
     if baseline_code != 0:
         backup.unlink(missing_ok=True)
         raise SystemExit(
-            f"BASELINE IS NOT GREEN for src/{module}.py -- fix that before mutating\n"
+            f"BASELINE IS NOT GREEN for {source.relative_to(ROOT).as_posix()} "
+            "-- fix that before mutating\n"
             + "\n".join(f"  {line}" for line in baseline_failing)
         )
 
@@ -1033,7 +1084,11 @@ def main() -> int:
         results = mutate_module(module)
         total += len(results)
         module_survivors = 0
-        print(f"-- src/{module}.py, checked by `python -m src.{module} --check`")
+        relative_source = source_of(module).relative_to(ROOT).as_posix()
+        print(
+            f"-- {relative_source}, checked by "
+            f"`python -m src.{import_of(module)} --check`"
+        )
         for label, code, failing in results:
             caught = code == 1 and bool(failing)
             print(f"[{'CAUGHT  ' if caught else 'SURVIVED'}] exit={code}  {label}")

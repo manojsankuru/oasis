@@ -8,14 +8,32 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Mon 31 Aug, at the end of S12.
+Checked Tue 1 Sep, at the end of S13.
 
 | | |
 | --- | --- |
-| Plan | S13 and S14 next, then paper and submission. |
-| Reality | S1-S12 done. Robustness is measured; the transfer has not run yet. |
-| Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace`, `sandbox`, `critic`, `faults`, `experiments/faults`, `experiments/behaviour` |
-| Missing | `experiments/transfer`, `figures`, and the S14 paper numbers artifact |
+| Plan | S14 next, then paper and submission. |
+| Reality | S1-S13 done. S13 is a measured failed transfer, not a completed second-county pipeline. |
+| Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace`, `sandbox`, `critic`, `faults`, `experiments/faults`, `experiments/behaviour`, `experiments/transfer` |
+| Missing | `figures` and the S14 paper numbers artifact |
+
+**Measured S13 result.** The real transfer reached the configured second area,
+loaded 88 tract polygons, and derived their extent before the 3DEP
+`exportImage` endpoint ended with HTTP 500 under the existing bounded request
+path. Acquisition therefore produced no manifest and the pipeline was not
+called. `outputs/paper/transfer_report.json` says `failed/acquisition`, lists
+four files only as unregistered partial output, leaves retry/attempt counts
+unknown, records all five config paths restored, and proves the complete
+eight-file primary snapshot fingerprint unchanged. The primary paper trade-off
+is a byte-identical nine-row copy at `outputs/paper/tradeoff.csv`.
+
+The S13 gate is green for an honestly measured failure, not for transfer
+completion: the pre-S13 baseline was 881 PASS; the final offline transfer check
+is 42 PASS; `python mutate.py transfer` catches 4/4; the post-attempt primary
+pipeline remains 34 PASS; and the tool surface remains 135 PASS with eleven
+tools, no pending tools, and no surface faults. The weakest rubric criterion is
+still RB: generalization reached a second county without an analysis-code
+change, but the live raster dependency prevented an end-to-end transfer result.
 
 **Both feedback cycles exist, and the robustness half of RB is now measured
 rather than claimed.** `python -m src.tools` lists no tool as `[PENDING]`,
@@ -24,18 +42,12 @@ eleven names in `contracts.TOOL_NAMES` are all advertised, all executable, and
 all backed by a module that exists. Fault injection did **not** become a
 twelfth tool and is not reachable from the model.
 
-The recovered S12 gate is 881 PASS across the ten baseline modules; the
-behaviour port adds 41 PASS; the live endpoint boundary remains 87 PASS;
-`python mutate.py faults` catches 18/18. The weakest criterion is still RB:
-fault recovery is now measured, but the second-county transfer is still the
-next session's work.
+What S14 inherits from S13:
 
-What S13 inherits from S12:
-
-- **`src/experiments/` exists, with `__init__.py`.** `transfer.py` goes in the
-  same package. Two runners are already there and neither is imported by the
-  agent or by a tool: an experiment that the shipped system could reach would be
-  a second route to an answer for `critic.py` to trace to.
+- **`src/experiments/transfer.py` is an isolated runner, not a model-visible
+  tool.** It lives beside the two S12 experiment runners, and none is imported
+  by the agent or by a tool: an experiment that the shipped system could reach
+  would be a second route to an answer for `critic.py` to trace to.
 - **`src/faults.py` injects at `acquire._SESSION`**, the session object
   `acquire._request` calls at `acquire.py`'s single outbound call site, *inside*
   the body tenacity retries. Decided this way rather than by replacing the
@@ -79,9 +91,10 @@ What S13 inherits from S12:
   `MANIFEST_PATH` — restoring all five in a `finally`. Five, not one, because
   the manifest stores dataset paths relative to the root and every one of those
   names is evaluated at import: moving `SNAPSHOT_DIR` alone leaves the manifest
-  resolving straight back to the real files. S13 should reuse that exact list.
-- **`mutate.py` has a `faults` entry.** It also has a hazard S13 should know
-  about: `run_check` has no timeout, and a sweep killed by a wall-clock limit
+  resolving straight back to the real files. **S13 rebinds and restores that
+  same exact five-path set for the transfer area.**
+- **`mutate.py` has `faults` and nested-module `transfer` entries.** A mutation
+  sweep killed by a wall-clock limit
   leaves a mutated module on disk, because a Python `finally` does not run when
   the interpreter is signalled. The backup file beside the source is what
   recovers it. See `failures.md`.
@@ -631,17 +644,20 @@ names.
 ## S13 — scenario sweep and transfer · 2.5 h
 
 ```
-Implement src/scenarios.py and src/experiments/transfer.py. scenarios.py sweeps
-every WeightPreset against every HazardScenario, emitting ScenarioRows. Fill
-displaced_geoids — the units another preset prioritises and this one does not.
-Reporting only who gains is the most common way to fail criterion SG.
-experiments/transfer.py runs the entire pipeline on TRANSFER_AREA with no code
-change. Record what worked, what broke, and what the agent recovered from
-unaided.
+Measured outcome: no src/scenarios.py was added. The existing
+Risk.compare_presets() plus pipeline.run() remain the single authoritative
+scenario/weighting sweep and already emit ScenarioRows with displaced_geoids.
+src/experiments/transfer.py exercised TRANSFER_AREA through the real acquisition
+entry point in an isolated namespace. The attempt reached 88 tracts, then the
+3DEP export returned HTTP 500; no manifest was written and the pipeline was not
+called. The cut line was taken and the failed acquisition was preserved as the
+finding rather than presented as a successful transfer.
 ```
 
-**Gate:** `/gate scenarios` — trade-off table and transfer report both written to
-`outputs/paper/`.
+**Gate:** `outputs/paper/tradeoff.csv` and
+`outputs/paper/transfer_report.json` exist. The latter records
+`failed/acquisition`, four unregistered partial files, exact restoration and
+primary-snapshot safety evidence, and null—not zero—retry counts.
 **Cut:** if transfer breaks early, spend one hour making the failure legible and
 stop. The failure mode is the finding. Do not spend the day making the second
 county work.

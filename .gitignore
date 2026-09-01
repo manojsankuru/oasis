@@ -20,6 +20,8 @@ outputs/*
 !outputs/.gitkeep
 !outputs/faults.md
 !outputs/faults.json
+!outputs/paper/
+!outputs/paper/**
 
 data/*.geojson
 data/snapshot/

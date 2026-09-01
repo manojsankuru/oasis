@@ -1,0 +1,211 @@
+{
+  "alignment": null,
+  "boundary_verification": null,
+  "config_paths_restored": true,
+  "datasets": [],
+  "error": {
+    "message": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage: HTTP 500",
+    "message_sha256": "593eae4102e0486358e4b7c4bdf2b417dded235fd95c74137f12fec4de00dea3",
+    "type": "TransientError"
+  },
+  "finished_at": "2026-09-01T16:59:20.811804+00:00",
+  "last_observable_action": "TransientError raised during acquisition: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage: HTTP 500",
+  "manifest_path": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/manifest.json",
+  "network_attempts": null,
+  "partial_pipeline_files": [],
+  "pipeline": null,
+  "pipeline_output_path": "outputs/paper/transfer/20260901T165757230230Z-aa13b0d4",
+  "primary_snapshot_after": {
+    "inventory": {
+      "3depelevation.tif": {
+        "sha256": "e043cedeab927393d67e078b32a2eeda883feb40a482b01eedf2ffcf992fa25e",
+        "size": 32773212,
+        "st_mtime_ns": 1787974003977294500
+      },
+      "acs.parquet": {
+        "sha256": "0a2d2e2fc6e3fbf528982d66dcd2f755f5373fed93e5c39d59ead8482be23647",
+        "size": 92138,
+        "st_mtime_ns": 1787973983910507400
+      },
+      "acs_block_groups.parquet": {
+        "sha256": "bcb3edd3732b87db7407625b46c14a7aa4983c8612bbb5f110c6670374229dfc",
+        "size": 12302,
+        "st_mtime_ns": 1787973984486590300
+      },
+      "block_groups.geojson": {
+        "sha256": "727feb28e263675ee697d44fd0538fc3546c47644ac653a3e430fd2ca21c6c22",
+        "size": 4211886,
+        "st_mtime_ns": 1787973980383740000
+      },
+      "facilities.geojson": {
+        "sha256": "848ab6a5d8b125d7040de1724cd3e1381cf1cfd40cf8c492df2b1508566bb77c",
+        "size": 1020829,
+        "st_mtime_ns": 1787974006586402100
+      },
+      "flood_zones.geojson": {
+        "sha256": "3d1c97f364d79ddea88df2f57d2d52e3736b1d8a24ffe31782bcf796f7bfaa8a",
+        "size": 159,
+        "st_mtime_ns": 1788200575945981200
+      },
+      "manifest.json": {
+        "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
+        "size": 39374,
+        "st_mtime_ns": 1788200575959479200
+      },
+      "tracts.geojson": {
+        "sha256": "bd0cdf4598a261ab2b9dc2a84c7b2912d483f1c57c2835daa197d46ce3bf75b3",
+        "size": 2198821,
+        "st_mtime_ns": 1787973976442180400
+      }
+    },
+    "manifest": {
+      "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
+      "size": 39374,
+      "st_mtime_ns": 1788200575959479200
+    },
+    "manifest_path": "data/snapshot/manifest.json",
+    "tract_count": 99
+  },
+  "primary_snapshot_before": {
+    "inventory": {
+      "3depelevation.tif": {
+        "sha256": "e043cedeab927393d67e078b32a2eeda883feb40a482b01eedf2ffcf992fa25e",
+        "size": 32773212,
+        "st_mtime_ns": 1787974003977294500
+      },
+      "acs.parquet": {
+        "sha256": "0a2d2e2fc6e3fbf528982d66dcd2f755f5373fed93e5c39d59ead8482be23647",
+        "size": 92138,
+        "st_mtime_ns": 1787973983910507400
+      },
+      "acs_block_groups.parquet": {
+        "sha256": "bcb3edd3732b87db7407625b46c14a7aa4983c8612bbb5f110c6670374229dfc",
+        "size": 12302,
+        "st_mtime_ns": 1787973984486590300
+      },
+      "block_groups.geojson": {
+        "sha256": "727feb28e263675ee697d44fd0538fc3546c47644ac653a3e430fd2ca21c6c22",
+        "size": 4211886,
+        "st_mtime_ns": 1787973980383740000
+      },
+      "facilities.geojson": {
+        "sha256": "848ab6a5d8b125d7040de1724cd3e1381cf1cfd40cf8c492df2b1508566bb77c",
+        "size": 1020829,
+        "st_mtime_ns": 1787974006586402100
+      },
+      "flood_zones.geojson": {
+        "sha256": "3d1c97f364d79ddea88df2f57d2d52e3736b1d8a24ffe31782bcf796f7bfaa8a",
+        "size": 159,
+        "st_mtime_ns": 1788200575945981200
+      },
+      "manifest.json": {
+        "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
+        "size": 39374,
+        "st_mtime_ns": 1788200575959479200
+      },
+      "tracts.geojson": {
+        "sha256": "bd0cdf4598a261ab2b9dc2a84c7b2912d483f1c57c2835daa197d46ce3bf75b3",
+        "size": 2198821,
+        "st_mtime_ns": 1787973976442180400
+      }
+    },
+    "manifest": {
+      "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
+      "size": 39374,
+      "st_mtime_ns": 1788200575959479200
+    },
+    "manifest_path": "data/snapshot/manifest.json",
+    "tract_count": 99
+  },
+  "primary_snapshot_unchanged": true,
+  "primary_tradeoff": {
+    "byte_count": 1992,
+    "bytes_equal": true,
+    "columns": [
+      "preset",
+      "scenario",
+      "population_in_priority",
+      "vulnerable_population_in_priority",
+      "mean_inundation_m",
+      "top_geoids",
+      "displaced_geoids"
+    ],
+    "columns_equal": true,
+    "destination": "outputs/paper/tradeoff.csv",
+    "destination_sha256": "bec5ca3f1cfacb724476ccf616afb6c8c85a006902e9a45fa7b09b2e1dffbff1",
+    "row_count": 9,
+    "rows_equal": true,
+    "source": "outputs/tradeoff.csv",
+    "source_sha256": "bec5ca3f1cfacb724476ccf616afb6c8c85a006902e9a45fa7b09b2e1dffbff1"
+  },
+  "retries_by_stage": null,
+  "retry_observability": "not_exposed",
+  "run_id": "20260901T165757230230Z-aa13b0d4",
+  "safety_verification": {
+    "config_paths_after": {
+      "DATA_DIR": "data",
+      "DERIVED_DIR": "data/derived",
+      "MANIFEST_PATH": "data/snapshot/manifest.json",
+      "PROJECT_ROOT": ".",
+      "SNAPSHOT_DIR": "data/snapshot"
+    },
+    "config_paths_before": {
+      "DATA_DIR": "data",
+      "DERIVED_DIR": "data/derived",
+      "MANIFEST_PATH": "data/snapshot/manifest.json",
+      "PROJECT_ROOT": ".",
+      "SNAPSHOT_DIR": "data/snapshot"
+    },
+    "config_paths_restored": true,
+    "git_data_state": {
+      "clean": true,
+      "staged_diff": {
+        "error": "",
+        "output": "",
+        "return_code": 0
+      },
+      "status": {
+        "error": "",
+        "output": "",
+        "return_code": 0
+      },
+      "unstaged_diff": {
+        "error": "",
+        "output": "",
+        "return_code": 0
+      }
+    },
+    "isolated_layout": {
+      "DATA_DIR": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data",
+      "DERIVED_DIR": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/derived",
+      "MANIFEST_PATH": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/manifest.json",
+      "PROJECT_ROOT": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4",
+      "SNAPSHOT_DIR": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot"
+    },
+    "post_attempt_errors": [],
+    "primary_fingerprint_error": null,
+    "primary_registry_reload": true,
+    "primary_snapshot_unchanged": true
+  },
+  "schema_version": 1,
+  "snapshot_path": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot",
+  "stage": "acquisition",
+  "started_at": "2026-09-01T16:57:57.233393+00:00",
+  "status": "failed",
+  "study_area": {
+    "county_fips": "051",
+    "name": "Chatham County, Georgia",
+    "state_fips": "13",
+    "working_crs": "EPSG:5070"
+  },
+  "unregistered_partial_files": [
+    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/acs.parquet",
+    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/acs_block_groups.parquet",
+    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/block_groups.geojson",
+    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/tracts.geojson"
+  ],
+  "warnings": [],
+  "work_root": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4",
+  "working_crs": "EPSG:5070",
+  "written_files": []
+}

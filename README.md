@@ -13,7 +13,7 @@ See `CLAUDE.md` for the hard invariants, `src/contracts.py` for the frozen inter
 
 ## Status
 
-Session S12 of 14 complete. **Both feedback cycles exist, and robustness is now a
+Session S13 of 14 complete. **Both feedback cycles exist, and robustness is now a
 measurement rather than a claim.** Behind `run_spatial_code` there is a sandbox —
 model-written Python in a child process, with the traceback brought back as the thing the
 model repairs from. Around the answer there is a critic: every number the agent reports is
@@ -21,6 +21,20 @@ traced back to a logged tool result, and an answer that cannot support one is se
 be rewritten, bounded at two revision cycles. All eleven names in `contracts.TOOL_NAMES`
 are advertised, executable and backed by a module that exists; `python -m src.tools` lists
 none as `[PENDING]`.
+
+**The measured S13 transfer status is `failed`, not completed.** The
+county-neutral runner acquired and loaded 88 tract polygons for the configured
+second area and derived its extent, then the real 3DEP image export ended with
+`TransientError: .../exportImage: HTTP 500` after the existing bounded request
+policy. Because `acquire.main()` did not return zero, it wrote no manifest and
+the transfer pipeline was not called. Four files from the attempt are retained
+as explicitly unregistered partial output; no provenance is reconstructed from
+them. The runner restored all five configuration paths and proved the complete
+primary snapshot inventory unchanged. See the portable, strict
+[transfer report](outputs/paper/transfer_report.json), the byte-identical
+[paper trade-off](outputs/paper/tradeoff.csv), and the verbatim failure record
+in [docs/failures.md](docs/failures.md). Unknown retry/attempt counts remain
+JSON `null` with `retry_observability: "not_exposed"`—never an assumed zero.
 
 **Retrieval can now be made to fail on purpose.** `src/faults.py` injects five kinds of
 failure — timeout, 5xx, an empty response, a wrong declared CRS, a truncated page — into
@@ -114,13 +128,14 @@ runs model-written Python in a subprocess with the same interpreter and packages
 parent. It bounds the run and kills the whole process tree when the bound expires, gives
 the code a scratch directory so it cannot reach `data/`, and refuses to carry a
 coordinate back into a model message. It does not sandbox the filesystem, the network or
-the process table, and the paper's limitations say so. The cleaned layers reach the child
+the process table, and the paper's limitations must say so. The cleaned layers reach the child
 as a parquet dump the sandbox writes once per process and rebuilds when a live retrieval
 replaces the snapshot — the child cannot import the pipeline, so a second computation of
 a reported number is not merely discouraged but unreachable.
 
-Every module carries its own `--check` that verifies its results against an
-independently computed value, and `python mutate.py` breaks each of those checks on
+Each analysis or boundary module listed under Verification carries a `--check`
+that verifies its results against an independently computed value, and
+`python mutate.py` breaks each of those checks on
 purpose and reports any that did not notice. As of S11: **789 checks across nine modules,
 all passing, and 225 mutations with no survivors** — `align` 145, `hazard` 65,
 `vulnerability` 57, `risk` 68, `pipeline` 34, `schemas` 38, `tools` 135, `sandbox` 99,
@@ -205,7 +220,7 @@ python -m src.demo "question"   # or on one of your own
 python -m src.experiments.faults        # the robustness table                       (S12)
 python -m src.experiments.faults --live # ...with rows from the real service         (S12)
 python -m src.experiments.behaviour     # the four adversarial scenarios             (S12)
-python -m src.experiments.transfer  # second-county run                              (S13)
+python -m src.experiments.transfer      # second-county run                          (S13)
 ```
 
 ### Analysis — no model, no key, no network
@@ -267,7 +282,7 @@ reason.
 | `src/vulnerability.py` | the percentile index, the indicators' rationale, the weight presets |
 | `src/risk.py` | the four components, the score, the trade-off table |
 | `src/pipeline.py` | the deterministic spine: snapshot in, risk table out |
-| `src/verify.py` | check helpers shared by every module's `--check` |
+| `src/verify.py` | discipline/check helpers shared by the checked modules |
 | `src/tools.py` | the eleven LLM-visible tools; reports the pipeline's numbers, computes none |
 | `src/schemas.py` | flat scalar pydantic arg models to tool specs, no `$ref` |
 | `src/trace.py` | terminal formatting |
