@@ -1,20 +1,1389 @@
 {
-  "alignment": null,
-  "boundary_verification": null,
-  "config_paths_restored": true,
-  "datasets": [],
-  "error": {
-    "message": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage: HTTP 500",
-    "message_sha256": "593eae4102e0486358e4b7c4bdf2b417dded235fd95c74137f12fec4de00dea3",
-    "type": "TransientError"
+  "alignment": {
+    "apportioned": {
+      "population": "sum of 246 block_groups_joined value(s) into 88 tracts_joined unit(s) by GEOID prefix, width 12 -> 11"
+    },
+    "apportionment_error": {
+      "population": 0.0
+    },
+    "geometries_dropped": 0,
+    "geometries_repaired": 0,
+    "reprojected": {
+      "acs": "n/a -> EPSG:5070",
+      "acs_block_groups": "n/a -> EPSG:5070",
+      "block_groups": "EPSG:4326 -> EPSG:5070",
+      "elevation": "EPSG:5070 -> EPSG:5070",
+      "facilities": "EPSG:4326 -> EPSG:5070",
+      "flood_zones": "EPSG:4326 -> EPSG:5070",
+      "tracts": "EPSG:4326 -> EPSG:5070"
+    },
+    "sentinels_removed": {},
+    "temporal_span": {
+      "acs": "ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)",
+      "acs_block_groups": "ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)",
+      "block_groups": "Census Block Groups (layer 1) from service v11.5",
+      "elevation": "3DEPElevation (esriImageServiceDataTypeElevation) from service v11.3; USGS National Map 3D Elevation Program (3DEP). August 25, 2026.",
+      "facilities": "OSM planet as of 2026-09-01T18:52:22Z, via Overpass API 0.7.62.11 87bfad18",
+      "flood_zones": "unavailable at retrieval time",
+      "tracts": "Census Tracts (layer 0) from service v11.5"
+    },
+    "units_below_cell_threshold": 0,
+    "unmatched_left": [],
+    "unmatched_right": [],
+    "warnings": [
+      "flood_zones: retrieval degraded, so its 0 features are an absence of data rather than an absence of hazard. DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone",
+      "acs: pct_age_65_plus is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_disability is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_limited_english is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_no_vehicle is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_poverty is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them"
+    ]
   },
-  "finished_at": "2026-09-01T16:59:20.811804+00:00",
-  "last_observable_action": "TransientError raised during acquisition: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage: HTTP 500",
-  "manifest_path": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/manifest.json",
+  "boundary_verification": {
+    "all_geoids_match_prefix": true,
+    "all_request_area_checks_pass": true,
+    "all_required_datasets_registered": true,
+    "block_groups": {
+      "attribute_count": 246,
+      "attributes_without_boundary": [],
+      "boundary_count": 246,
+      "boundary_without_attributes": [],
+      "sets_equal": true
+    },
+    "geoid_prefix": "13051",
+    "population_source": "RiskTable.exposure.population_total, verified against aligned PipelineResult tables",
+    "population_total": 300879.0,
+    "registered_datasets": [
+      "acs",
+      "acs_block_groups",
+      "block_groups",
+      "elevation",
+      "facilities",
+      "flood_zones",
+      "tracts"
+    ],
+    "request_area_matches": {
+      "acs": true,
+      "acs_block_groups": true,
+      "block_groups": true,
+      "tracts": true
+    },
+    "required_datasets": [
+      "acs",
+      "acs_block_groups",
+      "block_groups",
+      "elevation",
+      "facilities",
+      "flood_zones",
+      "tracts"
+    ],
+    "tracts": {
+      "attribute_count": 88,
+      "attributes_without_boundary": [],
+      "boundary_count": 88,
+      "boundary_without_attributes": [],
+      "sets_equal": true
+    }
+  },
+  "config_paths_restored": true,
+  "datasets": [
+    {
+      "kind": "table",
+      "name": "acs",
+      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/acs.parquet",
+      "provenance": {
+        "dataset": "acs",
+        "declared_crs": "n/a",
+        "feature_count": 88,
+        "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "notes": [
+          "vintage, title and licence read from https://api.census.gov/data/2024/acs/acs5.json, not composed here",
+          "56 estimates requested with all 56 margins of error",
+          "'get' is capped at 50 variables, so this took 3 request(s), joined on ['state', 'county', 'tract'] rather than on row order",
+          "GEOID concatenates ['state', 'county', 'tract'], the geography columns the API appended to the header, in the order it returned them",
+          "values are exactly as the API sent them, as strings: suppressed estimates are still sentinels and leading zeros are still present, both handled in align.py",
+          "CENSUS_API_KEY is sent as a query parameter and is deliberately absent from request_params, from these notes and from every error this module raises",
+          "resolved against https://api.census.gov/data/2024/acs/acs5/variables.json (28475 variables published, no key required)",
+          "population: /^Total Population\\|\\|Estimate!!Total:?$/ searched 1 estimate variables in B01003 and matched 1",
+          "population: matched B01003_001E <- Total Population||Estimate!!Total",
+          "pct_poverty: /\\|\\|Estimate!!Total:!!Income in the past 12 months below poverty level:$/ searched 59 estimate variables in B17001 and matched 1",
+          "pct_poverty: matched B17001_002E <- Poverty Status in the Past 12 Months by Sex by Age||Estimate!!Total:!!Income in the past 12 months below poverty level:",
+          "pct_poverty: rejected 58: B17001_001E (Estimate!!Total:), B17001_003E (Estimate!!Total:!!Income in the past 12 months below poverty level:!!Male:), B17001_004E (Estimate!!Total:!!Income in the past 12 months below poverty level:!!Male:!!Under 5 years), B17001_005E (Estimate!!Total:!!Income in the past 12 months below poverty level:!!Male:!!5 years), and 54 more",
+          "pct_poverty: denominator B17001_001E <- Poverty Status in the Past 12 Months by Sex by Age||Estimate!!Total:",
+          "pct_age_65_plus: /\\|\\|Estimate!!Total:!!(?:Male|Female):!!(?:6[5-9]|[78]\\d) (?:and|to) \\d+ years$|\\|\\|Estimate!!Total:!!(?:Male|Female):!!85 years and over$/ searched 49 estimate variables in B01001 and matched 12",
+          "pct_age_65_plus: matched B01001_020E <- Sex by Age||Estimate!!Total:!!Male:!!65 and 66 years",
+          "pct_age_65_plus: matched B01001_021E <- Sex by Age||Estimate!!Total:!!Male:!!67 to 69 years",
+          "pct_age_65_plus: matched B01001_022E <- Sex by Age||Estimate!!Total:!!Male:!!70 to 74 years",
+          "pct_age_65_plus: matched B01001_023E <- Sex by Age||Estimate!!Total:!!Male:!!75 to 79 years",
+          "pct_age_65_plus: matched B01001_024E <- Sex by Age||Estimate!!Total:!!Male:!!80 to 84 years",
+          "pct_age_65_plus: matched B01001_025E <- Sex by Age||Estimate!!Total:!!Male:!!85 years and over",
+          "pct_age_65_plus: matched B01001_044E <- Sex by Age||Estimate!!Total:!!Female:!!65 and 66 years",
+          "pct_age_65_plus: matched B01001_045E <- Sex by Age||Estimate!!Total:!!Female:!!67 to 69 years",
+          "pct_age_65_plus: matched B01001_046E <- Sex by Age||Estimate!!Total:!!Female:!!70 to 74 years",
+          "pct_age_65_plus: matched B01001_047E <- Sex by Age||Estimate!!Total:!!Female:!!75 to 79 years",
+          "pct_age_65_plus: matched B01001_048E <- Sex by Age||Estimate!!Total:!!Female:!!80 to 84 years",
+          "pct_age_65_plus: matched B01001_049E <- Sex by Age||Estimate!!Total:!!Female:!!85 years and over",
+          "pct_age_65_plus: rejected 37: B01001_001E (Estimate!!Total:), B01001_002E (Estimate!!Total:!!Male:), B01001_003E (Estimate!!Total:!!Male:!!Under 5 years), B01001_004E (Estimate!!Total:!!Male:!!5 to 9 years), and 33 more",
+          "pct_age_65_plus: denominator B01001_001E <- Sex by Age||Estimate!!Total:",
+          "pct_disability: /\\|\\|Estimate!!Total:!!(?:Male|Female):!!.+:!!With a disability$/ searched 39 estimate variables in B18101 and matched 12",
+          "pct_disability: matched B18101_004E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!Under 5 years:!!With a disability",
+          "pct_disability: matched B18101_007E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!5 to 17 years:!!With a disability",
+          "pct_disability: matched B18101_010E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!18 to 34 years:!!With a disability",
+          "pct_disability: matched B18101_013E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!35 to 64 years:!!With a disability",
+          "pct_disability: matched B18101_016E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!65 to 74 years:!!With a disability",
+          "pct_disability: matched B18101_019E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!75 years and over:!!With a disability",
+          "pct_disability: matched B18101_023E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!Under 5 years:!!With a disability",
+          "pct_disability: matched B18101_026E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!5 to 17 years:!!With a disability",
+          "pct_disability: matched B18101_029E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!18 to 34 years:!!With a disability",
+          "pct_disability: matched B18101_032E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!35 to 64 years:!!With a disability",
+          "pct_disability: matched B18101_035E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!65 to 74 years:!!With a disability",
+          "pct_disability: matched B18101_038E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!75 years and over:!!With a disability",
+          "pct_disability: rejected 27: B18101_001E (Estimate!!Total:), B18101_002E (Estimate!!Total:!!Male:), B18101_003E (Estimate!!Total:!!Male:!!Under 5 years:), B18101_005E (Estimate!!Total:!!Male:!!Under 5 years:!!No disability), and 23 more",
+          "pct_disability: denominator B18101_001E <- Sex by Age by Disability Status||Estimate!!Total:",
+          "pct_no_vehicle: /\\|\\|Estimate!!Total:!!No vehicle available$/ searched 30 estimate variables in B08201 and matched 1",
+          "pct_no_vehicle: matched B08201_002E <- Household Size by Vehicles Available||Estimate!!Total:!!No vehicle available",
+          "pct_no_vehicle: rejected 29: B08201_001E (Estimate!!Total:), B08201_003E (Estimate!!Total:!!1 vehicle available), B08201_004E (Estimate!!Total:!!2 vehicles available), B08201_005E (Estimate!!Total:!!3 vehicles available), and 25 more",
+          "pct_no_vehicle: denominator B08201_001E <- Household Size by Vehicles Available||Estimate!!Total:",
+          "pct_limited_english: /\\|\\|Estimate!!Total:!!(?:Native|Foreign born):!!Speak .+:!!Speak English \\\"(?:well|not well|not at all)\\\"$/ searched 45 estimate variables in B16005 and matched 24",
+          "pct_limited_english: matched B16005_006E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_007E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_008E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_011E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_012E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_013E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_016E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_017E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_018E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_021E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_022E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_023E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_028E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_029E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_030E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_033E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_034E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_035E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_038E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_039E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_040E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_043E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_044E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_045E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English \"not at all\"",
+          "pct_limited_english: rejected 21: B16005_001E (Estimate!!Total:), B16005_002E (Estimate!!Total:!!Native:), B16005_003E (Estimate!!Total:!!Native:!!Speak only English), B16005_004E (Estimate!!Total:!!Native:!!Speak Spanish:), and 17 more",
+          "pct_limited_english: denominator B16005_001E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:"
+        ],
+        "request_params": {
+          "estimates": "B01001_001E,B01001_020E,B01001_021E,B01001_022E,B01001_023E,B01001_024E,B01001_025E,B01001_044E,B01001_045E,B01001_046E,B01001_047E,B01001_048E,B01001_049E,B01003_001E,B08201_001E,B08201_002E,B16005_001E,B16005_006E,B16005_007E,B16005_008E,B16005_011E,B16005_012E,B16005_013E,B16005_016E,B16005_017E,B16005_018E,B16005_021E,B16005_022E,B16005_023E,B16005_028E,B16005_029E,B16005_030E,B16005_033E,B16005_034E,B16005_035E,B16005_038E,B16005_039E,B16005_040E,B16005_043E,B16005_044E,B16005_045E,B17001_001E,B17001_002E,B18101_001E,B18101_004E,B18101_007E,B18101_010E,B18101_013E,B18101_016E,B18101_019E,B18101_023E,B18101_026E,B18101_029E,B18101_032E,B18101_035E,B18101_038E",
+          "for": "tract:*",
+          "in": "state:13 county:051",
+          "margins": "B01001_001M,B01001_020M,B01001_021M,B01001_022M,B01001_023M,B01001_024M,B01001_025M,B01001_044M,B01001_045M,B01001_046M,B01001_047M,B01001_048M,B01001_049M,B01003_001M,B08201_001M,B08201_002M,B16005_001M,B16005_006M,B16005_007M,B16005_008M,B16005_011M,B16005_012M,B16005_013M,B16005_016M,B16005_017M,B16005_018M,B16005_021M,B16005_022M,B16005_023M,B16005_028M,B16005_029M,B16005_030M,B16005_033M,B16005_034M,B16005_035M,B16005_038M,B16005_039M,B16005_040M,B16005_043M,B16005_044M,B16005_045M,B17001_001M,B17001_002M,B18101_001M,B18101_004M,B18101_007M,B18101_010M,B18101_013M,B18101_016M,B18101_019M,B18101_023M,B18101_026M,B18101_029M,B18101_032M,B18101_035M,B18101_038M",
+          "requests": "3",
+          "resolved:pct_age_65_plus": "B01001_020E+B01001_021E+B01001_022E+B01001_023E+B01001_024E+B01001_025E+B01001_044E+B01001_045E+B01001_046E+B01001_047E+B01001_048E+B01001_049E/B01001_001E",
+          "resolved:pct_disability": "B18101_004E+B18101_007E+B18101_010E+B18101_013E+B18101_016E+B18101_019E+B18101_023E+B18101_026E+B18101_029E+B18101_032E+B18101_035E+B18101_038E/B18101_001E",
+          "resolved:pct_limited_english": "B16005_006E+B16005_007E+B16005_008E+B16005_011E+B16005_012E+B16005_013E+B16005_016E+B16005_017E+B16005_018E+B16005_021E+B16005_022E+B16005_023E+B16005_028E+B16005_029E+B16005_030E+B16005_033E+B16005_034E+B16005_035E+B16005_038E+B16005_039E+B16005_040E+B16005_043E+B16005_044E+B16005_045E/B16005_001E",
+          "resolved:pct_no_vehicle": "B08201_002E/B08201_001E",
+          "resolved:pct_poverty": "B17001_002E/B17001_001E",
+          "resolved:population": "B01003_001E",
+          "year": "2024"
+        },
+        "retrieved_at": "2026-09-01T18:54:07.998496+00:00",
+        "source_url": "https://api.census.gov/data/2024/acs/acs5",
+        "vintage": "ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)",
+        "working_crs": "EPSG:5070"
+      },
+      "validation": {
+        "actual_feature_count": 88,
+        "complete_text_fields": true,
+        "degraded": false,
+        "degraded_reasons": [],
+        "feature_count_matches": true,
+        "geoid_count": 88,
+        "geoid_count_matches_rows": true,
+        "geoids_unique": true,
+        "malformed_geoids": [],
+        "notes_present": true,
+        "path_exists": true,
+        "path_inside_work_root": true,
+        "provenance_name_matches": true,
+        "request_area_matches": true,
+        "request_params_present": true,
+        "retrieved_at_timezone_aware": true,
+        "working_crs_matches_area": true
+      }
+    },
+    {
+      "kind": "table",
+      "name": "acs_block_groups",
+      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/acs_block_groups.parquet",
+      "provenance": {
+        "dataset": "acs_block_groups",
+        "declared_crs": "n/a",
+        "feature_count": 246,
+        "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "notes": [
+          "vintage, title and licence read from https://api.census.gov/data/2024/acs/acs5.json, not composed here",
+          "1 estimates requested with all 1 margins of error",
+          "'get' is capped at 50 variables, so this took 1 request(s), joined on ['state', 'county', 'tract', 'block group'] rather than on row order",
+          "GEOID concatenates ['state', 'county', 'tract', 'block group'], the geography columns the API appended to the header, in the order it returned them",
+          "values are exactly as the API sent them, as strings: suppressed estimates are still sentinels and leading zeros are still present, both handled in align.py",
+          "CENSUS_API_KEY is sent as a query parameter and is deliberately absent from request_params, from these notes and from every error this module raises",
+          "resolved against https://api.census.gov/data/2024/acs/acs5/variables.json (28475 variables published, no key required)",
+          "population: /^Total Population\\|\\|Estimate!!Total:?$/ searched 1 estimate variables in B01003 and matched 1",
+          "population: matched B01003_001E <- Total Population||Estimate!!Total",
+          "pct_poverty: /\\|\\|Estimate!!Total:!!Income in the past 12 months below poverty level:$/ searched 59 estimate variables in B17001 and matched 1",
+          "pct_poverty: matched B17001_002E <- Poverty Status in the Past 12 Months by Sex by Age||Estimate!!Total:!!Income in the past 12 months below poverty level:",
+          "pct_poverty: rejected 58: B17001_001E (Estimate!!Total:), B17001_003E (Estimate!!Total:!!Income in the past 12 months below poverty level:!!Male:), B17001_004E (Estimate!!Total:!!Income in the past 12 months below poverty level:!!Male:!!Under 5 years), B17001_005E (Estimate!!Total:!!Income in the past 12 months below poverty level:!!Male:!!5 years), and 54 more",
+          "pct_poverty: denominator B17001_001E <- Poverty Status in the Past 12 Months by Sex by Age||Estimate!!Total:",
+          "pct_age_65_plus: /\\|\\|Estimate!!Total:!!(?:Male|Female):!!(?:6[5-9]|[78]\\d) (?:and|to) \\d+ years$|\\|\\|Estimate!!Total:!!(?:Male|Female):!!85 years and over$/ searched 49 estimate variables in B01001 and matched 12",
+          "pct_age_65_plus: matched B01001_020E <- Sex by Age||Estimate!!Total:!!Male:!!65 and 66 years",
+          "pct_age_65_plus: matched B01001_021E <- Sex by Age||Estimate!!Total:!!Male:!!67 to 69 years",
+          "pct_age_65_plus: matched B01001_022E <- Sex by Age||Estimate!!Total:!!Male:!!70 to 74 years",
+          "pct_age_65_plus: matched B01001_023E <- Sex by Age||Estimate!!Total:!!Male:!!75 to 79 years",
+          "pct_age_65_plus: matched B01001_024E <- Sex by Age||Estimate!!Total:!!Male:!!80 to 84 years",
+          "pct_age_65_plus: matched B01001_025E <- Sex by Age||Estimate!!Total:!!Male:!!85 years and over",
+          "pct_age_65_plus: matched B01001_044E <- Sex by Age||Estimate!!Total:!!Female:!!65 and 66 years",
+          "pct_age_65_plus: matched B01001_045E <- Sex by Age||Estimate!!Total:!!Female:!!67 to 69 years",
+          "pct_age_65_plus: matched B01001_046E <- Sex by Age||Estimate!!Total:!!Female:!!70 to 74 years",
+          "pct_age_65_plus: matched B01001_047E <- Sex by Age||Estimate!!Total:!!Female:!!75 to 79 years",
+          "pct_age_65_plus: matched B01001_048E <- Sex by Age||Estimate!!Total:!!Female:!!80 to 84 years",
+          "pct_age_65_plus: matched B01001_049E <- Sex by Age||Estimate!!Total:!!Female:!!85 years and over",
+          "pct_age_65_plus: rejected 37: B01001_001E (Estimate!!Total:), B01001_002E (Estimate!!Total:!!Male:), B01001_003E (Estimate!!Total:!!Male:!!Under 5 years), B01001_004E (Estimate!!Total:!!Male:!!5 to 9 years), and 33 more",
+          "pct_age_65_plus: denominator B01001_001E <- Sex by Age||Estimate!!Total:",
+          "pct_disability: /\\|\\|Estimate!!Total:!!(?:Male|Female):!!.+:!!With a disability$/ searched 39 estimate variables in B18101 and matched 12",
+          "pct_disability: matched B18101_004E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!Under 5 years:!!With a disability",
+          "pct_disability: matched B18101_007E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!5 to 17 years:!!With a disability",
+          "pct_disability: matched B18101_010E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!18 to 34 years:!!With a disability",
+          "pct_disability: matched B18101_013E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!35 to 64 years:!!With a disability",
+          "pct_disability: matched B18101_016E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!65 to 74 years:!!With a disability",
+          "pct_disability: matched B18101_019E <- Sex by Age by Disability Status||Estimate!!Total:!!Male:!!75 years and over:!!With a disability",
+          "pct_disability: matched B18101_023E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!Under 5 years:!!With a disability",
+          "pct_disability: matched B18101_026E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!5 to 17 years:!!With a disability",
+          "pct_disability: matched B18101_029E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!18 to 34 years:!!With a disability",
+          "pct_disability: matched B18101_032E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!35 to 64 years:!!With a disability",
+          "pct_disability: matched B18101_035E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!65 to 74 years:!!With a disability",
+          "pct_disability: matched B18101_038E <- Sex by Age by Disability Status||Estimate!!Total:!!Female:!!75 years and over:!!With a disability",
+          "pct_disability: rejected 27: B18101_001E (Estimate!!Total:), B18101_002E (Estimate!!Total:!!Male:), B18101_003E (Estimate!!Total:!!Male:!!Under 5 years:), B18101_005E (Estimate!!Total:!!Male:!!Under 5 years:!!No disability), and 23 more",
+          "pct_disability: denominator B18101_001E <- Sex by Age by Disability Status||Estimate!!Total:",
+          "pct_no_vehicle: /\\|\\|Estimate!!Total:!!No vehicle available$/ searched 30 estimate variables in B08201 and matched 1",
+          "pct_no_vehicle: matched B08201_002E <- Household Size by Vehicles Available||Estimate!!Total:!!No vehicle available",
+          "pct_no_vehicle: rejected 29: B08201_001E (Estimate!!Total:), B08201_003E (Estimate!!Total:!!1 vehicle available), B08201_004E (Estimate!!Total:!!2 vehicles available), B08201_005E (Estimate!!Total:!!3 vehicles available), and 25 more",
+          "pct_no_vehicle: denominator B08201_001E <- Household Size by Vehicles Available||Estimate!!Total:",
+          "pct_limited_english: /\\|\\|Estimate!!Total:!!(?:Native|Foreign born):!!Speak .+:!!Speak English \\\"(?:well|not well|not at all)\\\"$/ searched 45 estimate variables in B16005 and matched 24",
+          "pct_limited_english: matched B16005_006E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_007E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_008E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Spanish:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_011E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_012E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_013E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other Indo-European languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_016E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_017E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_018E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak Asian and Pacific Island languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_021E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_022E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_023E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Native:!!Speak other languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_028E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_029E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_030E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Spanish:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_033E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_034E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_035E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other Indo-European languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_038E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_039E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_040E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak Asian and Pacific Island languages:!!Speak English \"not at all\"",
+          "pct_limited_english: matched B16005_043E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English \"well\"",
+          "pct_limited_english: matched B16005_044E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English \"not well\"",
+          "pct_limited_english: matched B16005_045E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:!!Foreign born:!!Speak other languages:!!Speak English \"not at all\"",
+          "pct_limited_english: rejected 21: B16005_001E (Estimate!!Total:), B16005_002E (Estimate!!Total:!!Native:), B16005_003E (Estimate!!Total:!!Native:!!Speak only English), B16005_004E (Estimate!!Total:!!Native:!!Speak Spanish:), and 17 more",
+          "pct_limited_english: denominator B16005_001E <- Nativity by Language Spoken at Home by Ability to Speak English for the Population 5 Years and Over||Estimate!!Total:"
+        ],
+        "request_params": {
+          "estimates": "B01003_001E",
+          "for": "block group:*",
+          "in": "state:13 county:051",
+          "margins": "B01003_001M",
+          "requests": "1",
+          "resolved:population": "B01003_001E",
+          "year": "2024"
+        },
+        "retrieved_at": "2026-09-01T18:54:08.924772+00:00",
+        "source_url": "https://api.census.gov/data/2024/acs/acs5",
+        "vintage": "ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)",
+        "working_crs": "EPSG:5070"
+      },
+      "validation": {
+        "actual_feature_count": 246,
+        "complete_text_fields": true,
+        "degraded": false,
+        "degraded_reasons": [],
+        "feature_count_matches": true,
+        "geoid_count": 246,
+        "geoid_count_matches_rows": true,
+        "geoids_unique": true,
+        "malformed_geoids": [],
+        "notes_present": true,
+        "path_exists": true,
+        "path_inside_work_root": true,
+        "provenance_name_matches": true,
+        "request_area_matches": true,
+        "request_params_present": true,
+        "retrieved_at_timezone_aware": true,
+        "working_crs_matches_area": true
+      }
+    },
+    {
+      "kind": "vector",
+      "name": "block_groups",
+      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/block_groups.geojson",
+      "provenance": {
+        "dataset": "block_groups",
+        "declared_crs": "EPSG:4326",
+        "feature_count": 246,
+        "license": "Source: U.S. Census Bureau",
+        "notes": [
+          "requested outSR=4326; response spatialReference={'wkid': 4326, 'latestWkid': 4326}",
+          "CRS verified against the response body, not assumed from the format (f=json)",
+          "retrieved in 1 page(s) of up to 2000 features",
+          "paged with orderByFields=OBJECTID",
+          "outFields=* returned 19 columns"
+        ],
+        "request_params": {
+          "f": "json",
+          "outFields": "*",
+          "outSR": "4326",
+          "returnGeometry": "true",
+          "where": "STATE='13' AND COUNTY='051'"
+        },
+        "retrieved_at": "2026-09-01T18:54:04.479450+00:00",
+        "source_url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/1/query",
+        "vintage": "Census Block Groups (layer 1) from service v11.5",
+        "working_crs": "EPSG:5070"
+      },
+      "validation": {
+        "actual_feature_count": 246,
+        "complete_text_fields": true,
+        "degraded": false,
+        "degraded_reasons": [],
+        "feature_count_matches": true,
+        "geoid_count": 246,
+        "geoid_count_matches_rows": true,
+        "geoids_unique": true,
+        "malformed_geoids": [],
+        "notes_present": true,
+        "path_exists": true,
+        "path_inside_work_root": true,
+        "provenance_name_matches": true,
+        "request_area_matches": true,
+        "request_params_present": true,
+        "retrieved_at_timezone_aware": true,
+        "working_crs_matches_area": true
+      }
+    },
+    {
+      "kind": "raster",
+      "name": "elevation",
+      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/3depelevation.tif",
+      "provenance": {
+        "dataset": "elevation",
+        "declared_crs": "EPSG:5070",
+        "feature_count": 1,
+        "license": "USGS National Map 3D Elevation Program (3DEP). August 25, 2026.",
+        "notes": [
+          "requested cell size 30 m, effective cell size 29.9924 m; both recorded, because a raster coarser than the one asked for is otherwise invisible",
+          "no cap fired: 30 m fits in 2195x2252 px",
+          "export caps read from the service: maxImageWidth=8000, maxImageHeight=8000; neither is written in this source",
+          "size computed from the bbox reprojected to EPSG:5070: 65833 m by 67536 m. A size computed from the degree span would be invariant 2 broken silently",
+          "CRS read back off the written file with rasterio rather than assumed from imageSR: EPSG:5070, 29.9924 m pixels, 2195x2252 px, float32, nodata -9999.0",
+          "content type is not the test here: this service answers a bad export parameter with HTTP 200 and Content-Type image/tiff carrying a JSON error body, so the TIFF magic bytes are checked before anything is written",
+          "21237468 bytes in 3.3 s"
+        ],
+        "request_params": {
+          "bbox": "-81.3916980004,31.7051980001,-80.7829600002,32.2375910003",
+          "bboxSR": "4326",
+          "capped": "false",
+          "cell_size_m_effective": "29.992446",
+          "cell_size_m_requested": "30.000000",
+          "f": "image",
+          "format": "tiff",
+          "imageSR": "5070",
+          "interpolation": "RSP_BilinearInterpolation",
+          "maxImageHeight": "8000",
+          "maxImageWidth": "8000",
+          "max_export_pixels": "8000000",
+          "noData": "-9999.0",
+          "pixelType": "F32",
+          "size": "2195,2252"
+        },
+        "retrieved_at": "2026-09-01T18:54:12.756843+00:00",
+        "source_url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage",
+        "vintage": "3DEPElevation (esriImageServiceDataTypeElevation) from service v11.3; USGS National Map 3D Elevation Program (3DEP). August 25, 2026.",
+        "working_crs": "EPSG:5070"
+      },
+      "validation": {
+        "actual_feature_count": 1,
+        "complete_text_fields": true,
+        "degraded": false,
+        "degraded_reasons": [],
+        "feature_count_matches": true,
+        "notes_present": true,
+        "path_exists": true,
+        "path_inside_work_root": true,
+        "provenance_name_matches": true,
+        "raster_height": 2252,
+        "raster_width": 2195,
+        "request_area_matches": null,
+        "request_params_present": true,
+        "retrieved_at_timezone_aware": true,
+        "working_crs_matches_area": true
+      }
+    },
+    {
+      "kind": "vector",
+      "name": "facilities",
+      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/facilities.geojson",
+      "provenance": {
+        "dataset": "facilities",
+        "declared_crs": "EPSG:4326",
+        "feature_count": 206,
+        "license": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL.",
+        "notes": [
+          "POST to Overpass; the query is in request_params, not reconstructed here",
+          "bbox converted from (min_lon, min_lat, max_lon, max_lat) (-81.3916980003602, 31.705198000060093, -80.78296000023906, 32.23759100029845) to Overpass south,west,north,east (31.705198000060093, -81.3916980003602, 32.23759100029845, -80.78296000023906) in acquire._overpass_bbox and nowhere else",
+          "verified after the fact: all 206 returned points fall inside the requested bbox, which is what makes the order conversion a check rather than a claim",
+          "out center tags: 92 node(s) carry their own position and 114 way(s) carry a center, so both are usable as points",
+          "206 element(s) returned, 0 without any point and dropped, 206 kept",
+          "every tag the API returned became a column (71 in total); selecting columns is align.py's job",
+          "no remark in the response, so the result is complete rather than truncated; Overpass reports truncation in the body under HTTP 200",
+          "declared_crs is WGS84 by the Overpass API contract, not read from the body: the response states no CRS at all, which is why the containment check above exists instead of an assertion this service cannot support",
+          "answered in 19.3 s by Overpass API 0.7.62.11 87bfad18"
+        ],
+        "request_params": {
+          "bbox_4326": "-81.391698,31.705198,-80.782960,32.237591",
+          "bbox_overpass_swne": "31.705198000060093,-81.3916980003602,32.23759100029845,-80.78296000023906",
+          "overpass_ql": "[out:json][timeout:120];(node[\"amenity\"~\"^(hospital|school|community_centre|fire_station)$\"](31.705198000060093,-81.3916980003602,32.23759100029845,-80.78296000023906);way[\"amenity\"~\"^(hospital|school|community_centre|fire_station)$\"](31.705198000060093,-81.3916980003602,32.23759100029845,-80.78296000023906););out center tags;",
+          "tags": "{\"amenity\": \"^(hospital|school|community_centre|fire_station)$\"}",
+          "timeout_s": "180.0"
+        },
+        "retrieved_at": "2026-09-01T18:54:32.069927+00:00",
+        "source_url": "https://overpass-api.de/api/interpreter",
+        "vintage": "OSM planet as of 2026-09-01T18:52:22Z, via Overpass API 0.7.62.11 87bfad18",
+        "working_crs": "EPSG:5070"
+      },
+      "validation": {
+        "actual_feature_count": 206,
+        "complete_text_fields": true,
+        "degraded": false,
+        "degraded_reasons": [],
+        "feature_count_matches": true,
+        "notes_present": true,
+        "path_exists": true,
+        "path_inside_work_root": true,
+        "provenance_name_matches": true,
+        "request_area_matches": null,
+        "request_params_present": true,
+        "retrieved_at_timezone_aware": true,
+        "working_crs_matches_area": true
+      }
+    },
+    {
+      "kind": "vector",
+      "name": "flood_zones",
+      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/flood_zones.geojson",
+      "provenance": {
+        "dataset": "flood_zones",
+        "declared_crs": "EPSG:4326",
+        "feature_count": 0,
+        "license": "not retrieved",
+        "notes": [
+          "DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone",
+          "ServiceError: https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query: HTTP 200 with an ArcGIS error body (code 500): Error performing query operation",
+          "registered as an empty layer rather than omitted, so every downstream module sees a dataset with zero features instead of a missing name"
+        ],
+        "request_params": {
+          "bbox_4326": "-81.391698,31.705198,-80.782960,32.237591",
+          "degraded": "true",
+          "name_contains": "Flood Hazard",
+          "service_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer"
+        },
+        "retrieved_at": "2026-09-01T18:54:32.091084+00:00",
+        "source_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer",
+        "vintage": "unavailable at retrieval time",
+        "working_crs": "EPSG:5070"
+      },
+      "validation": {
+        "actual_feature_count": 0,
+        "complete_text_fields": true,
+        "degraded": true,
+        "degraded_reasons": [
+          "DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone"
+        ],
+        "feature_count_matches": true,
+        "notes_present": true,
+        "path_exists": true,
+        "path_inside_work_root": true,
+        "provenance_name_matches": true,
+        "request_area_matches": null,
+        "request_params_present": true,
+        "retrieved_at_timezone_aware": true,
+        "working_crs_matches_area": true
+      }
+    },
+    {
+      "kind": "vector",
+      "name": "tracts",
+      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/tracts.geojson",
+      "provenance": {
+        "dataset": "tracts",
+        "declared_crs": "EPSG:4326",
+        "feature_count": 88,
+        "license": "Source: U.S. Census Bureau",
+        "notes": [
+          "requested outSR=4326; response spatialReference={'wkid': 4326, 'latestWkid': 4326}",
+          "CRS verified against the response body, not assumed from the format (f=json)",
+          "retrieved in 1 page(s) of up to 2000 features",
+          "paged with orderByFields=OBJECTID",
+          "outFields=* returned 18 columns"
+        ],
+        "request_params": {
+          "f": "json",
+          "outFields": "*",
+          "outSR": "4326",
+          "returnGeometry": "true",
+          "where": "STATE='13' AND COUNTY='051'"
+        },
+        "retrieved_at": "2026-09-01T18:54:03.203991+00:00",
+        "source_url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0/query",
+        "vintage": "Census Tracts (layer 0) from service v11.5",
+        "working_crs": "EPSG:5070"
+      },
+      "validation": {
+        "actual_feature_count": 88,
+        "complete_text_fields": true,
+        "degraded": false,
+        "degraded_reasons": [],
+        "feature_count_matches": true,
+        "geoid_count": 88,
+        "geoid_count_matches_rows": true,
+        "geoids_unique": true,
+        "malformed_geoids": [],
+        "notes_present": true,
+        "path_exists": true,
+        "path_inside_work_root": true,
+        "provenance_name_matches": true,
+        "request_area_matches": true,
+        "request_params_present": true,
+        "retrieved_at_timezone_aware": true,
+        "working_crs_matches_area": true
+      }
+    }
+  ],
+  "error": null,
+  "finished_at": "2026-09-01T18:54:59.339302+00:00",
+  "last_observable_action": "all five paths restored and the complete primary snapshot matched",
+  "manifest_path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/manifest.json",
   "network_attempts": null,
   "partial_pipeline_files": [],
-  "pipeline": null,
-  "pipeline_output_path": "outputs/paper/transfer/20260901T165757230230Z-aa13b0d4",
+  "pipeline": {
+    "artifact_validation": {
+      "expected_names": [
+        "pipeline_report.txt",
+        "risk_surge_1_5m_svi_equal.csv",
+        "risk_surge_3_0m_svi_equal.csv",
+        "risk_surge_5_0m_svi_equal.csv",
+        "tradeoff.csv"
+      ],
+      "observed_names": [
+        "pipeline_report.txt",
+        "risk_surge_1_5m_svi_equal.csv",
+        "risk_surge_3_0m_svi_equal.csv",
+        "risk_surge_5_0m_svi_equal.csv",
+        "tradeoff.csv"
+      ],
+      "pipeline_report_nonempty": true,
+      "table_file_rows": {
+        "risk_surge_1_5m_svi_equal.csv": 88,
+        "risk_surge_3_0m_svi_equal.csv": 88,
+        "risk_surge_5_0m_svi_equal.csv": 88
+      },
+      "table_files_match_pipeline_result": true,
+      "tradeoff_matches_pipeline_result": true,
+      "tradeoff_row_count": 9
+    },
+    "default_table_preset": "svi_equal",
+    "expected_presets": [
+      "svi_equal",
+      "svi_themes",
+      "evacuation_capacity"
+    ],
+    "expected_scenarios": [
+      "surge_1_5m",
+      "surge_3_0m",
+      "surge_5_0m"
+    ],
+    "population_missing_by_scenario": {
+      "surge_1_5m": 0,
+      "surge_3_0m": 0,
+      "surge_5_0m": 0
+    },
+    "population_total": 300879.0,
+    "row_counts": {
+      "surge_1_5m": 88,
+      "surge_3_0m": 88,
+      "surge_5_0m": 88
+    },
+    "scenario_rows": [
+      {
+        "displaced_geoids": [
+          "13051010503",
+          "13051010815",
+          "13051011104",
+          "13051011111"
+        ],
+        "mean_inundation_m": 0.78374191556902,
+        "population_in_priority": 43845,
+        "preset": "svi_equal",
+        "scenario": "surge_1_5m",
+        "top_geoids": [
+          "13051010901",
+          "13051010813",
+          "13051010814",
+          "13051004209",
+          "13051011005",
+          "13051004212",
+          "13051010806",
+          "13051011007",
+          "13051011110",
+          "13051011113"
+        ],
+        "vulnerable_population_in_priority": 26647
+      },
+      {
+        "displaced_geoids": [
+          "13051004212",
+          "13051011007",
+          "13051011104",
+          "13051011111"
+        ],
+        "mean_inundation_m": 0.7086367167006812,
+        "population_in_priority": 41414,
+        "preset": "svi_themes",
+        "scenario": "surge_1_5m",
+        "top_geoids": [
+          "13051010814",
+          "13051010901",
+          "13051010806",
+          "13051004209",
+          "13051011113",
+          "13051011005",
+          "13051010813",
+          "13051010815",
+          "13051010503",
+          "13051011110"
+        ],
+        "vulnerable_population_in_priority": 20688
+      },
+      {
+        "displaced_geoids": [
+          "13051004212",
+          "13051010503",
+          "13051010815",
+          "13051011007"
+        ],
+        "mean_inundation_m": 0.74652792728399,
+        "population_in_priority": 42009,
+        "preset": "evacuation_capacity",
+        "scenario": "surge_1_5m",
+        "top_geoids": [
+          "13051010813",
+          "13051011005",
+          "13051011113",
+          "13051010814",
+          "13051010901",
+          "13051011110",
+          "13051010806",
+          "13051011111",
+          "13051011104",
+          "13051004209"
+        ],
+        "vulnerable_population_in_priority": 19700
+      },
+      {
+        "displaced_geoids": [
+          "13051010815",
+          "13051011104",
+          "13051011113"
+        ],
+        "mean_inundation_m": 1.6068144711440913,
+        "population_in_priority": 41769,
+        "preset": "svi_equal",
+        "scenario": "surge_3_0m",
+        "top_geoids": [
+          "13051010813",
+          "13051010814",
+          "13051011005",
+          "13051004209",
+          "13051010901",
+          "13051010806",
+          "13051011007",
+          "13051011111",
+          "13051011110",
+          "13051004212"
+        ],
+        "vulnerable_population_in_priority": 26647
+      },
+      {
+        "displaced_geoids": [
+          "13051004212",
+          "13051011007",
+          "13051011104"
+        ],
+        "mean_inundation_m": 1.7242086416584628,
+        "population_in_priority": 41004,
+        "preset": "svi_themes",
+        "scenario": "surge_3_0m",
+        "top_geoids": [
+          "13051010814",
+          "13051010806",
+          "13051010815",
+          "13051011005",
+          "13051010901",
+          "13051004209",
+          "13051010813",
+          "13051011113",
+          "13051011111",
+          "13051011110"
+        ],
+        "vulnerable_population_in_priority": 18493
+      },
+      {
+        "displaced_geoids": [
+          "13051004212",
+          "13051010815",
+          "13051010901"
+        ],
+        "mean_inundation_m": 1.6965673179200127,
+        "population_in_priority": 40406,
+        "preset": "evacuation_capacity",
+        "scenario": "surge_3_0m",
+        "top_geoids": [
+          "13051010813",
+          "13051011111",
+          "13051011005",
+          "13051011104",
+          "13051010814",
+          "13051010806",
+          "13051011113",
+          "13051011110",
+          "13051011007",
+          "13051004209"
+        ],
+        "vulnerable_population_in_priority": 18097
+      },
+      {
+        "displaced_geoids": [
+          "13051000601",
+          "13051011108",
+          "13051011112"
+        ],
+        "mean_inundation_m": 3.0780768335351594,
+        "population_in_priority": 42366,
+        "preset": "svi_equal",
+        "scenario": "surge_5_0m",
+        "top_geoids": [
+          "13051010813",
+          "13051010814",
+          "13051011005",
+          "13051010806",
+          "13051011104",
+          "13051011111",
+          "13051004209",
+          "13051011007",
+          "13051011113",
+          "13051010815"
+        ],
+        "vulnerable_population_in_priority": 16890
+      },
+      {
+        "displaced_geoids": [
+          "13051004209",
+          "13051011007",
+          "13051011108"
+        ],
+        "mean_inundation_m": 2.763570645900623,
+        "population_in_priority": 43121,
+        "preset": "svi_themes",
+        "scenario": "surge_5_0m",
+        "top_geoids": [
+          "13051010814",
+          "13051010806",
+          "13051010813",
+          "13051010815",
+          "13051011005",
+          "13051011113",
+          "13051011112",
+          "13051000601",
+          "13051011104",
+          "13051011111"
+        ],
+        "vulnerable_population_in_priority": 14738
+      },
+      {
+        "displaced_geoids": [
+          "13051000601",
+          "13051004209",
+          "13051011007"
+        ],
+        "mean_inundation_m": 3.0759400643479315,
+        "population_in_priority": 41067,
+        "preset": "evacuation_capacity",
+        "scenario": "surge_5_0m",
+        "top_geoids": [
+          "13051010813",
+          "13051011005",
+          "13051011104",
+          "13051011113",
+          "13051011111",
+          "13051010806",
+          "13051010814",
+          "13051011112",
+          "13051010815",
+          "13051011108"
+        ],
+        "vulnerable_population_in_priority": 11287
+      }
+    ],
+    "scenarios_completed": [
+      "surge_1_5m",
+      "surge_3_0m",
+      "surge_5_0m"
+    ],
+    "study_area": {
+      "county_fips": "051",
+      "name": "Chatham County, Georgia",
+      "state_fips": "13",
+      "working_crs": "EPSG:5070"
+    },
+    "study_area_matches_requested": true,
+    "tables": {
+      "surge_1_5m": {
+        "exposure_evidence": {
+          "coarse": "tracts_joined",
+          "coarse_total": 63621.880516881196,
+          "coarse_units": 88,
+          "fine": "block groups",
+          "fine_total": 45311.68037288335,
+          "fine_units": 246,
+          "max_abs_difference": 3926.897583866425,
+          "method_note": "sum of 246 block groups value(s) into 88 tracts_joined unit(s) by GEOID prefix, width 12 -> 11",
+          "population_total": 300879.0,
+          "relative_error_pct": 89.65756406104435,
+          "scenario": "surge_1_5m",
+          "units_compared": 88,
+          "units_over_population": 0,
+          "units_suppressed": 0,
+          "units_undefined": 26,
+          "warnings": [
+            "tracts_joined: 26 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+            "exposure granularity: summing block groups gives 45,312 exposed resident(s) against 63,622 from the tract-uniform assumption, worst unit 3,927 resident(s). That gap is a result about granularity, not an error either estimate made"
+          ]
+        },
+        "population_missing": 0,
+        "population_total": 300879.0,
+        "resilience_evidence": {
+          "by_tag": {
+            "community_centre": 358,
+            "fire_station": 580,
+            "hospital": 263,
+            "school": 2687
+          },
+          "dataset": "tracts_joined",
+          "facilities": 206,
+          "facilities_placed": 206,
+          "matches": 3888,
+          "max_count": 85,
+          "median_count": 50.5,
+          "min_count": 2,
+          "radius_m": 5000.0,
+          "tag_key": "amenity",
+          "tag_source": "read from facilities provenance: {\"amenity\": \"^(hospital|school|community_centre|fire_station)$\"}",
+          "units": 88,
+          "units_with_none": 0,
+          "warnings": []
+        },
+        "risk_evidence": {
+          "component_published": {
+            "exposed_population": 88,
+            "inundated_fraction": 88,
+            "resilience_index": 88,
+            "vulnerability_index": 86
+          },
+          "components": [
+            "inundated_fraction",
+            "exposed_population",
+            "vulnerability_index",
+            "resilience_index"
+          ],
+          "dataset": "tracts_joined",
+          "directions": {
+            "exposed_population": 1,
+            "inundated_fraction": 1,
+            "resilience_index": -1,
+            "vulnerability_index": 1
+          },
+          "origin": "published_index",
+          "origin_url": "https://www.atsdr.cdc.gov/place-health/php/svi/index.html",
+          "preset": "svi_equal",
+          "rank_denominator": {
+            "exposed_population": 88,
+            "inundated_fraction": 88,
+            "resilience_index": 88,
+            "vulnerability_index": 86
+          },
+          "scenario": "surge_1_5m",
+          "score_max": 0.8151427061310782,
+          "score_min": 0.10815274841437633,
+          "units": 88,
+          "units_scored": 86,
+          "units_unscored": 2,
+          "unscored_geoids": [
+            "13051980000",
+            "13051990000"
+          ],
+          "warnings": [
+            "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+            "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit"
+          ],
+          "weights": {
+            "exposed_population": 0.25,
+            "inundated_fraction": 0.25,
+            "resilience_index": 0.25,
+            "vulnerability_index": 0.25
+          }
+        },
+        "row_count": 88,
+        "score_rank_nullness_agrees": true,
+        "units_scored": 86,
+        "units_unscored": 2,
+        "vulnerability_evidence": {
+          "dataset": "tracts_joined",
+          "directions": {
+            "pct_age_65_plus": 1,
+            "pct_disability": 1,
+            "pct_limited_english": 1,
+            "pct_no_vehicle": 1,
+            "pct_poverty": 1
+          },
+          "index_max": 0.7744186046511627,
+          "index_min": 0.13023255813953488,
+          "indicators": [
+            "pct_poverty",
+            "pct_age_65_plus",
+            "pct_disability",
+            "pct_no_vehicle",
+            "pct_limited_english"
+          ],
+          "missing": {
+            "pct_age_65_plus": 2,
+            "pct_disability": 2,
+            "pct_limited_english": 2,
+            "pct_no_vehicle": 2,
+            "pct_poverty": 2
+          },
+          "origin": "published_index",
+          "origin_url": "https://www.atsdr.cdc.gov/place-health/php/svi/index.html",
+          "preset": "svi_equal",
+          "published": {
+            "pct_age_65_plus": 86,
+            "pct_disability": 86,
+            "pct_limited_english": 86,
+            "pct_no_vehicle": 86,
+            "pct_poverty": 86
+          },
+          "rank_denominator": {
+            "pct_age_65_plus": 86,
+            "pct_disability": 86,
+            "pct_limited_english": 86,
+            "pct_no_vehicle": 86,
+            "pct_poverty": 86
+          },
+          "units": 88,
+          "units_scored": 86,
+          "units_unscored": 2,
+          "unscored_geoids": [
+            "13051980000",
+            "13051990000"
+          ],
+          "warnings": [
+            "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+            "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units"
+          ],
+          "weights": {
+            "pct_age_65_plus": 0.2,
+            "pct_disability": 0.2,
+            "pct_limited_english": 0.2,
+            "pct_no_vehicle": 0.2,
+            "pct_poverty": 0.2
+          }
+        }
+      },
+      "surge_3_0m": {
+        "exposure_evidence": {
+          "coarse": "tracts_joined",
+          "coarse_total": 96082.6293055377,
+          "coarse_units": 88,
+          "fine": "block groups",
+          "fine_total": 76824.06566515725,
+          "fine_units": 246,
+          "max_abs_difference": 4201.393393312318,
+          "method_note": "sum of 246 block groups value(s) into 88 tracts_joined unit(s) by GEOID prefix, width 12 -> 11",
+          "population_total": 300879.0,
+          "relative_error_pct": 84.48060622097036,
+          "scenario": "surge_3_0m",
+          "units_compared": 88,
+          "units_over_population": 0,
+          "units_suppressed": 0,
+          "units_undefined": 15,
+          "warnings": [
+            "tracts_joined: 15 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+            "exposure granularity: summing block groups gives 76,824 exposed resident(s) against 96,083 from the tract-uniform assumption, worst unit 4,201 resident(s). That gap is a result about granularity, not an error either estimate made"
+          ]
+        },
+        "population_missing": 0,
+        "population_total": 300879.0,
+        "resilience_evidence": {
+          "by_tag": {
+            "community_centre": 358,
+            "fire_station": 580,
+            "hospital": 263,
+            "school": 2687
+          },
+          "dataset": "tracts_joined",
+          "facilities": 206,
+          "facilities_placed": 206,
+          "matches": 3888,
+          "max_count": 85,
+          "median_count": 50.5,
+          "min_count": 2,
+          "radius_m": 5000.0,
+          "tag_key": "amenity",
+          "tag_source": "read from facilities provenance: {\"amenity\": \"^(hospital|school|community_centre|fire_station)$\"}",
+          "units": 88,
+          "units_with_none": 0,
+          "warnings": []
+        },
+        "risk_evidence": {
+          "component_published": {
+            "exposed_population": 88,
+            "inundated_fraction": 88,
+            "resilience_index": 88,
+            "vulnerability_index": 86
+          },
+          "components": [
+            "inundated_fraction",
+            "exposed_population",
+            "vulnerability_index",
+            "resilience_index"
+          ],
+          "dataset": "tracts_joined",
+          "directions": {
+            "exposed_population": 1,
+            "inundated_fraction": 1,
+            "resilience_index": -1,
+            "vulnerability_index": 1
+          },
+          "origin": "published_index",
+          "origin_url": "https://www.atsdr.cdc.gov/place-health/php/svi/index.html",
+          "preset": "svi_equal",
+          "rank_denominator": {
+            "exposed_population": 88,
+            "inundated_fraction": 88,
+            "resilience_index": 88,
+            "vulnerability_index": 86
+          },
+          "scenario": "surge_3_0m",
+          "score_max": 0.8043076109936576,
+          "score_min": 0.07690274841437633,
+          "units": 88,
+          "units_scored": 86,
+          "units_unscored": 2,
+          "unscored_geoids": [
+            "13051980000",
+            "13051990000"
+          ],
+          "warnings": [
+            "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+            "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit"
+          ],
+          "weights": {
+            "exposed_population": 0.25,
+            "inundated_fraction": 0.25,
+            "resilience_index": 0.25,
+            "vulnerability_index": 0.25
+          }
+        },
+        "row_count": 88,
+        "score_rank_nullness_agrees": true,
+        "units_scored": 86,
+        "units_unscored": 2,
+        "vulnerability_evidence": {
+          "dataset": "tracts_joined",
+          "directions": {
+            "pct_age_65_plus": 1,
+            "pct_disability": 1,
+            "pct_limited_english": 1,
+            "pct_no_vehicle": 1,
+            "pct_poverty": 1
+          },
+          "index_max": 0.7744186046511627,
+          "index_min": 0.13023255813953488,
+          "indicators": [
+            "pct_poverty",
+            "pct_age_65_plus",
+            "pct_disability",
+            "pct_no_vehicle",
+            "pct_limited_english"
+          ],
+          "missing": {
+            "pct_age_65_plus": 2,
+            "pct_disability": 2,
+            "pct_limited_english": 2,
+            "pct_no_vehicle": 2,
+            "pct_poverty": 2
+          },
+          "origin": "published_index",
+          "origin_url": "https://www.atsdr.cdc.gov/place-health/php/svi/index.html",
+          "preset": "svi_equal",
+          "published": {
+            "pct_age_65_plus": 86,
+            "pct_disability": 86,
+            "pct_limited_english": 86,
+            "pct_no_vehicle": 86,
+            "pct_poverty": 86
+          },
+          "rank_denominator": {
+            "pct_age_65_plus": 86,
+            "pct_disability": 86,
+            "pct_limited_english": 86,
+            "pct_no_vehicle": 86,
+            "pct_poverty": 86
+          },
+          "units": 88,
+          "units_scored": 86,
+          "units_unscored": 2,
+          "unscored_geoids": [
+            "13051980000",
+            "13051990000"
+          ],
+          "warnings": [
+            "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+            "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units"
+          ],
+          "weights": {
+            "pct_age_65_plus": 0.2,
+            "pct_disability": 0.2,
+            "pct_limited_english": 0.2,
+            "pct_no_vehicle": 0.2,
+            "pct_poverty": 0.2
+          }
+        }
+      },
+      "surge_5_0m": {
+        "exposure_evidence": {
+          "coarse": "tracts_joined",
+          "coarse_total": 175278.45867703116,
+          "coarse_units": 88,
+          "fine": "block groups",
+          "fine_total": 162818.5620431925,
+          "fine_units": 246,
+          "max_abs_difference": 3076.713728769285,
+          "method_note": "sum of 246 block groups value(s) into 88 tracts_joined unit(s) by GEOID prefix, width 12 -> 11",
+          "population_total": 300879.0,
+          "relative_error_pct": 81.74625462970641,
+          "scenario": "surge_5_0m",
+          "units_compared": 88,
+          "units_over_population": 0,
+          "units_suppressed": 0,
+          "units_undefined": 6,
+          "warnings": [
+            "tracts_joined: 6 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+            "exposure granularity: summing block groups gives 162,819 exposed resident(s) against 175,278 from the tract-uniform assumption, worst unit 3,077 resident(s). That gap is a result about granularity, not an error either estimate made"
+          ]
+        },
+        "population_missing": 0,
+        "population_total": 300879.0,
+        "resilience_evidence": {
+          "by_tag": {
+            "community_centre": 358,
+            "fire_station": 580,
+            "hospital": 263,
+            "school": 2687
+          },
+          "dataset": "tracts_joined",
+          "facilities": 206,
+          "facilities_placed": 206,
+          "matches": 3888,
+          "max_count": 85,
+          "median_count": 50.5,
+          "min_count": 2,
+          "radius_m": 5000.0,
+          "tag_key": "amenity",
+          "tag_source": "read from facilities provenance: {\"amenity\": \"^(hospital|school|community_centre|fire_station)$\"}",
+          "units": 88,
+          "units_with_none": 0,
+          "warnings": []
+        },
+        "risk_evidence": {
+          "component_published": {
+            "exposed_population": 88,
+            "inundated_fraction": 88,
+            "resilience_index": 88,
+            "vulnerability_index": 86
+          },
+          "components": [
+            "inundated_fraction",
+            "exposed_population",
+            "vulnerability_index",
+            "resilience_index"
+          ],
+          "dataset": "tracts_joined",
+          "directions": {
+            "exposed_population": 1,
+            "inundated_fraction": 1,
+            "resilience_index": -1,
+            "vulnerability_index": 1
+          },
+          "origin": "published_index",
+          "origin_url": "https://www.atsdr.cdc.gov/place-health/php/svi/index.html",
+          "preset": "svi_equal",
+          "rank_denominator": {
+            "exposed_population": 88,
+            "inundated_fraction": 88,
+            "resilience_index": 88,
+            "vulnerability_index": 86
+          },
+          "scenario": "surge_5_0m",
+          "score_max": 0.8383985200845666,
+          "score_min": 0.1195163847780127,
+          "units": 88,
+          "units_scored": 86,
+          "units_unscored": 2,
+          "unscored_geoids": [
+            "13051980000",
+            "13051990000"
+          ],
+          "warnings": [
+            "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+            "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit"
+          ],
+          "weights": {
+            "exposed_population": 0.25,
+            "inundated_fraction": 0.25,
+            "resilience_index": 0.25,
+            "vulnerability_index": 0.25
+          }
+        },
+        "row_count": 88,
+        "score_rank_nullness_agrees": true,
+        "units_scored": 86,
+        "units_unscored": 2,
+        "vulnerability_evidence": {
+          "dataset": "tracts_joined",
+          "directions": {
+            "pct_age_65_plus": 1,
+            "pct_disability": 1,
+            "pct_limited_english": 1,
+            "pct_no_vehicle": 1,
+            "pct_poverty": 1
+          },
+          "index_max": 0.7744186046511627,
+          "index_min": 0.13023255813953488,
+          "indicators": [
+            "pct_poverty",
+            "pct_age_65_plus",
+            "pct_disability",
+            "pct_no_vehicle",
+            "pct_limited_english"
+          ],
+          "missing": {
+            "pct_age_65_plus": 2,
+            "pct_disability": 2,
+            "pct_limited_english": 2,
+            "pct_no_vehicle": 2,
+            "pct_poverty": 2
+          },
+          "origin": "published_index",
+          "origin_url": "https://www.atsdr.cdc.gov/place-health/php/svi/index.html",
+          "preset": "svi_equal",
+          "published": {
+            "pct_age_65_plus": 86,
+            "pct_disability": 86,
+            "pct_limited_english": 86,
+            "pct_no_vehicle": 86,
+            "pct_poverty": 86
+          },
+          "rank_denominator": {
+            "pct_age_65_plus": 86,
+            "pct_disability": 86,
+            "pct_limited_english": 86,
+            "pct_no_vehicle": 86,
+            "pct_poverty": 86
+          },
+          "units": 88,
+          "units_scored": 86,
+          "units_unscored": 2,
+          "unscored_geoids": [
+            "13051980000",
+            "13051990000"
+          ],
+          "warnings": [
+            "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+            "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units"
+          ],
+          "weights": {
+            "pct_age_65_plus": 0.2,
+            "pct_disability": 0.2,
+            "pct_limited_english": 0.2,
+            "pct_no_vehicle": 0.2,
+            "pct_poverty": 0.2
+          }
+        }
+      }
+    },
+    "warnings": [
+      "flood_zones: retrieval degraded, so its 0 features are an absence of data rather than an absence of hazard. DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone",
+      "acs: pct_age_65_plus is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_disability is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_limited_english is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_no_vehicle is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "acs: pct_poverty is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+      "flood_zones: retrieval degraded, so the hazard in this table is the bathtub over elevation ALONE. Its zero features are an absence of data, not an absence of regulatory flood risk, and every inundated fraction here is therefore unconstrained by the mapped floodplain",
+      "tracts_joined: 26 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+      "exposure granularity: summing block groups gives 45,312 exposed resident(s) against 63,622 from the tract-uniform assumption, worst unit 3,927 resident(s). That gap is a result about granularity, not an error either estimate made",
+      "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+      "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units",
+      "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+      "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit",
+      "tracts_joined: 15 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+      "exposure granularity: summing block groups gives 76,824 exposed resident(s) against 96,083 from the tract-uniform assumption, worst unit 4,201 resident(s). That gap is a result about granularity, not an error either estimate made",
+      "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+      "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units",
+      "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+      "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit",
+      "tracts_joined: 6 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+      "exposure granularity: summing block groups gives 162,819 exposed resident(s) against 175,278 from the tract-uniform assumption, worst unit 3,077 resident(s). That gap is a result about granularity, not an error either estimate made",
+      "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+      "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units",
+      "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+      "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit"
+    ],
+    "written_files": [
+      "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_1_5m_svi_equal.csv",
+      "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_3_0m_svi_equal.csv",
+      "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_5_0m_svi_equal.csv",
+      "outputs/paper/transfer/20260901T185401974111Z-10931654/tradeoff.csv",
+      "outputs/paper/transfer/20260901T185401974111Z-10931654/pipeline_report.txt"
+    ]
+  },
+  "pipeline_output_path": "outputs/paper/transfer/20260901T185401974111Z-10931654",
   "primary_snapshot_after": {
     "inventory": {
       "3depelevation.tif": {
@@ -140,7 +1509,7 @@
   },
   "retries_by_stage": null,
   "retry_observability": "not_exposed",
-  "run_id": "20260901T165757230230Z-aa13b0d4",
+  "run_id": "20260901T185401974111Z-10931654",
   "safety_verification": {
     "config_paths_after": {
       "DATA_DIR": "data",
@@ -176,11 +1545,11 @@
       }
     },
     "isolated_layout": {
-      "DATA_DIR": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data",
-      "DERIVED_DIR": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/derived",
-      "MANIFEST_PATH": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/manifest.json",
-      "PROJECT_ROOT": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4",
-      "SNAPSHOT_DIR": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot"
+      "DATA_DIR": "outputs/transfer-work/20260901T185401974111Z-10931654/data",
+      "DERIVED_DIR": "outputs/transfer-work/20260901T185401974111Z-10931654/data/derived",
+      "MANIFEST_PATH": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/manifest.json",
+      "PROJECT_ROOT": "outputs/transfer-work/20260901T185401974111Z-10931654",
+      "SNAPSHOT_DIR": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot"
     },
     "post_attempt_errors": [],
     "primary_fingerprint_error": null,
@@ -188,24 +1557,51 @@
     "primary_snapshot_unchanged": true
   },
   "schema_version": 1,
-  "snapshot_path": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot",
-  "stage": "acquisition",
-  "started_at": "2026-09-01T16:57:57.233393+00:00",
-  "status": "failed",
+  "snapshot_path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot",
+  "stage": "complete",
+  "started_at": "2026-09-01T18:54:01.975109+00:00",
+  "status": "completed",
   "study_area": {
     "county_fips": "051",
     "name": "Chatham County, Georgia",
     "state_fips": "13",
     "working_crs": "EPSG:5070"
   },
-  "unregistered_partial_files": [
-    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/acs.parquet",
-    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/acs_block_groups.parquet",
-    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/block_groups.geojson",
-    "outputs/transfer-work/20260901T165757230230Z-aa13b0d4/data/snapshot/tracts.geojson"
+  "unregistered_partial_files": [],
+  "warnings": [
+    "flood_zones: retrieval degraded, so its 0 features are an absence of data rather than an absence of hazard. DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone",
+    "acs: pct_age_65_plus is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+    "acs: pct_disability is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+    "acs: pct_limited_english is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+    "acs: pct_no_vehicle is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+    "acs: pct_poverty is undefined for 2 of 88 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them",
+    "flood_zones: retrieval degraded, so the hazard in this table is the bathtub over elevation ALONE. Its zero features are an absence of data, not an absence of regulatory flood risk, and every inundated fraction here is therefore unconstrained by the mapped floodplain",
+    "tracts_joined: 26 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+    "exposure granularity: summing block groups gives 45,312 exposed resident(s) against 63,622 from the tract-uniform assumption, worst unit 3,927 resident(s). That gap is a result about granularity, not an error either estimate made",
+    "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+    "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units",
+    "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+    "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit",
+    "tracts_joined: 15 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+    "exposure granularity: summing block groups gives 76,824 exposed resident(s) against 96,083 from the tract-uniform assumption, worst unit 4,201 resident(s). That gap is a result about granularity, not an error either estimate made",
+    "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+    "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units",
+    "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+    "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit",
+    "tracts_joined: 6 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage",
+    "exposure granularity: summing block groups gives 162,819 exposed resident(s) against 175,278 from the tract-uniform assumption, worst unit 3,077 resident(s). That gap is a result about granularity, not an error either estimate made",
+    "tracts_joined: 2 of 88 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['13051980000', '13051990000']",
+    "tracts_joined: percentile ranks were taken over fewer than 88 unit(s) for {'pct_poverty': 86, 'pct_age_65_plus': 86, 'pct_disability': 86, 'pct_no_vehicle': 86, 'pct_limited_english': 86}, so the denominator of those ranks is the number of units publishing a value, not the number of units",
+    "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
+    "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit"
   ],
-  "warnings": [],
-  "work_root": "outputs/transfer-work/20260901T165757230230Z-aa13b0d4",
+  "work_root": "outputs/transfer-work/20260901T185401974111Z-10931654",
   "working_crs": "EPSG:5070",
-  "written_files": []
+  "written_files": [
+    "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_1_5m_svi_equal.csv",
+    "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_3_0m_svi_equal.csv",
+    "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_5_0m_svi_equal.csv",
+    "outputs/paper/transfer/20260901T185401974111Z-10931654/tradeoff.csv",
+    "outputs/paper/transfer/20260901T185401974111Z-10931654/pipeline_report.txt"
+  ]
 }

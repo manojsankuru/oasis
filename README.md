@@ -13,28 +13,61 @@ See `CLAUDE.md` for the hard invariants, `src/contracts.py` for the frozen inter
 
 ## Status
 
-Session S13 of 14 complete. **Both feedback cycles exist, and robustness is now a
-measurement rather than a claim.** Behind `run_spatial_code` there is a sandbox —
-model-written Python in a child process, with the traceback brought back as the thing the
-model repairs from. Around the answer there is a critic: every number the agent reports is
-traced back to a logged tool result, and an answer that cannot support one is sent back to
-be rewritten, bounded at two revision cycles. All eleven names in `contracts.TOOL_NAMES`
-are advertised, executable and backed by a module that exists; `python -m src.tools` lists
-none as `[PENDING]`.
+Session S13.1 of 14 complete; S14 is next. **Both feedback cycles exist,
+robustness is measured, and the second configured county has completed the same
+isolated acquisition and analysis path.** Behind `run_spatial_code` there is a
+sandbox—model-written Python in a child process, with the traceback brought
+back as the thing the model repairs from. Around the answer there is a critic:
+every number the agent reports is traced back to a logged tool result, and an
+answer that cannot support one is sent back to be rewritten, bounded at two
+revision cycles. All eleven names in `contracts.TOOL_NAMES` are advertised,
+executable and backed by a module that exists; `python -m src.tools` lists none
+as `[PENDING]`.
 
-**The measured S13 transfer status is `failed`, not completed.** The
-county-neutral runner acquired and loaded 88 tract polygons for the configured
-second area and derived its extent, then the real 3DEP image export ended with
-`TransientError: .../exportImage: HTTP 500` after the existing bounded request
-policy. Because `acquire.main()` did not return zero, it wrote no manifest and
-the transfer pipeline was not called. Four files from the attempt are retained
-as explicitly unregistered partial output; no provenance is reconstructed from
-them. The runner restored all five configuration paths and proved the complete
-primary snapshot inventory unchanged. See the portable, strict
-[transfer report](outputs/paper/transfer_report.json), the byte-identical
-[paper trade-off](outputs/paper/tradeoff.csv), and the verbatim failure record
-in [docs/failures.md](docs/failures.md). Unknown retry/attempt counts remain
-JSON `null` with `retry_observability: "not_exposed"`—never an assumed zero.
+**The Chatham transfer completed after one county-neutral acquisition-policy
+repair.** The initial isolated run acquired its Census and boundary data but
+failed at a 2792×2864, 7,996,288-pixel 3DEP export with HTTP 500. That attempt
+has not been rewritten: its report remains archived at
+[`outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json`](outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json).
+Following the raster cut line declared before the transfer, the global nominal
+elevation target was changed from 10 m to 30 m. No county name, FIPS, literal
+bbox, manual data repair, frozen contract, alignment, hazard, vulnerability,
+risk, or pipeline branch was introduced for that repair.
+
+Fresh run `20260901T185401974111Z-10931654` then finished with
+`status: "completed"` and `stage: "complete"`. It registered seven datasets,
+matched 88 tract boundaries to 88 tract ACS rows and 246 block-group boundaries
+to 246 block-group ACS rows, and verified a population total of 300,879. Its
+3DEP raster is 2195×2252 in EPSG:5070, requested at 30 m, with approximately
+29.9924 m square pixels on TIFF readback, `float32` values, and nodata `-9999`.
+All three default hazard scenarios and all three weight presets completed,
+producing three 88-row risk tables and nine trade-off rows.
+
+The optional NFHL source degraded truthfully after its query returned HTTP 200
+with ArcGIS code 500, `Error performing query operation`. It remains a
+registered zero-feature layer, so the completed Chatham hazard analysis is the
+bathtub model over elevation alone; zero NFHL features do not mean zero
+regulatory flood risk. Two zero-population tracts, `13051980000` and
+`13051990000`, have zero ACS universes for all five vulnerability indicators.
+They remain in every table but correctly carry null vulnerability, risk score,
+and priority rank: each scenario has 88 rows, 86 scored units, and two explicitly
+unscored units.
+
+The runner proved the complete Charleston snapshot unchanged and restored all
+five rebound configuration paths. The final code demonstrates portability
+across both configured areas after one generic acquisition-policy repair; it
+does not demonstrate a zero-change transfer that succeeded on its first
+attempt. The canonical strict report is
+[`outputs/paper/transfer_report.json`](outputs/paper/transfer_report.json).
+
+**Primary and transfer paper artifacts are separate.**
+[`outputs/paper/tradeoff.csv`](outputs/paper/tradeoff.csv) remains the
+byte-identical nine-row Charleston paper artifact copied from
+`outputs/tradeoff.csv`. Chatham's validated nine-row trade-off, three risk
+tables, and pipeline report are run-scoped under
+[`outputs/paper/transfer/20260901T185401974111Z-10931654/`](outputs/paper/transfer/20260901T185401974111Z-10931654/).
+The canonical transfer report names the latest attempt; earlier reports remain
+under `outputs/paper/transfer_attempts/`.
 
 **Retrieval can now be made to fail on purpose.** `src/faults.py` injects five kinds of
 failure — timeout, 5xx, an empty response, a wrong declared CRS, a truncated page — into
@@ -221,6 +254,9 @@ python -m src.experiments.faults        # the robustness table                  
 python -m src.experiments.faults --live # ...with rows from the real service         (S12)
 python -m src.experiments.behaviour     # the four adversarial scenarios             (S12)
 python -m src.experiments.transfer      # second-county run                          (S13)
+python -m src.acquire --check           # live acquisition-boundary verification
+python -m src.experiments.transfer --check # offline isolation/report/artifact harness
+python mutate.py transfer               # four transfer-harness mutations
 ```
 
 ### Analysis — no model, no key, no network
@@ -289,6 +325,9 @@ reason.
 | `src/faults.py` | seeded retrieval faults, injected inside the retry; off unless asked |
 | `src/experiments/faults.py` | the robustness table: retrieval under each fault kind, two rates |
 | `src/experiments/behaviour.py` | four adversarial scenarios, including injection through data |
+| `src/experiments/transfer.py` | isolated second-area acquisition, pipeline run, validation, restoration, and portable report |
+| `outputs/paper/transfer/` | run-scoped transfer pipeline artifacts, separate from the primary paper trade-off |
+| `outputs/paper/transfer_attempts/` | preserved reports from earlier transfer attempts |
 | `mutate.py` | applies one wrong edit at a time and reports any check that did not notice |
 | `docs/` | `DATA.md`, `BUILD-PLAN.md`, `failures.md`, `RUNBOOK.md` |
 | `test_demo/` | parked pre-rewrite scaffolding, git-ignored |

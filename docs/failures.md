@@ -1919,9 +1919,11 @@ was:
 TransientError: https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage: HTTP 500
 ```
 
-The canonical report records `status: "failed"`, `stage: "acquisition"`, run
-ID `20260901T165757230230Z-aa13b0d4`, all five configuration paths restored,
-and the complete primary snapshot unchanged.
+The report produced by that attempt, now archived byte-for-byte at
+`outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json`, recorded
+`status: "failed"`, `stage: "acquisition"`, run ID
+`20260901T165757230230Z-aa13b0d4`, all five configuration paths restored, and
+the complete primary snapshot unchanged.
 
 **Where.** `acquire_elevation()` through the existing `src.acquire` request
 choke point, during the run-specific isolated acquisition under
@@ -1942,7 +1944,78 @@ primary registry/snapshot, wrote a strict current-attempt report, and returned
 nonzero. Per the S13 cut line, it did not hand-edit data, weaken checks, change
 the endpoint, or launch a second real endpoint attempt.
 
-**Kept as a paper failure case?** Yes. This is the measured transfer result: the
-county-neutral system progressed on a second county without analysis-code
-changes, then failed honestly at an external raster service while preserving
-the primary dataset and enough structured evidence to diagnose the boundary.
+**Kept as a paper failure case?** Yes. This was the initial measured transfer
+result: the county-neutral system progressed on a second county, failed
+honestly at the external raster boundary, and preserved enough evidence to
+diagnose it. S13.1 later recovered through the single global 30 m policy change
+documented below; that recovery does not erase this first attempt.
+
+## 2026-09-01 — the near-budget 3DEP export required the predeclared 30 m cut line (S13.1)
+
+**What happened.** The initial isolated transfer failed at the 3DEP
+`exportImage` boundary after acquiring the configured second area's Census and
+boundary files. Its report remains preserved byte-for-byte at
+`outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json`, SHA-256
+`7fdaa3d0c548d845fc6f26419aef45f9a40f79c380f51c8410bb7537fb695f35`.
+A fresh bounded diagnostic of the unchanged 2792x2864 request (7,996,288
+pixels, approximately 23.581 m effective) reproduced HTTP 500. Eight million
+pixels is therefore a client ceiling, not a universal promise that this public
+service will render every extent below it.
+
+**Measured repair.** The raster cut line in `docs/BUILD-PLAN.md` had already
+selected a 30 m nominal target if the export size fought the service. At that
+global target, the same tract-derived extent produced a 2195x2252 request
+(4,943,140 pixels). The exact public-service request returned HTTP 200 with
+21,237,468 bytes in approximately 3.5 seconds. Rasterio verified EPSG:5070, the
+requested 2195x2252 dimensions, approximately 29.9924 m square pixels,
+`float32`, and nodata `-9999`.
+
+**Why this is county-neutral.** The production change is one global target from
+10 m to 30 m. It does not inspect a county name, FIPS code, feature count, or
+literal bbox; the bbox still comes from freshly retrieved tract geometry. The
+module pixel budget remains 8,000,000, and requested and effective resolution
+still enter Provenance. For the primary area, both nominal targets calculate
+the same 3185x2511 final grid at approximately 39.8161 m effective resolution.
+No frozen contract, alignment, hazard, vulnerability, risk, or pipeline module
+was changed for this repair.
+
+**Acceptance after the probe was still pending.** The successful raster probe
+was treated only as boundary evidence. Full acceptance still required a fresh
+isolated acquisition, manifest and provenance validation, alignment, all
+pipeline scenarios and presets, artifact round trips, configuration
+restoration, and proof that the primary snapshot was unchanged.
+
+**Full recovery verified.** Fresh isolated run
+`20260901T185401974111Z-10931654` completed with `status: "completed"` and
+`stage: "complete"`. It registered all seven expected dataset names, matched 88
+tract and 246 block-group boundary rows exactly to their ACS rows, and verified
+300,879 residents. The registered 3DEP raster is EPSG:5070, 2195x2252,
+`float32`, nodata `-9999`, with requested cell size 30.000000 m and effective
+cell size 29.992446 m.
+
+Alignment reported no unmatched GEOIDs, no dropped or repaired geometries, no
+unit below the raster-cell threshold, and zero block-group-to-tract population
+apportionment error. All three default surge scenarios and all three weight
+presets completed. Each scenario table contains 88 rows; 86 receive a risk
+score and the two zero-population units `13051980000` and `13051990000` remain
+explicitly unscored because every vulnerability-indicator universe is zero.
+The transfer trade-off contains nine scenario/preset rows and round-trips to
+the pipeline result.
+
+The optional NFHL query still returned HTTP 200 with ArcGIS code 500, `Error
+performing query operation`. It was registered as a truthful degraded
+zero-feature layer, and the pipeline completed on the elevation raster alone.
+This is absence of NFHL data, not absence of flood hazard.
+
+The successful run wrote its five validated pipeline artifacts beneath
+`outputs/paper/transfer/20260901T185401974111Z-10931654/`. The canonical
+Charleston paper artifact `outputs/paper/tradeoff.csv` remained a byte-identical
+copy of `outputs/tradeoff.csv`; it was not overwritten with the transfer
+trade-off. The runner restored all five rebound configuration paths, reloaded
+the primary registry, and proved the complete primary snapshot unchanged.
+There were no successful-attempt partial or unregistered files.
+
+**Generalizability classification.** Successful Chatham analysis is achieved.
+Generalizability is demonstrated by the final code across both configured
+areas after one county-neutral acquisition-policy repair. It is not a
+zero-change first-attempt success.

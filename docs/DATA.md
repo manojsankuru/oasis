@@ -1,8 +1,11 @@
 # Data contract
 
-Six datasets. Every one is retrieved live by `src/acquire.py`, carries a
-`Provenance`, and is snapshotted to `data/snapshot/` with `manifest.json`.
-Nothing here is downloaded by hand.
+Six source families produce seven registered datasets: ACS is retrieved at both
+tract and block-group granularity. `src/acquire.py` attempts every source
+programmatically against its live endpoint; every registered entry carries a
+`Provenance` and is snapshotted with a manifest. An optional source may instead
+register a truthfully degraded empty layer, as NFHL did in the completed
+transfer. Nothing here is downloaded or completed by hand.
 
 **Verification status** is honest: `VERIFIED` means the endpoint was queried and
 answered on the stated date. `UNVERIFIED` means the URL pattern is from
@@ -13,8 +16,9 @@ an UNVERIFIED row as a task, not a fact.
 
 ## Study area parameters
 
-Everything below is driven from `config.py`. No county name, FIPS code, state
-code, or bounding box appears anywhere else in the repository.
+Everything in production is driven from `config.py`. No production module
+outside that configuration hardcodes a county name, FIPS pair, or bounding box;
+evidence documents and experiment reports may name the areas they observed.
 
 ```python
 STUDY_AREA = StudyArea(
@@ -26,10 +30,10 @@ STUDY_AREA = StudyArea(
 # TRANSFER_AREA is defined only in src/config.py.
 ```
 
-`TRANSFER_AREA` is fixed in `src/config.py`; change it only there. S13 exercised
-that configured second area on 1 Sep 2026. Keeping the identity in one place is
-what lets acquisition, registry validation, and the pipeline share the same
-county-neutral path without duplicating a name or FIPS code here.
+`TRANSFER_AREA` is fixed in `src/config.py`; change it only there. The initial
+S13 run exposed a generic raster-request limit, and S13.1 completed that same
+configured area after changing the global nominal elevation target from 10 m
+to 30 m. No area-specific branch was introduced.
 
 ---
 
@@ -243,8 +247,10 @@ definition and excludes the `"very well"` cells.
 > **Verified against a figure this code did not compute.** Charleston County's
 > 99 tracts sum to 420,264 population; its 261 block groups sum to 420,264; and a
 > separate `for=county:` query returns 420,264. `--check` asserts all three.
-> Chatham County, Georgia runs the same code with no change: 88 tracts, 246 block
-> groups, 300,879 population.
+> The final acquisition code retrieved 88 Chatham tracts, 246 block groups, and
+> 300,879 residents through the same Census path. Reaching the final build
+> required the separate global raster-policy repair described in section 4; no
+> ACS query, variable-resolution, GEOID, or alignment logic changed.
 >
 > **Keep the margins of error.** Every `E` is requested with its `M`. The
 > catalogue lists only the `E` variables, so the `M` id is derived by suffix and
@@ -260,6 +266,13 @@ definition and excludes the `"very well"` cells.
 > `align.py` handles them and counts them, and the count is reported. Charleston
 > had none in these 56 variables, so the transfer county is where that path first
 > runs on real data.
+>
+> **Zero universes remain undefined, not zero.** In the successful transfer,
+> `13051980000` and `13051990000` each have population zero and a zero universe
+> for all five vulnerability indicators. Their indicator values, vulnerability
+> index, risk score, and priority rank remain null. Each scenario table still
+> contains all 88 rows and reports 86 scored plus two unscored; neither unit is
+> silently dropped.
 >
 > **The snapshot is parquet, not CSV.** County and tract codes are zero-padded
 > and `pd.read_csv` reads them back as integers with the padding gone, which
@@ -278,14 +291,42 @@ definition and excludes the `"very well"` cells.
 - **The advertised 8000 × 8000 cap is not the operative one.** Measured the same
   day: 3000×2366 (7.1 Mpx) succeeded, 4000×3154 (12.6 Mpx) returned HTTP 500
   "Error exporting image", and 8000×6309 (50.5 Mpx) returned HTTP 504 after 90 s.
-  `acquire.MAX_EXPORT_PIXELS` therefore applies a second, lower budget before the
-  request, and `_raster_grid` coarsens against whichever cap binds and records
-  which one in Provenance. See `docs/failures.md`.
+  `acquire.MAX_EXPORT_PIXELS` therefore applies a conservative client ceiling
+  before the request, and `_raster_grid` coarsens against whichever cap binds
+  and records which one in Provenance. The later transfer diagnostic proved
+  that a near-eight-million-pixel request can still fail: this is a ceiling,
+  not a universal service-success guarantee. See `docs/failures.md`.
+- **VERIFIED 1 Sep 2026 against the configured transfer area, exact image
+  boundary and complete isolated transfer.** Its bbox was derived from 88 freshly
+  retrieved tract polygons, never typed into production code. The original
+  nominal 10 m target produced a 6584x6754 raw grid (44,468,336 pixels) and a
+  2792x2864 request (7,996,288 pixels, approximately 23.581 m effective); a
+  fresh repeat of that unchanged request still returned HTTP 500. The
+  predeclared 30 m cut line produced a 2195x2252 request (4,943,140 pixels),
+  which returned HTTP 200 with 21,237,468 bytes in approximately 3.5 seconds.
+  Fresh full transfer run `20260901T185401974111Z-10931654` then retrieved and
+  registered that same-sized raster as part of the complete pipeline.
+- The successful transfer raster declares EPSG:5070, is 2195x2252 with
+  approximately 29.992446 m square pixels, uses `float32` and nodata `-9999`,
+  and records requested `30.000000`, effective `29.992446`, and `capped=false`
+  in Provenance.
+- The global nominal target is now **30 m**, following the raster cut line in
+  `docs/BUILD-PLAN.md`. This is a county-neutral acquisition policy, not a
+  branch for the transfer county. `MAX_EXPORT_PIXELS` remains 8,000,000;
+  requested and effective resolution both remain in Provenance; and a larger
+  extent may still be coarsened by either the service's published axis limits
+  or the module pixel budget.
 - The study extent is **126,789 m × 99,978 m** in EPSG:5070, computed at run time
   from the retrieved tract layer. An earlier planning note said 106,785 × 93,524;
   four independent methods (pyproj corners, `transform_bounds` densified and not,
   `rasterio.warp`) agree on the larger figure. The conclusion is unchanged — 10 m
   needs 12,679 px and blows the cap either way — but do not reuse the old number.
+- At the new 30 m target, the primary area's uncapped grid is 4227x3333 and the
+  module budget coarsens it to 3185x2511 (7,997,535 pixels) at approximately
+  39.8161 m effective resolution. The former 10 m target reaches the service
+  axis cap first but ends at that same final grid. This is a derived grid and
+  existing-raster comparison, not a claim that the primary area was reacquired
+  under the new target.
 - `https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage`
 
 ```
@@ -305,11 +346,12 @@ definition and excludes the `"very well"` cells.
   silently: the request succeeds, the raster is a handful of pixels, and only a
   strange zonal statistic ever hints at it. `acquire._metric_bounds` refuses a
   geographic or non-metre `out_sr` rather than computing anything.
-- A county at 10 m exceeds 8000 px in one dimension — compute the size, and if it
-  exceeds either cap, coarsen. **Handle this in code**, because the transfer
-  county will have a different extent and a hardcoded size is a hardcoded study
-  area. Coarsening shrinks both axes proportionally; clamping each axis to its
-  own cap would square off a rectangular county. Record the requested *and* the
+- Compute every grid from its retrieved bbox and the global 30 m target; if it
+  exceeds either published axis cap or the total-pixel budget, coarsen. **Handle
+  this in code**, because each county has a different extent and a hardcoded
+  size is a hardcoded study area. Coarsening shrinks both axes proportionally;
+  clamping each axis to its own cap would square off a rectangular county.
+  Record the requested *and* the
   effective cell size — a raster quietly coarser than asked for is a number the
   paper would get wrong.
 - Response is a GeoTIFF body, not JSON. **Checking `Content-Type` is not enough,
@@ -404,6 +446,13 @@ out center tags;
   an empty layer whose Provenance carries that sentence verbatim, and the other
   six datasets landed. `--check` also forces the same path against an unresolvable
   host so the recovery is tested rather than merely observed.
+- **It degraded again, truthfully, in the completed 1 Sep transfer.** The layer
+  28 query returned HTTP 200 carrying ArcGIS code 500, `Error performing query
+  operation`. Acquisition registered a zero-feature `flood_zones` layer with
+  `degraded=true`, the exact error text, a retrieval timestamp, CRS, and request
+  parameters. Alignment and all three scenarios then completed on the 3DEP
+  elevation raster alone. Its zero features are an absence of NFHL data, not
+  evidence that Chatham has no mapped or regulatory flood risk.
 - The cause is the same shape as section 4's: layer 28 publishes
   `maxRecordCount: 2000` and cannot serve it. Measured at the same bbox —
   2000 per page fails in 16 s, 500 fails in 14 s, **100 succeeds in 4 s**. A later

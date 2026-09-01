@@ -99,10 +99,14 @@ RASTER_NODATA = -9999.0
 RASTER_INTERPOLATION = "RSP_BilinearInterpolation"
 IMAGE_CAPABILITY = "Image"
 
-TARGET_CELL_SIZE_M = 10.0
-"""What the elevation export asks for. It will not get it on a county this size,
-which is the point: the coarsening path is load-bearing and a cell size chosen to
-slip under the caps would leave it untested until the transfer county."""
+TARGET_CELL_SIZE_M = 30.0
+"""The county-neutral nominal target for every elevation export.
+
+This follows the predeclared raster cut line in ``docs/BUILD-PLAN.md`` after a
+measured second-area export near the module's eight-million-pixel budget failed.
+Both the requested and effective resolutions remain in Provenance. Larger
+extents can still be coarsened by service axis limits or ``MAX_EXPORT_PIXELS``.
+"""
 
 MAX_EXPORT_PIXELS = 8_000_000
 """How large an export this module will ask an ImageServer for.
@@ -119,8 +123,11 @@ not the operative one. Measured against 3DEPElevation on 2026-08-28, with
 The advertised 8000 x 8000 is 64 Mpx and the service cannot render a fraction of
 it. Retrying does not help -- 500 and 504 are both retryable statuses, so the
 policy in `_request` spends its whole budget before failing -- which is why the
-budget is applied before the request rather than discovered after it. Sized well
-inside the largest observed success; see docs/failures.md."""
+budget is applied before the request rather than discovered after it. This is a
+conservative client ceiling, not a service guarantee: a later second-area
+request near the budget still failed and motivated the global nominal-resolution
+change above. The budget remains fixed so that repair changes one measured
+variable at a time; see docs/failures.md."""
 
 RASTER_CELL_TOLERANCE = 1e-3
 """How far the pixel size read back off disk may differ from the computed one.
@@ -921,9 +928,10 @@ def _raster_grid(
     """Choose an export size, coarsening the cell size when a cap bites.
 
     Two caps and either can bind: the `maxImageWidth`/`maxImageHeight` the
-    service publishes, and `MAX_EXPORT_PIXELS`, which is what it can actually
-    render. Both land in `capped_by`, so Provenance can say which one cost the
-    resolution.
+    service publishes, and `MAX_EXPORT_PIXELS`, the module's conservative
+    workload ceiling. Neither promises the public service will render every
+    valid request. Both land in `capped_by`, so Provenance can say which one
+    cost the resolution.
 
     The shrink is proportional. Clamping each axis to its own cap independently
     would turn a rectangular county into a square request, pay for tens of
@@ -2480,7 +2488,27 @@ def _raster_checks(bbox: BBox, timeout_s: float) -> list[tuple[str, bool]]:
         max_width=max_width,
         max_height=max_height,
     )
+    fine_grid = _raster_grid(
+        bbox,
+        out_sr=out_sr,
+        cell_size_m=10.0,
+        max_width=max_width,
+        max_height=max_height,
+    )
     width_m, height_m = grid.extent_m
+    production_exceeds_pixel_budget = (
+        grid.uncapped_size[0] * grid.uncapped_size[1] > MAX_EXPORT_PIXELS
+    )
+    production_exceeds_service_axis = (
+        grid.uncapped_size[0] > max_width
+        or grid.uncapped_size[1] > max_height
+    )
+    fine_exceeds_service_axis = (
+        fine_grid.uncapped_size[0] > max_width
+        or fine_grid.uncapped_size[1] > max_height
+    )
+    module_cap = f"the {MAX_EXPORT_PIXELS} px export budget in this module"
+    service_cap = f"the service cap of {max_width}x{max_height} px"
     print("\nsizing at full scale, from the bbox derived from the retrieved tract layer:")
     print(f"  bbox {config.STORAGE_CRS}   {tuple(round(value, 4) for value in bbox)}")
     print(f"  extent EPSG:{out_sr}        {width_m:.0f} m x {height_m:.0f} m")
@@ -2493,36 +2521,69 @@ def _raster_checks(bbox: BBox, timeout_s: float) -> list[tuple[str, bool]]:
         f"  coarsened to {grid.width}x{grid.height} px at "
         f"{grid.effective_cell_m:.4f} m, capped by {' and '.join(grid.capped_by) or 'nothing'}"
     )
+    print(
+        f"  fine branch at {fine_grid.requested_cell_m:g} m starts at "
+        f"{fine_grid.uncapped_size[0]}x{fine_grid.uncapped_size[1]} px and ends at "
+        f"{fine_grid.width}x{fine_grid.height} px, capped by "
+        f"{' and '.join(fine_grid.capped_by) or 'nothing'}"
+    )
     checks.append(
         (
-            "the size cap fires for real on the study county, it is not a dead branch",
-            grid.capped,
+            "the production target exceeds the module pixel budget but not the service axes",
+            production_exceeds_pixel_budget and not production_exceeds_service_axis,
         )
     )
     checks.append(
         (
-            "the requested cell size really does exceed the cap the service publishes",
-            grid.uncapped_size[0] > max_width or grid.uncapped_size[1] > max_height,
-        )
-    )
-    checks.append(
-        (
-            "the coarsened export honours both caps",
-            grid.width <= max_width
+            "the module pixel-budget branch coarsens production output within both caps",
+            grid.capped_by == (module_cap,)
+            and grid.width < grid.uncapped_size[0]
+            and grid.height < grid.uncapped_size[1]
+            and grid.width <= max_width
             and grid.height <= max_height
             and grid.width * grid.height <= MAX_EXPORT_PIXELS,
         )
     )
     checks.append(
         (
-            "coarsening makes the cell larger than requested and says so",
-            grid.effective_cell_m > grid.requested_cell_m and bool(grid.capped_by),
+            "a deliberately fine test grid exceeds the real service per-axis cap",
+            fine_exceeds_service_axis,
         )
     )
     checks.append(
         (
-            "the coarsened grid keeps the shape of the study area, it is not squared off",
-            abs((grid.width / grid.height) - (width_m / height_m)) < 0.01 * (width_m / height_m),
+            "the service-axis branch coarsens the fine grid within both caps",
+            service_cap in fine_grid.capped_by
+            and module_cap in fine_grid.capped_by
+            and fine_grid.width <= max_width
+            and fine_grid.height <= max_height
+            and fine_grid.width * fine_grid.height <= MAX_EXPORT_PIXELS,
+        )
+    )
+    checks.append(
+        (
+            "both cap paths preserve the aspect ratio instead of squaring the extent",
+            abs((grid.width / grid.height) - (width_m / height_m))
+            < 0.01 * (width_m / height_m)
+            and abs((fine_grid.width / fine_grid.height) - (width_m / height_m))
+            < 0.01 * (width_m / height_m),
+        )
+    )
+    checks.append(
+        (
+            "both grids use the same bounds in the requested projected metric CRS",
+            CRS.from_epsg(out_sr).is_projected
+            and grid.bounds_m == fine_grid.bounds_m
+            and grid.extent_m == fine_grid.extent_m,
+        )
+    )
+    checks.append(
+        (
+            "requested and effective cell sizes stay distinct for both cap paths",
+            grid.requested_cell_m == TARGET_CELL_SIZE_M
+            and fine_grid.requested_cell_m == 10.0
+            and grid.effective_cell_m > grid.requested_cell_m
+            and fine_grid.effective_cell_m > fine_grid.requested_cell_m,
         )
     )
 

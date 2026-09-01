@@ -8,32 +8,39 @@ from `BUILD-PLAN.md`; the prompts below are the short form plus the ritual.
 
 ## Where you actually are
 
-Checked Tue 1 Sep, at the end of S13.
+Checked Tue 1 Sep, after the S13.1 transfer recovery.
 
 | | |
 | --- | --- |
 | Plan | S14 next, then paper and submission. |
-| Reality | S1-S13 done. S13 is a measured failed transfer, not a completed second-county pipeline. |
+| Reality | S1-S13.1 done. The initial S13 transfer failed at 3DEP; the final isolated Chatham transfer completed after one global 30 m acquisition-policy repair. |
 | Built | `config`, `contracts`, `provenance`, `registry`, `acquire`, `align`, `verify`, `hazard`, `vulnerability`, `risk`, `pipeline`, `schemas`, `tools`, `agent`, `llm_client`, `trace`, `sandbox`, `critic`, `faults`, `experiments/faults`, `experiments/behaviour`, `experiments/transfer` |
 | Missing | `figures` and the S14 paper numbers artifact |
 
-**Measured S13 result.** The real transfer reached the configured second area,
-loaded 88 tract polygons, and derived their extent before the 3DEP
-`exportImage` endpoint ended with HTTP 500 under the existing bounded request
-path. Acquisition therefore produced no manifest and the pipeline was not
-called. `outputs/paper/transfer_report.json` says `failed/acquisition`, lists
-four files only as unregistered partial output, leaves retry/attempt counts
-unknown, records all five config paths restored, and proves the complete
-eight-file primary snapshot fingerprint unchanged. The primary paper trade-off
-is a byte-identical nine-row copy at `outputs/paper/tradeoff.csv`.
+**Initial S13 result.** The first real endpoint run reached 88 Chatham tracts
+and then failed at the 3DEP image boundary. That remains a paper failure case,
+not a discarded attempt. Its report is archived byte-for-byte at
+`outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json`, and its
+four isolated partial files remain under the failed run's transfer-work
+directory.
 
-The S13 gate is green for an honestly measured failure, not for transfer
-completion: the pre-S13 baseline was 881 PASS; the final offline transfer check
-is 42 PASS; `python mutate.py transfer` catches 4/4; the post-attempt primary
-pipeline remains 34 PASS; and the tool surface remains 135 PASS with eleven
-tools, no pending tools, and no surface faults. The weakest rubric criterion is
-still RB: generalization reached a second county without an analysis-code
-change, but the live raster dependency prevented an end-to-end transfer result.
+**Final S13.1 result.** A bounded repeat confirmed that the unchanged
+2792×2864 near-budget request still returned HTTP 500. The predeclared raster
+cut line was then applied globally: `TARGET_CELL_SIZE_M` changed from 10 m to
+30 m. Fresh run `20260901T185401974111Z-10931654` registered all seven expected
+dataset names, completed alignment and all three scenarios across all three
+presets, validated five run-scoped pipeline artifacts, restored all five
+configuration paths, and matched the complete primary snapshot before and
+after. The canonical report now records `completed/complete`.
+
+This demonstrates a successful second-area analysis after one generic
+acquisition-policy repair, not a first-attempt zero-change transfer. The
+remaining transfer limitations are explicit: optional NFHL degraded, so the
+hazard result is elevation-only, and two zero-population tracts whose ACS
+universes are zero remain unscored. The final gates include acquisition 89,
+alignment 145, hazard 65, vulnerability 57, risk 68, pipeline 34, schemas 38,
+tools 135, sandbox 99, critic 148, fault harness 92, behaviour 41, and transfer
+42 PASS; transfer mutations caught 4/4 and schema mutations caught 13/13.
 
 **Both feedback cycles exist, and the robustness half of RB is now measured
 rather than claimed.** `python -m src.tools` lists no tool as `[PENDING]`,
@@ -48,6 +55,17 @@ What S14 inherits from S13:
   tool.** It lives beside the two S12 experiment runners, and none is imported
   by the agent or by a tool: an experiment that the shipped system could reach
   would be a second route to an answer for `critic.py` to trace to.
+- **Primary and transfer outputs have separate ownership.**
+  `outputs/paper/tradeoff.csv` is the verified Charleston copy and remains
+  byte-identical to `outputs/tradeoff.csv`. Each transfer run writes its own
+  risk tables, `tradeoff.csv`, and `pipeline_report.txt` beneath
+  `outputs/paper/transfer/<run-id>/`. `transfer_report.json` names the latest
+  attempt; earlier attempt reports live under `outputs/paper/transfer_attempts/`.
+- **A completed run may still carry explicit missingness.** Chatham's NFHL
+  layer is degraded and its two zero-population special-use tracts are
+  unscored. S14 figures and numbers must use 88 total rows and 86 scored rows
+  where risk rankings are involved, and must describe the hazard as
+  elevation-only.
 - **`src/faults.py` injects at `acquire._SESSION`**, the session object
   `acquire._request` calls at `acquire.py`'s single outbound call site, *inside*
   the body tenacity retries. Decided this way rather than by replacing the
@@ -644,23 +662,30 @@ names.
 ## S13 — scenario sweep and transfer · 2.5 h
 
 ```
-Measured outcome: no src/scenarios.py was added. The existing
+Measured outcome, in two attempts. No src/scenarios.py was added:
 Risk.compare_presets() plus pipeline.run() remain the single authoritative
 scenario/weighting sweep and already emit ScenarioRows with displaced_geoids.
-src/experiments/transfer.py exercised TRANSFER_AREA through the real acquisition
-entry point in an isolated namespace. The attempt reached 88 tracts, then the
-3DEP export returned HTTP 500; no manifest was written and the pipeline was not
-called. The cut line was taken and the failed acquisition was preserved as the
-finding rather than presented as a successful transfer.
+
+The initial isolated Chatham run reached 88 tracts and failed at a near-budget
+3DEP export. Its report and partial isolated files were preserved, and a
+bounded repeat of the same request reproduced HTTP 500.
+
+S13.1 then applied the predeclared global 30 m raster policy. Fresh run
+20260901T185401974111Z-10931654 completed all seven registry entries,
+alignment, three scenarios, three presets, nine trade-off rows, artifact
+round-trips, primary-snapshot comparison, and configuration restoration. NFHL
+degraded to a truthful registered empty layer; two zero-population tracts
+remained explicitly unscored.
 ```
 
-**Gate:** `outputs/paper/tradeoff.csv` and
-`outputs/paper/transfer_report.json` exist. The latter records
-`failed/acquisition`, four unregistered partial files, exact restoration and
-primary-snapshot safety evidence, and null—not zero—retry counts.
-**Cut:** if transfer breaks early, spend one hour making the failure legible and
-stop. The failure mode is the finding. Do not spend the day making the second
-county work.
+**Gate:** `outputs/paper/transfer_report.json` records `completed/complete`, and
+the successful transfer artifacts live under
+`outputs/paper/transfer/20260901T185401974111Z-10931654/`.
+`outputs/paper/tradeoff.csv` remains the separate, byte-identical primary-area
+paper artifact. The initial failed report remains archived under
+`outputs/paper/transfer_attempts/`.
+**Cut taken:** the failed first attempt was made legible and preserved before
+the one predeclared, county-neutral raster-policy repair was attempted.
 
 ## S14 — figures and the numbers file · 2 h
 
