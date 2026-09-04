@@ -89,48 +89,6 @@ Never commit `.env`. Verify that it is ignored:
 git status --short --ignored .env
 ```
 
-### Offline verification
-
-Windows PowerShell:
-
-```powershell
-$ProjectPython = ".\.venv\Scripts\python.exe"
-
-$OfflineChecks = @(
-    "src.align",
-    "src.hazard",
-    "src.vulnerability",
-    "src.risk",
-    "src.pipeline",
-    "src.schemas",
-    "src.tools",
-    "src.sandbox",
-    "src.critic",
-    "src.faults",
-    "src.experiments.behaviour",
-    "src.experiments.transfer",
-    "src.figures",
-    "src.experiments.report"
-)
-
-foreach ($Module in $OfflineChecks) {
-    Write-Host "`n===== $Module --check ====="
-    & $ProjectPython -m $Module --check
-
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Module --check failed with exit code $LASTEXITCODE"
-    }
-}
-```
-
-Every command must exit successfully. A green console message without a successful exit code is not treated as verification.
-
-The live acquisition-boundary check is separate because it reaches public services:
-
-```powershell
-& $ProjectPython -m src.acquire --check
-```
-
 ### Primary Charleston reproduction
 
 The primary configured study area is Charleston County, South Carolina, with state FIPS `45` and county FIPS `019`.
