@@ -53,11 +53,11 @@
 
 \author{Manoj Sankuru}
 \affiliation{
-  \institution{[Institution Name]}
-  \department{[Department Name]}
-  \city{[City]}
-  \state{[State]}
-  \country{[Country]}
+  \institution{Clemson University}
+  \department{School of Computing}
+  \city{Clemson}
+  \state{South Carolina}
+  \country{USA}
 }
 \email{[email address]}
 
@@ -71,9 +71,6 @@
 }
 \email{cmachuk@clemson.edu}
 
-% The draft's unnamed additional-author entry is omitted until a name and
-% affiliation are supplied; inventing author metadata would be misleading.
-
 \author{Jason Lucas}
 \affiliation{
   \institution{Clemson University}
@@ -82,7 +79,7 @@
   \state{South Carolina}
   \country{USA}
 }
-\email{[email address]}
+\email{jlucas2@clemson.edu}
 
 \begin{abstract}
 Multi-source flood-risk analysis is difficult to repeat because elevation,
@@ -147,7 +144,7 @@ than it measures.
   traceback-guided code-repair and tool-log-guided critic-revision cycles.
   Geometry remains inside deterministic components, while summaries cross the
   model interface.}
-  \Description{Dark three-layer diagram showing live public data, acquisition,
+  \Description{Light three-panel diagram showing live public data, acquisition,
   deterministic tools, an orchestrating language model, tool-result logging,
   critic validation, generated code, bounded sandbox execution, traceback-guided
   code repair, revised drafts, and the final answer.}
@@ -177,7 +174,8 @@ tracts and block groups, 2024 ACS tables, USGS 3DEP elevation, OpenStreetMap
 facilities, and optional FEMA NFHL data. NFHL degraded in both evaluated areas;
 the empty registered layer denotes unavailable regulatory-flood evidence, not
 zero flood risk. No FEMA National Risk Index, HIFLD shelter, road-network, or
-storm-specific surge raster is claimed as an input.
+storm-specific surge raster is claimed as an input. Facility data are \copyright~OpenStreetMap
+contributors and available under the Open Database License.
 
 \subsection{Spatial Reasoning}
 
@@ -338,10 +336,6 @@ presets, the implementation produces reproducible maps and discrete trade-off
 comparisons while preserving degraded data and unscored units. The principal
 contribution is not an optimal route plan, but an auditable workflow whose
 assumptions and failure boundaries remain visible.
-
-\begin{acks}
-The authors thank [insert acknowledgment here].
-\end{acks}
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
