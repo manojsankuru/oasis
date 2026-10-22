@@ -39,3 +39,7 @@ data/snapshot-backup/
 
 # derived rasters, recomputed by hazard.py on every run
 data/derived/
+
+output/
+tmp/
+.codex-finalizer/
