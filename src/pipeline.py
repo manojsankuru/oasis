@@ -239,6 +239,13 @@ def run(
     return result
 
 
+def shown_path(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(config.PROJECT_ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
 def format_report(result: PipelineResult) -> str:
     """The whole run, from what was cleaned to who each weighting drops."""
     lines = [
@@ -266,7 +273,7 @@ def format_report(result: PipelineResult) -> str:
     if result.written:
         lines.append("  written:")
         for path in result.written:
-            lines.append(f"      {path}")
+            lines.append(f"      {shown_path(path)}")
     if result.warnings:
         lines.append("")
         lines.append(f"  warnings ({len(result.warnings)}):")
