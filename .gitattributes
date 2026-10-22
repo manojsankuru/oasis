@@ -1,0 +1,2 @@
+outputs/paper/** -text
+outputs/faults.json -text

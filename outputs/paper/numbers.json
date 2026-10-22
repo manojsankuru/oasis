@@ -1,0 +1,3689 @@
+{
+  "agent_behaviour": {
+    "evaluation_cohort": null,
+    "reason": "no declared paper evaluation manifest selects exact run IDs and questions",
+    "status": "missing_evidence"
+  },
+  "alignment": {
+    "primary": {
+      "apportionment_error_pct": {
+        "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+        "selector": "AlignmentReport line labeled apportionment_error",
+        "source": "outputs/pipeline_report.txt",
+        "unit": "percent",
+        "value": 0.0
+      },
+      "effective_raster_resolution_m": {
+        "derivation": "absolute pixel width read from the raster header and checked against manifest provenance",
+        "selector": "raster header transform pixel width",
+        "source": "data/snapshot/3depelevation.tif",
+        "unit": "metres",
+        "value": 39.816062348435985
+      },
+      "geometries_dropped": {
+        "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+        "selector": "AlignmentReport line labeled geometries_dropped",
+        "source": "outputs/pipeline_report.txt",
+        "unit": "count",
+        "value": 0
+      },
+      "geometries_repaired": {
+        "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+        "selector": "AlignmentReport line labeled geometries_repaired",
+        "source": "outputs/pipeline_report.txt",
+        "unit": "count",
+        "value": 0
+      },
+      "raster_height": {
+        "derivation": "read from the raster header and checked against manifest provenance",
+        "selector": "raster header height",
+        "source": "data/snapshot/3depelevation.tif",
+        "unit": "pixels",
+        "value": 2511
+      },
+      "raster_width": {
+        "derivation": "read from the raster header and checked against manifest provenance",
+        "selector": "raster header width",
+        "source": "data/snapshot/3depelevation.tif",
+        "unit": "pixels",
+        "value": 3185
+      },
+      "requested_raster_resolution_m": {
+        "derivation": "parsed finite requested cell size",
+        "selector": "$.datasets[name=elevation].provenance.request_params.cell_size_m_requested",
+        "source": "data/snapshot/manifest.json",
+        "unit": "metres",
+        "value": 30.0
+      },
+      "sentinel_count": {
+        "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+        "selector": "AlignmentReport line labeled sentinels_removed",
+        "source": "outputs/pipeline_report.txt",
+        "unit": "count",
+        "value": 0
+      },
+      "units_below_cell_threshold": {
+        "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+        "selector": "AlignmentReport line labeled units_below_cell_threshold",
+        "source": "outputs/pipeline_report.txt",
+        "unit": "count",
+        "value": 0
+      },
+      "unmatched_left": {
+        "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+        "selector": "AlignmentReport line labeled unmatched_left",
+        "source": "outputs/pipeline_report.txt",
+        "unit": "count",
+        "value": 0
+      },
+      "unmatched_right": {
+        "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+        "selector": "AlignmentReport line labeled unmatched_right",
+        "source": "outputs/pipeline_report.txt",
+        "unit": "count",
+        "value": 0
+      }
+    },
+    "working_crs": {
+      "derivation": "configured projected working CRS",
+      "selector": "DEFAULT_WORKING_CRS",
+      "source": "src/config.py",
+      "unit": "CRS identifier",
+      "value": "EPSG:5070"
+    },
+    "working_epsg": {
+      "derivation": "integer suffix of the validated EPSG identifier",
+      "selector": "DEFAULT_WORKING_CRS",
+      "source": "src/config.py",
+      "unit": "EPSG code",
+      "value": 5070
+    }
+  },
+  "configuration": {
+    "agent_iteration_bound": {
+      "derivation": "configured maximum turns for one question",
+      "selector": "MAX_ITERATIONS",
+      "source": "src/config.py",
+      "unit": "iterations",
+      "value": 15
+    },
+    "configured_county_count": {
+      "derivation": "count of the two distinct configured study-area values",
+      "selector": "STUDY_AREA and TRANSFER_AREA",
+      "source": "src/config.py",
+      "unit": "configured counties",
+      "value": 2
+    },
+    "critic_revision_bound": {
+      "derivation": "source constant bounding critic-requested revisions",
+      "selector": "MAX_REVISIONS",
+      "source": "src/agent.py",
+      "unit": "revisions",
+      "value": 2
+    },
+    "facility_radius_m": {
+      "derivation": "source default for straight-line reachable-facility measurement",
+      "selector": "DEFAULT_FACILITY_RADIUS_M",
+      "source": "src/risk.py",
+      "unit": "metres",
+      "value": 5000.0
+    },
+    "network_retry_bound": {
+      "derivation": "configured bound on network attempts",
+      "selector": "MAX_RETRIES",
+      "source": "src/config.py",
+      "unit": "attempts",
+      "value": 3
+    },
+    "network_timeout_s": {
+      "derivation": "configured timeout on each network request",
+      "selector": "REQUEST_TIMEOUT_S",
+      "source": "src/config.py",
+      "unit": "seconds",
+      "value": 60.0
+    },
+    "preset_count": {
+      "derivation": "length after validating unique preset names",
+      "selector": "WEIGHT_PRESETS",
+      "source": "src/vulnerability.py",
+      "unit": "weight presets",
+      "value": 3
+    },
+    "preset_names": {
+      "derivation": "ordered names from the source tuple",
+      "selector": "WeightPreset.name for WEIGHT_PRESETS",
+      "source": "src/vulnerability.py",
+      "unit": "preset names",
+      "value": [
+        "svi_equal",
+        "svi_themes",
+        "evacuation_capacity"
+      ]
+    },
+    "preset_origins": {
+      "derivation": "name-to-origin mapping from source values",
+      "selector": "WeightPreset.origin for WEIGHT_PRESETS",
+      "source": "src/vulnerability.py",
+      "unit": "origin labels",
+      "value": {
+        "evacuation_capacity": "authors",
+        "svi_equal": "published_index",
+        "svi_themes": "published_index"
+      }
+    },
+    "priority_units": {
+      "derivation": "source default used by the risk and trade-off priority sets",
+      "selector": "DEFAULT_PRIORITY_UNITS",
+      "source": "src/risk.py",
+      "unit": "tracts",
+      "value": 10
+    },
+    "sandbox_timeout_s": {
+      "derivation": "source constant bounding one generated-code run",
+      "selector": "DEFAULT_TIMEOUT_S",
+      "source": "src/sandbox.py",
+      "unit": "seconds",
+      "value": 60.0
+    },
+    "scenario_count": {
+      "derivation": "length after validating unique scenario names",
+      "selector": "HAZARD_SCENARIOS",
+      "source": "src/hazard.py",
+      "unit": "scenarios",
+      "value": 3
+    },
+    "scenario_names": {
+      "derivation": "ordered names from the source tuple",
+      "selector": "HazardScenario.name for HAZARD_SCENARIOS",
+      "source": "src/hazard.py",
+      "unit": "scenario names",
+      "value": [
+        "surge_1_5m",
+        "surge_3_0m",
+        "surge_5_0m"
+      ]
+    },
+    "tool_count": {
+      "derivation": "length of the frozen tool-name tuple",
+      "selector": "TOOL_NAMES",
+      "source": "src/contracts.py",
+      "unit": "model-visible tools",
+      "value": 11
+    },
+    "vulnerability_indicator_count": {
+      "derivation": "length of the frozen indicator tuple",
+      "selector": "VULNERABILITY_INDICATORS",
+      "source": "src/contracts.py",
+      "unit": "indicators",
+      "value": 5
+    },
+    "vulnerability_indicator_names": {
+      "derivation": "ordered names from the frozen indicator tuple",
+      "selector": "VULNERABILITY_INDICATORS",
+      "source": "src/contracts.py",
+      "unit": "indicator names",
+      "value": [
+        "pct_poverty",
+        "pct_age_65_plus",
+        "pct_disability",
+        "pct_no_vehicle",
+        "pct_limited_english"
+      ]
+    }
+  },
+  "data_acquisition": {
+    "primary": {
+      "dataset_count": {
+        "derivation": "length after requiring the complete registered dataset set",
+        "selector": "$.datasets",
+        "source": "data/snapshot/manifest.json",
+        "unit": "registered datasets",
+        "value": 7
+      },
+      "nfhl_degraded": {
+        "derivation": "the recorded degraded flag, not an inference from zero features",
+        "selector": "$.datasets[name=flood_zones].provenance.request_params.degraded",
+        "source": "data/snapshot/manifest.json",
+        "unit": "boolean",
+        "value": true
+      },
+      "nfhl_reason": {
+        "derivation": "recorded retrieval reason retained verbatim as structured strings",
+        "selector": "$.datasets[name=flood_zones].provenance.notes",
+        "source": "data/snapshot/manifest.json",
+        "unit": "provenance notes",
+        "value": [
+          "DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone",
+          "ServiceError: https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query: HTTP 200 with an ArcGIS error body (code 500): Error performing query operation",
+          "registered as an empty layer rather than omitted, so every downstream module sees a dataset with zero features instead of a missing name"
+        ]
+      }
+    },
+    "transfer": {
+      "dataset_count": {
+        "derivation": "length after requiring the complete registered dataset set",
+        "selector": "$.datasets",
+        "source": "outputs/paper/transfer_report.json",
+        "unit": "registered datasets",
+        "value": 7
+      },
+      "nfhl_degraded": {
+        "derivation": "canonical validation flag, not an inference from zero features",
+        "selector": "$.datasets[name=flood_zones].validation.degraded",
+        "source": "outputs/paper/transfer_report.json",
+        "unit": "boolean",
+        "value": true
+      },
+      "nfhl_reason": {
+        "derivation": "recorded reasons from the completed transfer validation",
+        "selector": "$.datasets[name=flood_zones].validation.degraded_reasons",
+        "source": "outputs/paper/transfer_report.json",
+        "unit": "degradation reasons",
+        "value": [
+          "DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone"
+        ]
+      }
+    }
+  },
+  "generated_at": "2026-10-22T18:47:34.563797+00:00",
+  "hazard": {
+    "population_exposed_by_scenario": {
+      "surge_1_5m": {
+        "derivation": "sum of the pipeline-produced tract values, rounded to the nearest resident",
+        "selector": "column=exposed_population; aggregation=sum; all rows",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "people",
+        "value": 99037
+      },
+      "surge_3_0m": {
+        "derivation": "sum of the pipeline-produced tract values, rounded to the nearest resident",
+        "selector": "column=exposed_population; aggregation=sum; all rows",
+        "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+        "unit": "people",
+        "value": 187349
+      },
+      "surge_5_0m": {
+        "derivation": "sum of the pipeline-produced tract values, rounded to the nearest resident",
+        "selector": "column=exposed_population; aggregation=sum; all rows",
+        "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+        "unit": "people",
+        "value": 303839
+      }
+    },
+    "scenario_count": {
+      "derivation": "length of the source tuple after validating unique names",
+      "selector": "HAZARD_SCENARIOS",
+      "source": "src/hazard.py",
+      "unit": "scenarios",
+      "value": 3
+    },
+    "scenario_heights_m": {
+      "derivation": "name-to-height mapping from the configured source tuple",
+      "selector": "HazardScenario.surge_height_m for HAZARD_SCENARIOS",
+      "source": "src/hazard.py",
+      "unit": "metres",
+      "value": {
+        "surge_1_5m": 1.5,
+        "surge_3_0m": 3.0,
+        "surge_5_0m": 5.0
+      }
+    },
+    "scenario_names": {
+      "derivation": "ordered names from the source tuple",
+      "selector": "HazardScenario.name for HAZARD_SCENARIOS",
+      "source": "src/hazard.py",
+      "unit": "scenario names",
+      "value": [
+        "surge_1_5m",
+        "surge_3_0m",
+        "surge_5_0m"
+      ]
+    }
+  },
+  "missing_evidence": [
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.question_count",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.llm_calls",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.gis_tool_calls",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.generated_code_calls",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.successful_code_runs",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.failed_code_runs",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.error_taxonomy",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.repair_attempts",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.repair_successes",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.critic_cycles",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.critic_firings",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.revisions_requested",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.first_draft_pass_rate",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.final_draft_pass_rate",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.numbers_checked",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.numbers_traceable",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.mean_turns",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.mean_duration",
+      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+    },
+    {
+      "expected_source": "outputs/faults.json",
+      "key": "robustness.live_rows",
+      "reason": "the current fault artifact contains no live rows; fixture results remain separately labeled"
+    }
+  ],
+  "paper_keys": {
+    "abstract.preset_count": {
+      "derivation": "length after validating unique preset names",
+      "selector": "WEIGHT_PRESETS",
+      "source": "src/vulnerability.py",
+      "unit": "weight presets",
+      "value": 3
+    },
+    "abstract.primary_tract_count": {
+      "derivation": "validated boundary/attribute count, equal to every risk-table row count",
+      "selector": "$.datasets[name=tracts].provenance.feature_count",
+      "source": "data/snapshot/manifest.json",
+      "unit": "tracts",
+      "value": 99
+    },
+    "abstract.scenario_count": {
+      "derivation": "length after validating unique scenario names",
+      "selector": "HAZARD_SCENARIOS",
+      "source": "src/hazard.py",
+      "unit": "scenarios",
+      "value": 3
+    },
+    "abstract.transfer_scored_count": {
+      "derivation": "single count shared by all completed scenarios and cross-checked against run-scoped risk tables",
+      "selector": "$.pipeline.tables[*].units_scored",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "tracts",
+      "value": 86
+    },
+    "abstract.transfer_tract_count": {
+      "derivation": "validated boundary/attribute count, equal to every risk-table row count",
+      "selector": "$.datasets[name=tracts].validation.actual_feature_count",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "tracts",
+      "value": 88
+    },
+    "alignment.primary_raster_resolution_m": {
+      "derivation": "absolute pixel width read from the raster header and checked against manifest provenance",
+      "selector": "raster header transform pixel width",
+      "source": "data/snapshot/3depelevation.tif",
+      "unit": "metres",
+      "value": 39.816062348435985
+    },
+    "alignment.primary_sentinel_count": {
+      "derivation": "parsed from the uniquely labeled alignment counter in the completed pipeline report",
+      "selector": "AlignmentReport line labeled sentinels_removed",
+      "source": "outputs/pipeline_report.txt",
+      "unit": "count",
+      "value": 0
+    },
+    "alignment.working_epsg": {
+      "derivation": "integer suffix of the validated EPSG identifier",
+      "selector": "DEFAULT_WORKING_CRS",
+      "source": "src/config.py",
+      "unit": "EPSG code",
+      "value": 5070
+    },
+    "limitations.county_count": {
+      "derivation": "count of the two distinct configured study-area values",
+      "selector": "STUDY_AREA and TRANSFER_AREA",
+      "source": "src/config.py",
+      "unit": "configured counties",
+      "value": 2
+    },
+    "methods.agent_iteration_bound": {
+      "derivation": "configured maximum turns for one question",
+      "selector": "MAX_ITERATIONS",
+      "source": "src/config.py",
+      "unit": "iterations",
+      "value": 15
+    },
+    "methods.critic_revision_bound": {
+      "derivation": "source constant bounding critic-requested revisions",
+      "selector": "MAX_REVISIONS",
+      "source": "src/agent.py",
+      "unit": "revisions",
+      "value": 2
+    },
+    "methods.retry_bound": {
+      "derivation": "configured bound on network attempts",
+      "selector": "MAX_RETRIES",
+      "source": "src/config.py",
+      "unit": "attempts",
+      "value": 3
+    },
+    "methods.sandbox_timeout_s": {
+      "derivation": "source constant bounding one generated-code run",
+      "selector": "DEFAULT_TIMEOUT_S",
+      "source": "src/sandbox.py",
+      "unit": "seconds",
+      "value": 60.0
+    },
+    "methods.tool_count": {
+      "derivation": "length of the frozen tool-name tuple",
+      "selector": "TOOL_NAMES",
+      "source": "src/contracts.py",
+      "unit": "model-visible tools",
+      "value": 11
+    },
+    "results.primary_population": {
+      "derivation": "sum of the validated tract population column; repeated scenario tables agree",
+      "selector": "column=population; aggregation=sum; all rows",
+      "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+      "unit": "people",
+      "value": 420264
+    },
+    "results.primary_scored_count": {
+      "derivation": "count after validating that score/rank nullness agrees and ranks stay within the scored population",
+      "selector": "columns=risk_score,priority_rank; rows where both are non-null",
+      "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+      "unit": "tracts",
+      "value": 98
+    },
+    "results.primary_tract_count": {
+      "derivation": "validated boundary/attribute count, equal to every risk-table row count",
+      "selector": "$.datasets[name=tracts].provenance.feature_count",
+      "source": "data/snapshot/manifest.json",
+      "unit": "tracts",
+      "value": 99
+    },
+    "results.transfer_facility_count": {
+      "derivation": "registered facility feature count",
+      "selector": "$.datasets[name=facilities].validation.actual_feature_count",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "facilities",
+      "value": 206
+    },
+    "results.transfer_population": {
+      "derivation": "sum of the validated tract population column; repeated scenario tables agree",
+      "selector": "$.pipeline.population_total",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "people",
+      "value": 300879
+    },
+    "results.transfer_raster_height": {
+      "derivation": "raster dimension read back and recorded by transfer validation",
+      "selector": "$.datasets[name=elevation].validation.raster_height",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "pixels",
+      "value": 2252
+    },
+    "results.transfer_raster_resolution_m": {
+      "derivation": "finite effective cell size recorded after raster read-back",
+      "selector": "$.datasets[name=elevation].provenance.request_params.cell_size_m_effective",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "metres",
+      "value": 29.992446
+    },
+    "results.transfer_raster_width": {
+      "derivation": "raster dimension read back and recorded by transfer validation",
+      "selector": "$.datasets[name=elevation].validation.raster_width",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "pixels",
+      "value": 2195
+    },
+    "results.transfer_scored_count": {
+      "derivation": "single count shared by all completed scenarios and cross-checked against run-scoped risk tables",
+      "selector": "$.pipeline.tables[*].units_scored",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "tracts",
+      "value": 86
+    },
+    "results.transfer_tract_count": {
+      "derivation": "validated boundary/attribute count, equal to every risk-table row count",
+      "selector": "$.datasets[name=tracts].validation.actual_feature_count",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "tracts",
+      "value": 88
+    },
+    "results.transfer_unscored_count": {
+      "derivation": "single count shared by all completed scenarios; not coerced to scored zeroes",
+      "selector": "$.pipeline.tables[*].units_unscored",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "tracts",
+      "value": 2
+    },
+    "robustness.fault_kind_count": {
+      "derivation": "count of unique kind names in the complete fixture grid",
+      "selector": "distinct $.rows[source=fixture].kind",
+      "source": "outputs/faults.json",
+      "unit": "fault kinds",
+      "value": 5
+    },
+    "robustness.fixture_runs_per_cell": {
+      "derivation": "the single run count shared by every validated fixture cell",
+      "selector": "$.rows[source=fixture].runs",
+      "source": "outputs/faults.json",
+      "unit": "runs per cell",
+      "value": 20
+    },
+    "robustness.rate_count": {
+      "derivation": "length of the validated rate list",
+      "selector": "$.rates",
+      "source": "outputs/faults.json",
+      "unit": "rates",
+      "value": 2
+    }
+  },
+  "remaining_paper_todos": [
+    {
+      "line": 8,
+      "text": "\\acmConference[Conference Name]{Conference Full Name}{Month Day--Day, 2026}{City, State, USA}"
+    },
+    {
+      "line": 9,
+      "text": "\\acmBooktitle{Proceedings of the Conference Name}"
+    },
+    {
+      "line": 11,
+      "text": "\\acmDOI{}"
+    },
+    {
+      "line": 12,
+      "text": "\\acmISBN{}"
+    },
+    {
+      "line": 56,
+      "text": "\\institution{[Institution Name]}"
+    },
+    {
+      "line": 57,
+      "text": "\\department{[Department Name]}"
+    },
+    {
+      "line": 58,
+      "text": "\\city{[City]}"
+    },
+    {
+      "line": 59,
+      "text": "\\state{[State]}"
+    },
+    {
+      "line": 60,
+      "text": "\\country{[Country]}"
+    },
+    {
+      "line": 62,
+      "text": "\\email{[email address]}"
+    },
+    {
+      "line": 85,
+      "text": "\\email{[email address]}"
+    },
+    {
+      "line": 343,
+      "text": "The authors thank [insert acknowledgment here]."
+    }
+  ],
+  "risk": {
+    "primary": {
+      "row_counts": {
+        "surge_1_5m": {
+          "derivation": "CSV row count after exact schema and unique-GEOID validation",
+          "selector": "all data rows",
+          "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+          "unit": "rows",
+          "value": 99
+        },
+        "surge_3_0m": {
+          "derivation": "CSV row count after exact schema and unique-GEOID validation",
+          "selector": "all data rows",
+          "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+          "unit": "rows",
+          "value": 99
+        },
+        "surge_5_0m": {
+          "derivation": "CSV row count after exact schema and unique-GEOID validation",
+          "selector": "all data rows",
+          "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+          "unit": "rows",
+          "value": 99
+        }
+      },
+      "scored_count": {
+        "derivation": "count after validating that score/rank nullness agrees and ranks stay within the scored population",
+        "selector": "columns=risk_score,priority_rank; rows where both are non-null",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "tracts",
+        "value": 98
+      },
+      "unscored_count": {
+        "derivation": "count of explicitly unscored rows, never coerced to zero score",
+        "selector": "columns=risk_score,priority_rank; rows where both are null",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "tracts",
+        "value": 1
+      },
+      "unscored_geoids": {
+        "derivation": "validated identifiers of explicitly unscored rows",
+        "selector": "GEOID where risk_score and priority_rank are both null",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "GEOIDs",
+        "value": [
+          "45019990100"
+        ]
+      }
+    },
+    "transfer": {
+      "row_counts": {
+        "surge_1_5m": {
+          "derivation": "CSV row count checked against canonical transfer validation",
+          "selector": "all data rows",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+          "unit": "rows",
+          "value": 88
+        },
+        "surge_3_0m": {
+          "derivation": "CSV row count checked against canonical transfer validation",
+          "selector": "all data rows",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+          "unit": "rows",
+          "value": 88
+        },
+        "surge_5_0m": {
+          "derivation": "CSV row count checked against canonical transfer validation",
+          "selector": "all data rows",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+          "unit": "rows",
+          "value": 88
+        }
+      }
+    }
+  },
+  "robustness": {
+    "clean_baseline": {
+      "attempts": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.attempts",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 40
+      },
+      "completed": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.completed",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 20
+      },
+      "correct": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.correct",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 20
+      },
+      "every_call_had_a_timeout": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.every_call_had_a_timeout",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": true
+      },
+      "failure_kinds": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.failure_kinds",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": []
+      },
+      "features_seen": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.features_seen",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": [
+          10
+        ]
+      },
+      "injected_faults": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.injected_faults",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 0
+      },
+      "kind": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.kind",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": "none"
+      },
+      "mean_extra_calls": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.mean_extra_calls",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 0.0
+      },
+      "not_applicable": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.not_applicable",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 0
+      },
+      "rate": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.rate",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 0.0
+      },
+      "recovery_rate": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.recovery_rate",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 1.0
+      },
+      "recovery_rate_given_faulted": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.recovery_rate_given_faulted",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": null
+      },
+      "runs": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.runs",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 20
+      },
+      "runs_with_an_injected_fault": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.runs_with_an_injected_fault",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 0
+      },
+      "source": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.source",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": "fixture"
+      }
+    },
+    "fault_kind_count": {
+      "derivation": "count of unique kind names in the complete fixture grid",
+      "selector": "distinct $.rows[source=fixture].kind",
+      "source": "outputs/faults.json",
+      "unit": "fault kinds",
+      "value": 5
+    },
+    "fault_kinds": {
+      "derivation": "sorted unique kind names in the complete fixture grid",
+      "selector": "distinct $.rows[source=fixture].kind",
+      "source": "outputs/faults.json",
+      "unit": "fault-kind names",
+      "value": [
+        "empty",
+        "server_error",
+        "timeout",
+        "truncated",
+        "wrong_crs"
+      ]
+    },
+    "fixture_runs_per_cell": {
+      "derivation": "the single run count shared by every validated fixture cell",
+      "selector": "$.rows[source=fixture].runs",
+      "source": "outputs/faults.json",
+      "unit": "runs per cell",
+      "value": 20
+    },
+    "rate_count": {
+      "derivation": "length of the validated rate list",
+      "selector": "$.rates",
+      "source": "outputs/faults.json",
+      "unit": "rates",
+      "value": 2
+    },
+    "rates": {
+      "derivation": "validated unique injected-fault rates",
+      "selector": "$.rates",
+      "source": "outputs/faults.json",
+      "unit": "probability per network attempt",
+      "value": [
+        0.25,
+        0.5
+      ]
+    },
+    "rows_by_source": {
+      "fixture": [
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 52
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": []
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 12
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "timeout"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.6
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.25
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 1.0
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 1.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 8
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 60
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 16
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 16
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": [
+              "TransientError"
+            ]
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 27
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "timeout"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 1.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.5
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.8
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.714
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 14
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 52
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": []
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 12
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "server_error"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.6
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.25
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 1.0
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 1.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 8
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 60
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 16
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 16
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": [
+              "TransientError"
+            ]
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 27
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "server_error"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 1.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.5
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.8
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.714
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 14
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 40
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 17
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": []
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 3
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "empty"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.25
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.85
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 3
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 40
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 14
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": []
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "empty"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 12
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.5
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.7
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 40
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 17
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 17
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": [
+              "CRSMismatch"
+            ]
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 3
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "wrong_crs"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.25
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.85
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 3
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 40
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 14
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 14
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": [
+              "CRSMismatch"
+            ]
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "wrong_crs"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 12
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.5
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.7
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 40
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 17
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": []
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 3
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "truncated"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.25
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.85
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 3
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        },
+        {
+          "attempts": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].attempts",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 40
+          },
+          "completed": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].completed",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "correct": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].correct",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 14
+          },
+          "failure_kinds": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].failure_kinds",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": []
+          },
+          "injected_faults": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].injected_faults",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "kind": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].kind",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "truncated"
+          },
+          "mean_extra_calls": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].mean_extra_calls",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "not_applicable": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].not_applicable",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 12
+          },
+          "rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.5
+          },
+          "recovery_rate": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].recovery_rate",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.7
+          },
+          "recovery_rate_given_faulted": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].recovery_rate_given_faulted",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0.0
+          },
+          "runs": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].runs",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 20
+          },
+          "runs_with_an_injected_fault": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].runs_with_an_injected_fault",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 6
+          },
+          "source": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].source",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": "fixture"
+          }
+        }
+      ],
+      "live": []
+    },
+    "seeds": {
+      "derivation": "declared fixture seed count, cross-checked against every fixture cell",
+      "selector": "$.seeds",
+      "source": "outputs/faults.json",
+      "unit": "seeded runs",
+      "value": 20
+    }
+  },
+  "schema_version": 1,
+  "sources": {
+    "data/snapshot/3depelevation.tif": {
+      "bytes": 32773212,
+      "role": "primary elevation raster metadata",
+      "sha256": "e043cedeab927393d67e078b32a2eeda883feb40a482b01eedf2ffcf992fa25e"
+    },
+    "data/snapshot/manifest.json": {
+      "bytes": 38970,
+      "role": "primary snapshot manifest",
+      "sha256": "b4cd69d7ce045db86c8100e644d88136791b6bb6e6fc7ed59c46c4ed84c47b1e"
+    },
+    "outputs/faults.json": {
+      "bytes": 30946,
+      "role": "fault-injection measurements",
+      "sha256": "64fbb90493370f18308b148116dcfc5fe1859f60a0e6548f64b7d21e4309856c"
+    },
+    "outputs/paper/tradeoff.csv": {
+      "bytes": 1982,
+      "role": "verified primary paper trade-off copy",
+      "sha256": "7868bf2ea73c8a400dc3f8faa97761e06f5de06c9caade391b0471adc1d692a2"
+    },
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/pipeline_report.txt": {
+      "bytes": 28005,
+      "role": "run-scoped transfer pipeline report",
+      "sha256": "cde2365d67a4d649b9449164694afdb276f5c3c4bc05c3f13896236cee048fdf"
+    },
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv": {
+      "bytes": 19889,
+      "role": "transfer risk table: surge_1_5m",
+      "sha256": "416823ad8a7dc9225dea1253d1a603837fed25cbdd876447030fd03ffd181699"
+    },
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv": {
+      "bytes": 20456,
+      "role": "transfer risk table: surge_3_0m",
+      "sha256": "e12c4f7054daa212f52012e9d47a86f4b606010e52bb1f57e6ff164d817b9e90"
+    },
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv": {
+      "bytes": 20876,
+      "role": "transfer risk table: surge_5_0m",
+      "sha256": "ae169d9a6506ddeb63296196acf334ff1ef8195cb0298d1af36f365cd75c6baf"
+    },
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv": {
+      "bytes": 2055,
+      "role": "run-scoped transfer trade-off table",
+      "sha256": "8fc860a34bd97c1aebb6c04583ef3806c3e23f36dde379372535b150b54719fb"
+    },
+    "outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json": {
+      "bytes": 7692,
+      "role": "preserved initial failed transfer attempt",
+      "sha256": "7fdaa3d0c548d845fc6f26419aef45f9a40f79c380f51c8410bb7537fb695f35"
+    },
+    "outputs/paper/transfer_report.json": {
+      "bytes": 92756,
+      "role": "canonical transfer report",
+      "sha256": "7cdd95e291bd13e5ea1f6b7f3a249a0f1897e69ad23c6d453e50b36f4d76b131"
+    },
+    "outputs/pipeline_report.txt": {
+      "bytes": 27633,
+      "role": "primary pipeline report",
+      "sha256": "9cc14c96025f4f771459e46224a82387542ad61747e761ed9322256649cab613"
+    },
+    "outputs/risk_surge_1_5m_svi_equal.csv": {
+      "bytes": 23105,
+      "role": "primary risk table: surge_1_5m",
+      "sha256": "90da429e2dc3b1dc8ca6146717e140061c62f8b1c8c7cbe0367bebf6625a11b8"
+    },
+    "outputs/risk_surge_3_0m_svi_equal.csv": {
+      "bytes": 23729,
+      "role": "primary risk table: surge_3_0m",
+      "sha256": "18970ad643bb430a9eafe91a70c9a0503135c06907c08263dab8d5977be33373"
+    },
+    "outputs/risk_surge_5_0m_svi_equal.csv": {
+      "bytes": 23420,
+      "role": "primary risk table: surge_5_0m",
+      "sha256": "42f4bdda2cc8380991f3162d615c86ec94a334b15e6edf32ce3c4023d2df0c8c"
+    },
+    "outputs/tradeoff.csv": {
+      "bytes": 1982,
+      "role": "primary trade-off table",
+      "sha256": "7868bf2ea73c8a400dc3f8faa97761e06f5de06c9caade391b0471adc1d692a2"
+    },
+    "paper/main.tex": {
+      "bytes": 17359,
+      "role": "paper placeholder source",
+      "sha256": "3dc93aa540a3e993257e41b7bc17c7bb5e001fe523b8f13285332a9bd404c9d8"
+    },
+    "src/agent.py": {
+      "bytes": 15678,
+      "role": "configuration constant source: agent",
+      "sha256": "0797acef86343ea748fec8cb33fd002bb3d942aec9a0e63264d62b7c29f783ae"
+    },
+    "src/config.py": {
+      "bytes": 6050,
+      "role": "configuration constant source: config",
+      "sha256": "00e7693a3caa1f52005220f30484a138dac3152250b48943d5499539a0c9d1fa"
+    },
+    "src/contracts.py": {
+      "bytes": 13186,
+      "role": "configuration constant source: contracts",
+      "sha256": "d2c9cb41cb764e95198d35de1781a3092b197ac182a62c70d2ecc305cd7e7e2e"
+    },
+    "src/hazard.py": {
+      "bytes": 66600,
+      "role": "configuration constant source: hazard",
+      "sha256": "2783ae99e3c1752d05c5e5a3f7bc097cce3790238e411790bf04d3306cb62512"
+    },
+    "src/risk.py": {
+      "bytes": 67965,
+      "role": "configuration constant source: risk",
+      "sha256": "2fbc6c24916b2a5c349c70af12c0bb09a914506ac1b896e4837dd65bfd635da1"
+    },
+    "src/sandbox.py": {
+      "bytes": 79370,
+      "role": "configuration constant source: sandbox",
+      "sha256": "ab9bd67cd83275ac9f366c141b63800b1a0b26263071333016f66b85906ab771"
+    },
+    "src/vulnerability.py": {
+      "bytes": 40944,
+      "role": "configuration constant source: vulnerability",
+      "sha256": "8c80ad2e441509f8ee7c779829eb9a1f599269df5ee9983c8c5b8b08aac4262d"
+    }
+  },
+  "study_areas": {
+    "primary": {
+      "block_group_count": {
+        "derivation": "validated boundary/attribute count",
+        "selector": "$.datasets[name=block_groups].provenance.feature_count",
+        "source": "data/snapshot/manifest.json",
+        "unit": "block groups",
+        "value": 261
+      },
+      "county_fips": {
+        "derivation": "read as an identifier from the configured study-area value",
+        "selector": "StudyArea.county_fips",
+        "source": "src/config.py",
+        "unit": "FIPS code",
+        "value": "019"
+      },
+      "facility_count": {
+        "derivation": "registered facility feature count",
+        "selector": "$.datasets[name=facilities].provenance.feature_count",
+        "source": "data/snapshot/manifest.json",
+        "unit": "facilities",
+        "value": 477
+      },
+      "name": {
+        "derivation": "read from the configured study-area value",
+        "selector": "StudyArea.name",
+        "source": "src/config.py",
+        "unit": "name",
+        "value": "Charleston County, South Carolina"
+      },
+      "population": {
+        "derivation": "sum of the validated tract population column; repeated scenario tables agree",
+        "selector": "column=population; aggregation=sum; all rows",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "people",
+        "value": 420264
+      },
+      "scored_count": {
+        "derivation": "count after validating that score/rank nullness agrees and ranks stay within the scored population",
+        "selector": "columns=risk_score,priority_rank; rows where both are non-null",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "tracts",
+        "value": 98
+      },
+      "state_fips": {
+        "derivation": "read as an identifier from the configured study-area value",
+        "selector": "StudyArea.state_fips",
+        "source": "src/config.py",
+        "unit": "FIPS code",
+        "value": "45"
+      },
+      "tract_count": {
+        "derivation": "validated boundary/attribute count, equal to every risk-table row count",
+        "selector": "$.datasets[name=tracts].provenance.feature_count",
+        "source": "data/snapshot/manifest.json",
+        "unit": "tracts",
+        "value": 99
+      },
+      "unscored_count": {
+        "derivation": "count of explicitly unscored rows, never coerced to zero score",
+        "selector": "columns=risk_score,priority_rank; rows where both are null",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "tracts",
+        "value": 1
+      },
+      "unscored_geoids": {
+        "derivation": "validated identifiers of explicitly unscored rows",
+        "selector": "GEOID where risk_score and priority_rank are both null",
+        "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+        "unit": "GEOIDs",
+        "value": [
+          "45019990100"
+        ]
+      }
+    },
+    "transfer": {
+      "block_group_count": {
+        "derivation": "validated boundary/attribute count",
+        "selector": "$.datasets[name=block_groups].validation.actual_feature_count",
+        "source": "outputs/paper/transfer_report.json",
+        "unit": "block groups",
+        "value": 246
+      },
+      "county_fips": {
+        "derivation": "read as an identifier from the configured study-area value",
+        "selector": "StudyArea.county_fips",
+        "source": "src/config.py",
+        "unit": "FIPS code",
+        "value": "051"
+      },
+      "facility_count": {
+        "derivation": "registered facility feature count",
+        "selector": "$.datasets[name=facilities].validation.actual_feature_count",
+        "source": "outputs/paper/transfer_report.json",
+        "unit": "facilities",
+        "value": 206
+      },
+      "name": {
+        "derivation": "read from the configured study-area value",
+        "selector": "StudyArea.name",
+        "source": "src/config.py",
+        "unit": "name",
+        "value": "Chatham County, Georgia"
+      },
+      "population": {
+        "derivation": "sum of the validated tract population column; repeated scenario tables agree",
+        "selector": "$.pipeline.population_total",
+        "source": "outputs/paper/transfer_report.json",
+        "unit": "people",
+        "value": 300879
+      },
+      "state_fips": {
+        "derivation": "read as an identifier from the configured study-area value",
+        "selector": "StudyArea.state_fips",
+        "source": "src/config.py",
+        "unit": "FIPS code",
+        "value": "13"
+      },
+      "tract_count": {
+        "derivation": "validated boundary/attribute count, equal to every risk-table row count",
+        "selector": "$.datasets[name=tracts].validation.actual_feature_count",
+        "source": "outputs/paper/transfer_report.json",
+        "unit": "tracts",
+        "value": 88
+      }
+    }
+  },
+  "tradeoffs": {
+    "primary": {
+      "row_count": {
+        "derivation": "validated scenario-by-preset Cartesian product; copy is byte-identical to outputs/tradeoff.csv",
+        "selector": "all data rows",
+        "source": "outputs/paper/tradeoff.csv",
+        "unit": "rows",
+        "value": 9
+      },
+      "rows": [
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 1
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019000100"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 1.0564545564244248
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 35846
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_equal"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_1_5m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019005002",
+              "45019004609",
+              "45019002300",
+              "45019002503",
+              "45019002008",
+              "45019004620",
+              "45019002009",
+              "45019002105",
+              "45019002004",
+              "45019002104"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 21509
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 1
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019002004"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 1.07128501654805
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 37243
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_themes"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_1_5m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019005002",
+              "45019004609",
+              "45019002503",
+              "45019002008",
+              "45019004620",
+              "45019002300",
+              "45019002009",
+              "45019002105",
+              "45019002104",
+              "45019000100"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 23776
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 1
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019000100"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 1.0564545564244248
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 35846
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "evacuation_capacity"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_1_5m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019005002",
+              "45019004609",
+              "45019002008",
+              "45019002300",
+              "45019002503",
+              "45019002105",
+              "45019002009",
+              "45019004620",
+              "45019002004",
+              "45019002104"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 18011
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 2
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019001100",
+              "45019004617"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 2.1004407279690955
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 43651
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_equal"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_3_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019004609",
+              "45019004616",
+              "45019002300",
+              "45019002009",
+              "45019002008",
+              "45019005002",
+              "45019002503",
+              "45019004620",
+              "45019004902",
+              "45019002105"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 21509
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 2
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019002105",
+              "45019004617"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 2.013060611890979
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 44486
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_themes"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_3_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019004609",
+              "45019002008",
+              "45019002009",
+              "45019005002",
+              "45019002300",
+              "45019004620",
+              "45019002503",
+              "45019001100",
+              "45019004616",
+              "45019004902"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 24652
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 2
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019001100",
+              "45019004620"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 1.9874527420644703
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 50267
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "evacuation_capacity"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_3_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019004616",
+              "45019004609",
+              "45019002008",
+              "45019002009",
+              "45019002300",
+              "45019004902",
+              "45019005002",
+              "45019002105",
+              "45019002503",
+              "45019004617"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 25670
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 5
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019000700",
+              "45019002008",
+              "45019004617",
+              "45019004902",
+              "45019005602"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 3.00867281263581
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 48387
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_equal"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_5_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019004616",
+              "45019002009",
+              "45019000400",
+              "45019004609",
+              "45019005300",
+              "45019002613",
+              "45019001100",
+              "45019002503",
+              "45019002300",
+              "45019002006"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 31025
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 5
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019002006",
+              "45019002300",
+              "45019002613",
+              "45019004617",
+              "45019004902"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 3.113201685279275
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 49785
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_themes"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_5_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019000400",
+              "45019002009",
+              "45019005300",
+              "45019001100",
+              "45019004609",
+              "45019000700",
+              "45019004616",
+              "45019002503",
+              "45019005602",
+              "45019002008"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 25463
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tracts",
+            "value": 5
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019000400",
+              "45019000700",
+              "45019001100",
+              "45019005300",
+              "45019005602"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=mean_inundation_m",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "metres",
+            "value": 3.3827764351044656
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 55046
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=preset",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset name",
+            "value": "evacuation_capacity"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_5_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=top_geoids",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "45019004616",
+              "45019002009",
+              "45019004609",
+              "45019004617",
+              "45019002008",
+              "45019002613",
+              "45019002006",
+              "45019002503",
+              "45019002300",
+              "45019004902"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "people",
+            "value": 32757
+          }
+        }
+      ]
+    },
+    "transfer": {
+      "row_count": {
+        "derivation": "validated scenario-by-preset Cartesian product and matched to canonical scenario_rows",
+        "selector": "all data rows",
+        "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+        "unit": "rows",
+        "value": 9
+      },
+      "rows": [
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 4
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010503",
+              "13051010815",
+              "13051011104",
+              "13051011111"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 0.78374191556902
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 43845
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_equal"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_1_5m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010901",
+              "13051010813",
+              "13051010814",
+              "13051004209",
+              "13051011005",
+              "13051004212",
+              "13051010806",
+              "13051011007",
+              "13051011110",
+              "13051011113"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 26647
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 4
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051004212",
+              "13051011007",
+              "13051011104",
+              "13051011111"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 0.7086367167006812
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 41414
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_themes"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_1_5m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010814",
+              "13051010901",
+              "13051010806",
+              "13051004209",
+              "13051011113",
+              "13051011005",
+              "13051010813",
+              "13051010815",
+              "13051010503",
+              "13051011110"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 20688
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 4
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051004212",
+              "13051010503",
+              "13051010815",
+              "13051011007"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 0.74652792728399
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 42009
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "evacuation_capacity"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_1_5m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010813",
+              "13051011005",
+              "13051011113",
+              "13051010814",
+              "13051010901",
+              "13051011110",
+              "13051010806",
+              "13051011111",
+              "13051011104",
+              "13051004209"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 19700
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 3
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010815",
+              "13051011104",
+              "13051011113"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 1.6068144711440913
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 41769
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_equal"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_3_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010813",
+              "13051010814",
+              "13051011005",
+              "13051004209",
+              "13051010901",
+              "13051010806",
+              "13051011007",
+              "13051011111",
+              "13051011110",
+              "13051004212"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 26647
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 3
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051004212",
+              "13051011007",
+              "13051011104"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 1.7242086416584628
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 41004
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_themes"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_3_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010814",
+              "13051010806",
+              "13051010815",
+              "13051011005",
+              "13051010901",
+              "13051004209",
+              "13051010813",
+              "13051011113",
+              "13051011111",
+              "13051011110"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 18493
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 3
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051004212",
+              "13051010815",
+              "13051010901"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 1.6965673179200127
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 40406
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "evacuation_capacity"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_3_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010813",
+              "13051011111",
+              "13051011005",
+              "13051011104",
+              "13051010814",
+              "13051010806",
+              "13051011113",
+              "13051011110",
+              "13051011007",
+              "13051004209"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 18097
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 3
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051000601",
+              "13051011108",
+              "13051011112"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 3.0780768335351594
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 42366
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_equal"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_5_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010813",
+              "13051010814",
+              "13051011005",
+              "13051010806",
+              "13051011104",
+              "13051011111",
+              "13051004209",
+              "13051011007",
+              "13051011113",
+              "13051010815"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 16890
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 3
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051004209",
+              "13051011007",
+              "13051011108"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 2.763570645900623
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 43121
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "svi_themes"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_5_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010814",
+              "13051010806",
+              "13051010813",
+              "13051010815",
+              "13051011005",
+              "13051011113",
+              "13051011112",
+              "13051000601",
+              "13051011104",
+              "13051011111"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 14738
+          }
+        },
+        {
+          "displaced_geoid_count": {
+            "derivation": "count of validated space-delimited displaced identifiers",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tracts",
+            "value": 3
+          },
+          "displaced_geoids": {
+            "derivation": "set difference between the union selected by any preset and this preset's selected set",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=displaced_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051000601",
+              "13051004209",
+              "13051011007"
+            ]
+          },
+          "mean_inundation_m": {
+            "derivation": "pipeline-produced mean over the discrete priority set",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=mean_inundation_m",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "metres",
+            "value": 3.0759400643479315
+          },
+          "population_in_priority": {
+            "derivation": "pipeline-produced sum over the ten selected GEOIDs",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 41067
+          },
+          "preset": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=preset",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset name",
+            "value": "evacuation_capacity"
+          },
+          "scenario": {
+            "derivation": "read from the validated scenario/preset Cartesian table",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "scenario name",
+            "value": "surge_5_0m"
+          },
+          "top_geoids": {
+            "derivation": "validated space-delimited identifiers, preserving leading zeros",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=top_geoids",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "GEOIDs",
+            "value": [
+              "13051010813",
+              "13051011005",
+              "13051011104",
+              "13051011113",
+              "13051011111",
+              "13051010806",
+              "13051010814",
+              "13051011112",
+              "13051010815",
+              "13051011108"
+            ]
+          },
+          "vulnerable_population_in_priority": {
+            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "people",
+            "value": 11287
+          }
+        }
+      ]
+    }
+  },
+  "transfer": {
+    "artifact_validation": {
+      "derivation": "all expected names, table rows, report content, and trade-off equality were required",
+      "selector": "$.pipeline.artifact_validation",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "boolean",
+      "value": true
+    },
+    "configuration_restored": {
+      "derivation": "required true after all rebound configuration paths are compared",
+      "selector": "$.safety_verification.config_paths_restored",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "boolean",
+      "value": true
+    },
+    "effective_raster_resolution_m": {
+      "derivation": "finite effective cell size recorded after raster read-back",
+      "selector": "$.datasets[name=elevation].provenance.request_params.cell_size_m_effective",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "metres",
+      "value": 29.992446
+    },
+    "final_stage": {
+      "derivation": "canonical report stage, required to equal complete",
+      "selector": "$.stage",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "stage",
+      "value": "complete"
+    },
+    "final_status": {
+      "derivation": "canonical report status, required to equal completed",
+      "selector": "$.status",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "status",
+      "value": "completed"
+    },
+    "initial_failed_run_id": {
+      "derivation": "earliest preserved failed attempt by started_at",
+      "selector": "$.run_id where $.status=failed and transfer study area matches",
+      "source": "outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json",
+      "unit": "run identifier",
+      "value": "20260901T165757230230Z-aa13b0d4"
+    },
+    "initial_failed_stage": {
+      "derivation": "recorded terminal stage of the preserved failed attempt",
+      "selector": "$.stage",
+      "source": "outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json",
+      "unit": "stage name",
+      "value": "acquisition"
+    },
+    "preset_count": {
+      "derivation": "length after matching the canonical preset list to source configuration",
+      "selector": "$.pipeline.expected_presets",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "weight presets",
+      "value": 3
+    },
+    "primary_snapshot_unchanged": {
+      "derivation": "required true after before/after fingerprint validation",
+      "selector": "$.safety_verification.primary_snapshot_unchanged",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "boolean",
+      "value": true
+    },
+    "raster_height": {
+      "derivation": "raster dimension read back and recorded by transfer validation",
+      "selector": "$.datasets[name=elevation].validation.raster_height",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "pixels",
+      "value": 2252
+    },
+    "raster_width": {
+      "derivation": "raster dimension read back and recorded by transfer validation",
+      "selector": "$.datasets[name=elevation].validation.raster_width",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "pixels",
+      "value": 2195
+    },
+    "requested_raster_resolution_m": {
+      "derivation": "finite requested cell size recorded by acquisition",
+      "selector": "$.datasets[name=elevation].provenance.request_params.cell_size_m_requested",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "metres",
+      "value": 30.0
+    },
+    "run_id": {
+      "derivation": "canonical completed run identifier, resolved dynamically",
+      "selector": "$.run_id",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "run identifier",
+      "value": "20260901T231445085774Z-4c1011c1"
+    },
+    "scenario_count": {
+      "derivation": "length after matching the canonical expected and completed scenario lists to source configuration",
+      "selector": "$.pipeline.expected_scenarios",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "scenarios",
+      "value": 3
+    },
+    "scored_count": {
+      "derivation": "single count shared by all completed scenarios and cross-checked against run-scoped risk tables",
+      "selector": "$.pipeline.tables[*].units_scored",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "tracts",
+      "value": 86
+    },
+    "tradeoff_row_count": {
+      "derivation": "validated scenario-by-preset Cartesian product and matched to the canonical scenario rows",
+      "selector": "all data rows",
+      "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+      "unit": "rows",
+      "value": 9
+    },
+    "unscored_count": {
+      "derivation": "single count shared by all completed scenarios; not coerced to scored zeroes",
+      "selector": "$.pipeline.tables[*].units_unscored",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "tracts",
+      "value": 2
+    },
+    "unscored_geoids": {
+      "derivation": "single validated identifier set shared by all completed scenarios",
+      "selector": "$.pipeline.tables[*].risk_evidence.unscored_geoids",
+      "source": "outputs/paper/transfer_report.json",
+      "unit": "GEOIDs",
+      "value": [
+        "13051980000",
+        "13051990000"
+      ]
+    }
+  },
+  "verification": {
+    "all_paper_todos_resolved": false,
+    "mapped_placeholder_count": {
+      "derivation": "count whose key exists in paper_keys with complete evidence",
+      "selector": "all semantic \\\\TD{key} occurrences",
+      "source": "paper/main.tex",
+      "unit": "mapped placeholders",
+      "value": 28
+    },
+    "quantitative_placeholder_count": {
+      "derivation": "count after rejecting generic and duplicate placeholders",
+      "selector": "all semantic \\\\TD{key} occurrences",
+      "source": "paper/main.tex",
+      "unit": "placeholders",
+      "value": 28
+    },
+    "remaining_prose_todo_count": {
+      "derivation": "counted separately from quantitative placeholders so mapping cannot imply the paper is complete",
+      "selector": "line scan for explicit TODO/TBD, bracketed author placeholders, and template instructions",
+      "source": "paper/main.tex",
+      "unit": "prose TODO lines",
+      "value": 12
+    },
+    "unused_paper_keys": []
+  }
+}

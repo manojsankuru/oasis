@@ -23,7 +23,7 @@
       "acs_block_groups": "ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)",
       "block_groups": "Census Block Groups (layer 1) from service v11.5",
       "elevation": "3DEPElevation (esriImageServiceDataTypeElevation) from service v11.3; USGS National Map 3D Elevation Program (3DEP). August 25, 2026.",
-      "facilities": "OSM planet as of 2026-09-01T18:52:22Z, via Overpass API 0.7.62.11 87bfad18",
+      "facilities": "OSM planet as of 2026-09-01T23:14:06Z, via Overpass API 0.7.62.11 87bfad18",
       "flood_zones": "unavailable at retrieval time",
       "tracts": "Census Tracts (layer 0) from service v11.5"
     },
@@ -90,7 +90,7 @@
     {
       "kind": "table",
       "name": "acs",
-      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/acs.parquet",
+      "path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/acs.parquet",
       "provenance": {
         "dataset": "acs",
         "declared_crs": "n/a",
@@ -186,7 +186,7 @@
           "resolved:population": "B01003_001E",
           "year": "2024"
         },
-        "retrieved_at": "2026-09-01T18:54:07.998496+00:00",
+        "retrieved_at": "2026-09-01T23:14:53.159587+00:00",
         "source_url": "https://api.census.gov/data/2024/acs/acs5",
         "vintage": "ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)",
         "working_crs": "EPSG:5070"
@@ -214,7 +214,7 @@
     {
       "kind": "table",
       "name": "acs_block_groups",
-      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/acs_block_groups.parquet",
+      "path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/acs_block_groups.parquet",
       "provenance": {
         "dataset": "acs_block_groups",
         "declared_crs": "n/a",
@@ -305,7 +305,7 @@
           "resolved:population": "B01003_001E",
           "year": "2024"
         },
-        "retrieved_at": "2026-09-01T18:54:08.924772+00:00",
+        "retrieved_at": "2026-09-01T23:14:57.466932+00:00",
         "source_url": "https://api.census.gov/data/2024/acs/acs5",
         "vintage": "ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)",
         "working_crs": "EPSG:5070"
@@ -333,7 +333,7 @@
     {
       "kind": "vector",
       "name": "block_groups",
-      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/block_groups.geojson",
+      "path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/block_groups.geojson",
       "provenance": {
         "dataset": "block_groups",
         "declared_crs": "EPSG:4326",
@@ -353,7 +353,7 @@
           "returnGeometry": "true",
           "where": "STATE='13' AND COUNTY='051'"
         },
-        "retrieved_at": "2026-09-01T18:54:04.479450+00:00",
+        "retrieved_at": "2026-09-01T23:14:48.514497+00:00",
         "source_url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/1/query",
         "vintage": "Census Block Groups (layer 1) from service v11.5",
         "working_crs": "EPSG:5070"
@@ -381,7 +381,7 @@
     {
       "kind": "raster",
       "name": "elevation",
-      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/3depelevation.tif",
+      "path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/3depelevation.tif",
       "provenance": {
         "dataset": "elevation",
         "declared_crs": "EPSG:5070",
@@ -394,7 +394,7 @@
           "size computed from the bbox reprojected to EPSG:5070: 65833 m by 67536 m. A size computed from the degree span would be invariant 2 broken silently",
           "CRS read back off the written file with rasterio rather than assumed from imageSR: EPSG:5070, 29.9924 m pixels, 2195x2252 px, float32, nodata -9999.0",
           "content type is not the test here: this service answers a bad export parameter with HTTP 200 and Content-Type image/tiff carrying a JSON error body, so the TIFF magic bytes are checked before anything is written",
-          "21237468 bytes in 3.3 s"
+          "21237468 bytes in 5.1 s"
         ],
         "request_params": {
           "bbox": "-81.3916980004,31.7051980001,-80.7829600002,32.2375910003",
@@ -413,7 +413,7 @@
           "pixelType": "F32",
           "size": "2195,2252"
         },
-        "retrieved_at": "2026-09-01T18:54:12.756843+00:00",
+        "retrieved_at": "2026-09-01T23:15:03.375233+00:00",
         "source_url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage",
         "vintage": "3DEPElevation (esriImageServiceDataTypeElevation) from service v11.3; USGS National Map 3D Elevation Program (3DEP). August 25, 2026.",
         "working_crs": "EPSG:5070"
@@ -439,7 +439,7 @@
     {
       "kind": "vector",
       "name": "facilities",
-      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/facilities.geojson",
+      "path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/facilities.geojson",
       "provenance": {
         "dataset": "facilities",
         "declared_crs": "EPSG:4326",
@@ -454,7 +454,7 @@
           "every tag the API returned became a column (71 in total); selecting columns is align.py's job",
           "no remark in the response, so the result is complete rather than truncated; Overpass reports truncation in the body under HTTP 200",
           "declared_crs is WGS84 by the Overpass API contract, not read from the body: the response states no CRS at all, which is why the containment check above exists instead of an assertion this service cannot support",
-          "answered in 19.3 s by Overpass API 0.7.62.11 87bfad18"
+          "answered in 10.7 s by Overpass API 0.7.62.11 87bfad18"
         ],
         "request_params": {
           "bbox_4326": "-81.391698,31.705198,-80.782960,32.237591",
@@ -463,9 +463,9 @@
           "tags": "{\"amenity\": \"^(hospital|school|community_centre|fire_station)$\"}",
           "timeout_s": "180.0"
         },
-        "retrieved_at": "2026-09-01T18:54:32.069927+00:00",
+        "retrieved_at": "2026-09-01T23:15:14.111930+00:00",
         "source_url": "https://overpass-api.de/api/interpreter",
-        "vintage": "OSM planet as of 2026-09-01T18:52:22Z, via Overpass API 0.7.62.11 87bfad18",
+        "vintage": "OSM planet as of 2026-09-01T23:14:06Z, via Overpass API 0.7.62.11 87bfad18",
         "working_crs": "EPSG:5070"
       },
       "validation": {
@@ -487,7 +487,7 @@
     {
       "kind": "vector",
       "name": "flood_zones",
-      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/flood_zones.geojson",
+      "path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/flood_zones.geojson",
       "provenance": {
         "dataset": "flood_zones",
         "declared_crs": "EPSG:4326",
@@ -504,7 +504,7 @@
           "name_contains": "Flood Hazard",
           "service_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer"
         },
-        "retrieved_at": "2026-09-01T18:54:32.091084+00:00",
+        "retrieved_at": "2026-09-01T23:15:14.133941+00:00",
         "source_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer",
         "vintage": "unavailable at retrieval time",
         "working_crs": "EPSG:5070"
@@ -530,7 +530,7 @@
     {
       "kind": "vector",
       "name": "tracts",
-      "path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/tracts.geojson",
+      "path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/tracts.geojson",
       "provenance": {
         "dataset": "tracts",
         "declared_crs": "EPSG:4326",
@@ -550,7 +550,7 @@
           "returnGeometry": "true",
           "where": "STATE='13' AND COUNTY='051'"
         },
-        "retrieved_at": "2026-09-01T18:54:03.203991+00:00",
+        "retrieved_at": "2026-09-01T23:14:46.774086+00:00",
         "source_url": "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0/query",
         "vintage": "Census Tracts (layer 0) from service v11.5",
         "working_crs": "EPSG:5070"
@@ -577,9 +577,9 @@
     }
   ],
   "error": null,
-  "finished_at": "2026-09-01T18:54:59.339302+00:00",
+  "finished_at": "2026-09-01T23:15:39.662864+00:00",
   "last_observable_action": "all five paths restored and the complete primary snapshot matched",
-  "manifest_path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/manifest.json",
+  "manifest_path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/manifest.json",
   "network_attempts": null,
   "partial_pipeline_files": [],
   "pipeline": {
@@ -1376,61 +1376,61 @@
       "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit"
     ],
     "written_files": [
-      "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_1_5m_svi_equal.csv",
-      "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_3_0m_svi_equal.csv",
-      "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_5_0m_svi_equal.csv",
-      "outputs/paper/transfer/20260901T185401974111Z-10931654/tradeoff.csv",
-      "outputs/paper/transfer/20260901T185401974111Z-10931654/pipeline_report.txt"
+      "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+      "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+      "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+      "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+      "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/pipeline_report.txt"
     ]
   },
-  "pipeline_output_path": "outputs/paper/transfer/20260901T185401974111Z-10931654",
+  "pipeline_output_path": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1",
   "primary_snapshot_after": {
     "inventory": {
       "3depelevation.tif": {
         "sha256": "e043cedeab927393d67e078b32a2eeda883feb40a482b01eedf2ffcf992fa25e",
         "size": 32773212,
-        "st_mtime_ns": 1787974003977294500
+        "st_mtime_ns": 1788303000992286700
       },
       "acs.parquet": {
         "sha256": "0a2d2e2fc6e3fbf528982d66dcd2f755f5373fed93e5c39d59ead8482be23647",
         "size": 92138,
-        "st_mtime_ns": 1787973983910507400
+        "st_mtime_ns": 1788302968342325200
       },
       "acs_block_groups.parquet": {
         "sha256": "bcb3edd3732b87db7407625b46c14a7aa4983c8612bbb5f110c6670374229dfc",
         "size": 12302,
-        "st_mtime_ns": 1787973984486590300
+        "st_mtime_ns": 1788302969276354500
       },
       "block_groups.geojson": {
         "sha256": "727feb28e263675ee697d44fd0538fc3546c47644ac653a3e430fd2ca21c6c22",
         "size": 4211886,
-        "st_mtime_ns": 1787973980383740000
+        "st_mtime_ns": 1788302932912740600
       },
       "facilities.geojson": {
         "sha256": "848ab6a5d8b125d7040de1724cd3e1381cf1cfd40cf8c492df2b1508566bb77c",
         "size": 1020829,
-        "st_mtime_ns": 1787974006586402100
+        "st_mtime_ns": 1788303020678100200
       },
       "flood_zones.geojson": {
         "sha256": "3d1c97f364d79ddea88df2f57d2d52e3736b1d8a24ffe31782bcf796f7bfaa8a",
         "size": 159,
-        "st_mtime_ns": 1788200575945981200
+        "st_mtime_ns": 1788303048009417300
       },
       "manifest.json": {
-        "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
-        "size": 39374,
-        "st_mtime_ns": 1788200575959479200
+        "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+        "size": 39338,
+        "st_mtime_ns": 1788303048021456300
       },
       "tracts.geojson": {
         "sha256": "bd0cdf4598a261ab2b9dc2a84c7b2912d483f1c57c2835daa197d46ce3bf75b3",
         "size": 2198821,
-        "st_mtime_ns": 1787973976442180400
+        "st_mtime_ns": 1788302928761427200
       }
     },
     "manifest": {
-      "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
-      "size": 39374,
-      "st_mtime_ns": 1788200575959479200
+      "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+      "size": 39338,
+      "st_mtime_ns": 1788303048021456300
     },
     "manifest_path": "data/snapshot/manifest.json",
     "tract_count": 99
@@ -1440,48 +1440,48 @@
       "3depelevation.tif": {
         "sha256": "e043cedeab927393d67e078b32a2eeda883feb40a482b01eedf2ffcf992fa25e",
         "size": 32773212,
-        "st_mtime_ns": 1787974003977294500
+        "st_mtime_ns": 1788303000992286700
       },
       "acs.parquet": {
         "sha256": "0a2d2e2fc6e3fbf528982d66dcd2f755f5373fed93e5c39d59ead8482be23647",
         "size": 92138,
-        "st_mtime_ns": 1787973983910507400
+        "st_mtime_ns": 1788302968342325200
       },
       "acs_block_groups.parquet": {
         "sha256": "bcb3edd3732b87db7407625b46c14a7aa4983c8612bbb5f110c6670374229dfc",
         "size": 12302,
-        "st_mtime_ns": 1787973984486590300
+        "st_mtime_ns": 1788302969276354500
       },
       "block_groups.geojson": {
         "sha256": "727feb28e263675ee697d44fd0538fc3546c47644ac653a3e430fd2ca21c6c22",
         "size": 4211886,
-        "st_mtime_ns": 1787973980383740000
+        "st_mtime_ns": 1788302932912740600
       },
       "facilities.geojson": {
         "sha256": "848ab6a5d8b125d7040de1724cd3e1381cf1cfd40cf8c492df2b1508566bb77c",
         "size": 1020829,
-        "st_mtime_ns": 1787974006586402100
+        "st_mtime_ns": 1788303020678100200
       },
       "flood_zones.geojson": {
         "sha256": "3d1c97f364d79ddea88df2f57d2d52e3736b1d8a24ffe31782bcf796f7bfaa8a",
         "size": 159,
-        "st_mtime_ns": 1788200575945981200
+        "st_mtime_ns": 1788303048009417300
       },
       "manifest.json": {
-        "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
-        "size": 39374,
-        "st_mtime_ns": 1788200575959479200
+        "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+        "size": 39338,
+        "st_mtime_ns": 1788303048021456300
       },
       "tracts.geojson": {
         "sha256": "bd0cdf4598a261ab2b9dc2a84c7b2912d483f1c57c2835daa197d46ce3bf75b3",
         "size": 2198821,
-        "st_mtime_ns": 1787973976442180400
+        "st_mtime_ns": 1788302928761427200
       }
     },
     "manifest": {
-      "sha256": "bcc8760769a72573687cca0ceccf70060e0740d1eed541296f001ad4473eeb15",
-      "size": 39374,
-      "st_mtime_ns": 1788200575959479200
+      "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+      "size": 39338,
+      "st_mtime_ns": 1788303048021456300
     },
     "manifest_path": "data/snapshot/manifest.json",
     "tract_count": 99
@@ -1509,7 +1509,7 @@
   },
   "retries_by_stage": null,
   "retry_observability": "not_exposed",
-  "run_id": "20260901T185401974111Z-10931654",
+  "run_id": "20260901T231445085774Z-4c1011c1",
   "safety_verification": {
     "config_paths_after": {
       "DATA_DIR": "data",
@@ -1545,11 +1545,11 @@
       }
     },
     "isolated_layout": {
-      "DATA_DIR": "outputs/transfer-work/20260901T185401974111Z-10931654/data",
-      "DERIVED_DIR": "outputs/transfer-work/20260901T185401974111Z-10931654/data/derived",
-      "MANIFEST_PATH": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot/manifest.json",
-      "PROJECT_ROOT": "outputs/transfer-work/20260901T185401974111Z-10931654",
-      "SNAPSHOT_DIR": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot"
+      "DATA_DIR": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data",
+      "DERIVED_DIR": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/derived",
+      "MANIFEST_PATH": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot/manifest.json",
+      "PROJECT_ROOT": "outputs/transfer-work/20260901T231445085774Z-4c1011c1",
+      "SNAPSHOT_DIR": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot"
     },
     "post_attempt_errors": [],
     "primary_fingerprint_error": null,
@@ -1557,9 +1557,9 @@
     "primary_snapshot_unchanged": true
   },
   "schema_version": 1,
-  "snapshot_path": "outputs/transfer-work/20260901T185401974111Z-10931654/data/snapshot",
+  "snapshot_path": "outputs/transfer-work/20260901T231445085774Z-4c1011c1/data/snapshot",
   "stage": "complete",
-  "started_at": "2026-09-01T18:54:01.975109+00:00",
+  "started_at": "2026-09-01T23:14:45.086773+00:00",
   "status": "completed",
   "study_area": {
     "county_fips": "051",
@@ -1595,13 +1595,13 @@
     "tracts_joined: 2 of 88 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['13051980000', '13051990000']",
     "every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit"
   ],
-  "work_root": "outputs/transfer-work/20260901T185401974111Z-10931654",
+  "work_root": "outputs/transfer-work/20260901T231445085774Z-4c1011c1",
   "working_crs": "EPSG:5070",
   "written_files": [
-    "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_1_5m_svi_equal.csv",
-    "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_3_0m_svi_equal.csv",
-    "outputs/paper/transfer/20260901T185401974111Z-10931654/risk_surge_5_0m_svi_equal.csv",
-    "outputs/paper/transfer/20260901T185401974111Z-10931654/tradeoff.csv",
-    "outputs/paper/transfer/20260901T185401974111Z-10931654/pipeline_report.txt"
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+    "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/pipeline_report.txt"
   ]
 }

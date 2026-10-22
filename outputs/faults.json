@@ -1,5 +1,5 @@
 {
-  "generated": "2026-08-31T14:18:55",
+  "generated": "2026-09-01T19:21:24",
   "rates": [
     0.25,
     0.5
@@ -243,52 +243,6 @@
       ],
       "every_call_had_a_timeout": true,
       "failure_kinds": []
-    },
-    {
-      "source": "live",
-      "kind": "timeout",
-      "rate": 0.5,
-      "runs": 6,
-      "completed": 5,
-      "correct": 5,
-      "recovery_rate": 0.833,
-      "recovery_rate_given_faulted": 0.667,
-      "runs_with_an_injected_fault": 3,
-      "injected_faults": 6,
-      "not_applicable": 0,
-      "attempts": 16,
-      "mean_extra_calls": 0.67,
-      "features_seen": [
-        0,
-        99
-      ],
-      "every_call_had_a_timeout": true,
-      "failure_kinds": [
-        "TransientError"
-      ]
-    },
-    {
-      "source": "live",
-      "kind": "wrong_crs",
-      "rate": 0.5,
-      "runs": 6,
-      "completed": 5,
-      "correct": 5,
-      "recovery_rate": 0.833,
-      "recovery_rate_given_faulted": 0.0,
-      "runs_with_an_injected_fault": 1,
-      "injected_faults": 1,
-      "not_applicable": 3,
-      "attempts": 12,
-      "mean_extra_calls": 0.0,
-      "features_seen": [
-        0,
-        99
-      ],
-      "every_call_had_a_timeout": true,
-      "failure_kinds": [
-        "CRSMismatch"
-      ]
     }
   ],
   "events": [
@@ -1609,84 +1563,6 @@
     {
       "kind": "truncated",
       "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "none",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 2
-    },
-    {
-      "kind": "timeout",
-      "dataset": "tracts",
-      "recovered": false,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "tracts",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "tracts",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "tracts",
       "recovered": true,
       "extra_turns": 0
     }
