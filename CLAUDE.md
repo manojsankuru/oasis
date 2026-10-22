@@ -23,6 +23,16 @@ responds to the program committee reviews.
 - `src/contracts.py` stays frozen.
 - The model-visible tool count stays at 11.
 - Every number in the paper comes from `outputs/paper/numbers.json`.
+- Nine committed data files are committed once and never overwritten in place:
+  `data/snapshot/3depelevation.tif`, `data/snapshot/manifest.json`,
+  `data/snapshot/tracts.geojson`, `data/derived/surge_3_0m_depth.tif`,
+  `outputs/tradeoff.csv`, `outputs/pipeline_report.txt` and the three
+  `outputs/risk_surge_*_svi_equal.csv` tables. A live acquisition, the
+  `acquire_dataset` tool, any analysis build (including `critic --check`) and
+  `hazard --check` or a hazard mutation sweep can rewrite them. Before any commit,
+  and after any sweep, `git status` must show all nine unmodified. Restore any
+  that changed with `git checkout -- <file>`, and never stage them while a sweep
+  is running.
 
 ---
 

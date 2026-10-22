@@ -28,9 +28,15 @@ outputs/*
 !outputs/faults.json
 !outputs/paper/
 !outputs/paper/**
+!outputs/tradeoff.csv
+!outputs/risk_surge_*_svi_equal.csv
+!outputs/pipeline_report.txt
 
 data/*.geojson
-data/snapshot/
+data/snapshot/*
+!data/snapshot/manifest.json
+!data/snapshot/tracts.geojson
+!data/snapshot/3depelevation.tif
 !data/.gitkeep
 
 # mutation harness backup, written and removed by mutate.py
@@ -38,7 +44,8 @@ data/snapshot/
 data/snapshot-backup/
 
 # derived rasters, recomputed by hazard.py on every run
-data/derived/
+data/derived/*
+!data/derived/surge_3_0m_depth.tif
 
 output/
 tmp/

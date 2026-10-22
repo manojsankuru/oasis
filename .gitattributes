@@ -1,2 +1,8 @@
 outputs/paper/** -text
 outputs/faults.json -text
+outputs/tradeoff.csv -text
+outputs/risk_surge_*_svi_equal.csv -text
+outputs/pipeline_report.txt -text
+data/snapshot/** -text
+data/derived/** -text
+paper/figs/*.pdf -text

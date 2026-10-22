@@ -62,7 +62,7 @@ ProjectPython="./.venv/bin/python"
 
 ### Secrets and environment configuration
 
-`.env`, credentials, service-account files, private keys, logs, acquired snapshots, and transfer-work directories are intentionally excluded from version control.
+`.env`, credentials, service-account files, private keys, logs, most acquired snapshot files, and transfer-work directories are intentionally excluded from version control. The snapshot files and outputs that the paper's offline checks need are committed. `docs/DATA.md` lists their sources and licences, including the OpenStreetMap ODbL attribution for every file derived from OpenStreetMap.
 
 For deterministic offline checks, no `.env` file is required.
 

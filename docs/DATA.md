@@ -472,6 +472,42 @@ out center tags;
 
 ---
 
+## Licences and attribution
+
+**OpenStreetMap.** The facilities layer is retrieved from OpenStreetMap through
+the Overpass API. Map data © OpenStreetMap contributors, available under the
+Open Database License (ODbL) as stated at
+https://www.openstreetmap.org/copyright. The manifest records the licence as
+"ODbL" without a version.
+The raw layer, `data/snapshot/facilities.geojson`, is not committed. These
+committed files are derived from it, because the resilience component counts
+the facilities each tract can reach:
+
+- `outputs/risk_surge_*_svi_equal.csv` and
+  `outputs/paper/transfer/*/risk_surge_*_svi_equal.csv`, through the
+  `resilience_index` column
+- `outputs/tradeoff.csv`, `outputs/paper/tradeoff.csv` and
+  `outputs/paper/transfer/*/tradeoff.csv`, whose priority sets are ranked with
+  that column
+- `outputs/pipeline_report.txt` and `outputs/paper/transfer/*/pipeline_report.txt`,
+  which report facility counts
+- `data/snapshot/manifest.json`, `outputs/paper/transfer_report.json`,
+  `outputs/paper/numbers.json` and `outputs/paper/transfer_attempts/*.json`,
+  which record facility counts, hashes and provenance
+- `paper/figs/risk_surface.pdf` and `paper/figs/tradeoff.pdf`, which are drawn
+  from those tables
+
+**U.S. Census Bureau and USGS.** The TIGERweb tract and block-group boundaries
+and the ACS estimates come from the U.S. Census Bureau. The 3DEP elevation
+raster, `data/snapshot/3depelevation.tif`, comes from the U.S. Geological
+Survey. Both are works of the U.S. federal government, and that is why they
+are in the public domain. The manifest does not record a licence for them: it
+records only `Source: U.S. Census Bureau` for the boundaries and a USGS 3DEP
+citation for the raster. The Census API descriptor labels the ACS tables CC0,
+and the manifest records that licence as read.
+
+---
+
 ## CRS policy
 
 - **Storage / transport:** EPSG:4326. Every `BBox` in the codebase is 4326.
