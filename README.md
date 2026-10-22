@@ -315,6 +315,14 @@ A mutation sweep is successful only when every deliberate defect is detected and
 
 ### Paper artifacts
 
+To reproduce the figure PDFs byte for byte, install the exact versions in `requirements-lock.txt` instead of `requirements.txt`:
+
+```powershell
+& $ProjectPython -m pip install -r requirements-lock.txt
+```
+
+Under that lock on Windows both data figures match the committed PDFs byte for byte. On Linux `tradeoff.pdf` matches byte for byte, and `risk_surface.pdf` draws identical content, but four of its compressed image streams differ because the system zlib differs (1.3.2 on the Linux test, 1.3.1 on Windows).
+
 Generate the two data figures. `paper/figs/architecture.pdf` was made by hand and is not regenerated:
 
 ```powershell
