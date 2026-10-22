@@ -185,7 +185,7 @@ and structured run results under:
 outputs/run_<id>.json
 ```
 
-Every numeric claim in the final answer is checked against returned tool evidence by the critic. Geometry and coordinate arrays are not sent to the model.
+The critic traces each number in a draft answer to a logged tool result, at the precision the answer writes it. Before tracing, it masks numerals that are not quantities: list markers, identifiers of ten or more digits such as GEOIDs, names in backticks or with digits in them, URLs, and dataset vintages. A masked numeral is not checked. Each logged critic step records how many numerals the answer held and how many each mask removed, and an answer whose numerals are all masked fails. The critic matches by value, so it confirms that a number came from some tool result, not that it belongs to the unit the answer names. Geometry and coordinate arrays are not sent to the model.
 
 ### Reproduce the registered transfer experiment
 
