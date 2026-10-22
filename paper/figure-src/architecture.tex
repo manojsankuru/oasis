@@ -1,0 +1,313 @@
+% Embeddable TikZ version of the user-provided architecture drawing.
+% The parent document loads graphicx, xcolor, tikz, and arrows.meta.
+% Coordinates and visible styling came from mermaid-diagram-2026-09-02-170031.svg.
+\begingroup
+
+\definecolor{pagebg}{HTML}{020817}
+\definecolor{clusterfill}{HTML}{474949}
+\definecolor{clusterline}{HTML}{777979}
+\definecolor{nodefill}{HTML}{1F2020}
+\definecolor{nodeborder}{HTML}{CCCCCC}
+\definecolor{textcol}{HTML}{CCCCCC}
+\definecolor{grouptitle}{HTML}{F9FFFE}
+\definecolor{edgecol}{HTML}{D3D3D3}
+\definecolor{labelbg}{HTML}{585858}
+
+\newcommand{\diagramfont}{\sffamily\fontsize{6}{7.2}\selectfont}
+\newcommand{\groupfont}{\sffamily\fontsize{6}{7.2}\selectfont}
+
+\tikzset{
+  node outline/.style={draw=nodeborder,line width=.37pt,line join=round},
+  edge/.style={draw=edgecol,line width=.37pt,line cap=round,line join=round},
+  solid arrow/.style={edge,-{Stealth[length=3.0pt,width=3.0pt]}},
+  dotted arrow/.style={
+    edge,
+    dash pattern=on .55pt off 1.15pt,
+    -{Stealth[length=3.0pt,width=3.0pt]}
+  },
+  both arrows/.style={
+    edge,
+    {Stealth[length=3.0pt,width=3.0pt]}-{Stealth[length=3.0pt,width=3.0pt]}
+  },
+  diagram text/.style={
+    text=textcol,
+    font=\diagramfont,
+    align=center,
+    inner sep=0pt
+  },
+  edge caption/.style={
+    fill=labelbg,
+    text=textcol,
+    font=\diagramfont,
+    align=center,
+    inner xsep=1.25pt,
+    inner ysep=.45pt
+  }
+}
+
+% One SVG coordinate unit is 0.013 cm.  A negative y unit reproduces the
+% SVG's downward-pointing y axis, allowing the source coordinates to be used
+% directly.
+\resizebox{0.78\columnwidth}{!}{%
+\begin{tikzpicture}[x=.013cm,y=-.013cm]
+
+  % Canvas.
+  \path[fill=pagebg] (-18,-18) rectangle (1202,1287);
+
+  % Group containers.
+  \path[fill=clusterfill,draw=clusterline,line width=.37pt]
+    (24.254,8) rectangle (585.796,526.567);
+  \path[fill=clusterfill,draw=clusterline,line width=.37pt]
+    (8,600.567) rectangle (730.023,979.134);
+  \path[fill=clusterfill,draw=clusterline,line width=.37pt]
+    (750.023,851.134) rectangle (1183.586,1269.134);
+
+  \node[text=grouptitle,font=\groupfont,inner sep=0pt]
+    at (305.025,20) {Data \& Interface Layer};
+  \node[text=grouptitle,font=\groupfont,inner sep=0pt]
+    at (369.012,612.567) {Agent Orchestration Layer};
+  \node[text=grouptitle,font=\groupfont,inner sep=0pt]
+    at (966.805,863.134) {Execution Sandbox};
+
+  % -----------------------------------------------------------------------
+  % Routed connectors.  These are the SVG's original line and Bezier paths.
+  % -----------------------------------------------------------------------
+
+  % Live Public Data -> Acquisition Registry & Pipeline
+  \draw[solid arrow]
+    (347.254,110.324) -- (347.254,114.491)
+    .. controls (347.254,118.657) and (347.254,126.991) .. (347.254,134.657)
+    .. controls (347.254,142.324) and (347.254,149.324) .. (347.254,152.824)
+    -- (347.254,156.324);
+
+  % Acquisition Registry & Pipeline -> Deterministic Tools
+  \draw[solid arrow]
+    (347.254,238.324) -- (347.254,246.491)
+    .. controls (347.254,254.657) and (347.254,270.991) .. (347.331,286.741)
+    .. controls (347.407,302.491) and (347.561,317.657) .. (347.637,325.241)
+    -- (347.714,332.824);
+
+  % Deterministic Tools -> Tool-Result Log
+  \draw[solid arrow]
+    (263.846,375.595) -- (245.454,379.717)
+    .. controls (227.062,383.838) and (190.279,392.081) .. (171.887,399.702)
+    .. controls (153.496,407.324) and (153.496,414.324) .. (153.496,417.824)
+    -- (153.496,421.324);
+
+  % Generate Code -> Sandbox
+  \draw[solid arrow]
+    (992.833,942.134) -- (999.625,948.301)
+    .. controls (1006.417,954.467) and (1020.002,966.801) .. (1026.794,979.134)
+    .. controls (1033.586,991.467) and (1033.586,1003.801) .. (1033.586,1015.467)
+    .. controls (1033.586,1027.134) and (1033.586,1038.134) .. (1033.586,1043.634)
+    -- (1033.586,1049.134);
+
+  % Sandbox -> Code-Repair Loop
+  \draw[solid arrow]
+    (1033.586,1131.134) -- (1033.586,1137.301)
+    .. controls (1033.586,1143.467) and (1033.586,1155.801) .. (1026.491,1167.794)
+    .. controls (1019.395,1179.788) and (1005.205,1191.441) .. (998.110,1197.268)
+    -- (991.015,1203.095);
+
+  % Code-Repair Loop -> Generate Code
+  \draw[dotted arrow]
+    (921.376,1205.634) -- (907.942,1199.384)
+    .. controls (894.507,1193.134) and (867.638,1180.634) .. (854.204,1161.717)
+    .. controls (840.769,1142.801) and (840.769,1117.467) .. (840.769,1092.134)
+    .. controls (840.769,1066.801) and (840.769,1041.467) .. (840.769,1022.634)
+    .. controls (840.769,1003.801) and (840.769,991.467) .. (851.965,979.443)
+    .. controls (863.161,967.419) and (885.553,955.703) .. (896.749,949.846)
+    -- (907.945,943.988);
+
+  % Question -> Orchestrator / LLM
+  \draw[solid arrow]
+    (710.523,483.446) -- (710.440,490.633)
+    .. controls (710.357,497.819) and (710.190,512.193) .. (710.107,525.547)
+    .. controls (710.023,538.901) and (710.023,551.234) .. (710.023,563.567)
+    .. controls (710.023,575.901) and (710.023,588.234) .. (681.028,606.189)
+    .. controls (652.033,624.145) and (594.044,647.723) .. (565.049,659.512)
+    -- (536.054,671.301);
+
+  % Orchestrator / LLM <-> Deterministic Tools
+  \draw[both arrows]
+    (396.321,656.267) -- (382.767,646.984)
+    .. controls (369.213,637.701) and (342.104,619.134) .. (328.550,603.684)
+    .. controls (314.996,588.234) and (314.996,575.901) .. (314.996,563.567)
+    .. controls (314.996,551.234) and (314.996,538.901) .. (314.996,522.214)
+    .. controls (314.996,505.527) and (314.996,484.486) .. (314.996,463.446)
+    .. controls (314.996,442.405) and (314.996,421.365) .. (317.696,407.292)
+    .. controls (320.397,393.219) and (325.797,386.114) .. (328.498,382.561)
+    -- (331.198,379.008);
+
+  % Orchestrator / LLM <-> Generate Code
+  \draw[both arrows]
+    (529.382,744.301) -- (547.602,755.939)
+    .. controls (565.822,767.578) and (602.262,790.856) .. (620.482,808.662)
+    .. controls (638.702,826.467) and (638.702,838.801) .. (678.168,852.753)
+    .. controls (717.634,866.706) and (796.565,882.279) .. (836.030,890.065)
+    -- (875.496,897.851);
+
+  % Orchestrator / LLM -> Answer Draft / Revised Answer
+  \draw[solid arrow]
+    (403.564,749.427) -- (390.423,760.211)
+    .. controls (377.282,770.996) and (350.999,792.565) .. (337.858,809.516)
+    .. controls (324.717,826.467) and (324.717,838.801) .. (317.102,848.832)
+    .. controls (309.487,858.864) and (294.257,866.594) .. (286.642,870.459)
+    -- (279.027,874.324);
+
+  % Answer Draft / Revised Answer -> Critic
+  \draw[solid arrow]
+    (138.828,876.134) -- (132.440,871.967)
+    .. controls (126.052,867.801) and (113.276,859.467) .. (106.888,849.134)
+    .. controls (100.500,838.801) and (100.500,826.467) .. (106.567,807.390)
+    .. controls (112.633,788.312) and (124.767,762.490) .. (130.834,749.579)
+    -- (136.900,736.668);
+
+  % Tool-Result Log -> Critic
+  \draw[dotted arrow]
+    (153.496,501.567) -- (153.496,505.734)
+    .. controls (153.496,509.901) and (153.496,518.234) .. (153.496,528.567)
+    .. controls (153.496,538.901) and (153.496,551.234) .. (153.496,563.567)
+    .. controls (153.496,575.901) and (153.496,588.234) .. (153.496,602.766)
+    .. controls (153.496,617.298) and (153.496,634.028) .. (153.496,642.394)
+    -- (153.496,650.759);
+
+  % Critic -> Answer Draft / Revised Answer
+  \draw[dotted arrow]
+    (162.447,738.991) -- (165.425,751.515)
+    .. controls (168.404,764.039) and (174.360,789.086) .. (177.338,807.777)
+    .. controls (180.317,826.467) and (180.317,838.801) .. (181.325,848.493)
+    .. controls (182.333,858.185) and (184.350,865.237) .. (185.358,868.762)
+    -- (186.367,872.288);
+
+  % Critic -> Final Answer
+  \draw[solid arrow]
+    (188.773,712.665) -- (241.503,729.576)
+    .. controls (294.233,746.488) and (399.693,780.311) .. (452.423,803.389)
+    .. controls (505.152,826.467) and (505.152,838.801) .. (505.228,851.801)
+    .. controls (505.304,864.801) and (505.456,878.467) .. (505.532,885.301)
+    -- (505.608,892.134);
+
+  % Deterministic Tools -> Orchestrator / LLM
+  \draw[dotted arrow]
+    (398.100,375.824) -- (408.774,379.907)
+    .. controls (419.449,383.991) and (440.797,392.157) .. (451.472,406.761)
+    .. controls (462.146,421.365) and (462.146,442.405) .. (462.146,463.446)
+    .. controls (462.146,484.486) and (462.146,505.527) .. (462.146,522.214)
+    .. controls (462.146,538.901) and (462.146,551.234) .. (462.146,563.567)
+    .. controls (462.146,575.901) and (462.146,588.234) .. (462.146,597.901)
+    .. controls (462.146,607.567) and (462.146,614.567) .. (462.146,618.067)
+    -- (462.146,621.567);
+
+  % Connector captions.
+  \node[edge caption] at (347.254,287.324) {Spatial Aggregation\\Boundary};
+  \node[edge caption] at (1033.586,1016.134) {Execute};
+  \node[edge caption] at (1033.586,1168.134) {Traceback / Error};
+  \node[edge caption] at (840.769,1092.134) {Revise Code};
+  \node[edge caption] at (314.996,463.446) {API Calls / Results};
+  \node[edge caption] at (638.702,814.134) {Code / Output};
+  \node[edge caption] at (324.717,814.134) {Generates};
+  \node[edge caption] at (153.496,563.567) {Feeds Tool Log};
+  \node[edge caption] at (180.317,814.134) {Revision Request};
+  \node[edge caption] at (505.152,814.134) {Validation Passed};
+  \node[edge caption] at (462.146,463.446) {Tool / API Failure};
+
+  % -----------------------------------------------------------------------
+  % Nodes.  They are drawn after the connectors, matching Mermaid's z-order.
+  % -----------------------------------------------------------------------
+
+  % D1: Live Public Data (cylinder/database)
+  \path[fill=nodefill]
+    (281.946,45.775) rectangle (412.562,97.549);
+  \path[fill=nodefill]
+    (347.254,45.775) ellipse [x radius=65.308,y radius=12.775];
+  \path[fill=nodefill]
+    (347.254,97.549) ellipse [x radius=65.308,y radius=12.775];
+  \draw[node outline]
+    (347.254,45.775) ellipse [x radius=65.308,y radius=12.775];
+  \draw[node outline]
+    (281.946,45.775) -- (281.946,97.549)
+    .. controls (281.946,114.582) and (412.562,114.582) .. (412.562,97.549)
+    -- (412.562,45.775);
+  \node[diagram text] at (347.254,71.662) {Live Public Data};
+
+  % D2: Acquisition Registry & Pipeline
+  \path[fill=nodefill,node outline]
+    (217.254,160.324) rectangle (477.254,238.324);
+  \node[diagram text] at (347.254,199.324)
+    {Acquisition Registry \&\\Pipeline};
+
+  % D3: Deterministic Tools (subroutine/process with double side rules)
+  \path[fill=nodefill,node outline]
+    (263.346,336.324) rectangle (431.162,375.824);
+  \draw[node outline] (271.346,336.324) -- (271.346,375.824);
+  \draw[node outline] (423.162,336.324) -- (423.162,375.824);
+  \node[diagram text] at (347.254,355.824) {Deterministic Tools};
+
+  % D4: Tool-Result Log (cylinder/database)
+  \path[fill=nodefill]
+    (91.846,437.738) rectangle (215.146,489.153);
+  \path[fill=nodefill]
+    (153.496,437.738) ellipse [x radius=61.650,y radius=12.414];
+  \path[fill=nodefill]
+    (153.496,489.153) ellipse [x radius=61.650,y radius=12.414];
+  \draw[node outline]
+    (153.496,437.738) ellipse [x radius=61.650,y radius=12.414];
+  \draw[node outline]
+    (91.846,437.738) -- (91.846,489.153)
+    .. controls (91.846,505.705) and (215.146,505.705) .. (215.146,489.153)
+    -- (215.146,437.738);
+  \node[diagram text] at (153.496,463.446) {Tool-Result Log};
+
+  % S1: Generate Code
+  \path[fill=nodefill,node outline]
+    (879.420,888.134) rectangle (1046.770,942.134);
+  \node[diagram text] at (963.095,915.134) {Generate Code};
+
+  % S2: Sandbox
+  \path[fill=nodefill,node outline,rounded corners=.065cm]
+    (918.586,1053.134) rectangle (1148.586,1131.134);
+  \node[diagram text] at (1033.586,1092.134)
+    {Sandbox: 60s Timeout \&\\Scratch Dir};
+
+  % S3: Code-Repair Loop (notched rectangle)
+  \path[fill=nodefill,node outline]
+    (887.628,1205.134) --
+    (897.378,1224.634) --
+    (887.628,1244.134) --
+    (1038.562,1244.134) --
+    (1038.562,1205.134) -- cycle;
+  \node[diagram text] at (967.970,1224.634) {Code-Repair Loop};
+
+  % O1: Orchestrator / LLM
+  \path[fill=nodefill,node outline]
+    (462.146,701.351) circle [radius=75.783];
+  \node[diagram text] at (462.146,701.351) {Orchestrator / LLM};
+
+  % O2: Answer Draft / Revised Answer
+  \path[fill=nodefill,node outline]
+    (68.621,876.134) rectangle (328.621,954.134);
+  \node[diagram text] at (198.621,915.134)
+    {Answer Draft / Revised\\Answer};
+
+  % O3: Critic (decision diamond)
+  \path[fill=nodefill,node outline]
+    (153.996,654.759) --
+    (200.588,701.351) --
+    (153.996,747.942) --
+    (107.404,701.351) -- cycle;
+  \node[diagram text] at (153.996,701.351) {Critic};
+
+  % O4: Final Answer (stadium/pill)
+  \path[fill=nodefill,node outline,rounded corners=.254cm]
+    (447.194,895.634) rectangle (563.111,934.634);
+  \node[diagram text] at (505.152,915.134) {Final Answer};
+
+  % Q: Question (stadium/pill)
+  \path[fill=nodefill,node outline,rounded corners=.254cm]
+    (666.132,443.946) rectangle (753.915,482.946);
+  \node[diagram text] at (710.023,463.446) {Question};
+
+\end{tikzpicture}%
+}
+\endgroup
