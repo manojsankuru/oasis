@@ -2019,3 +2019,19 @@ There were no successful-attempt partial or unregistered files.
 Generalizability is demonstrated by the final code across both configured
 areas after one county-neutral acquisition-policy repair. It is not a
 zero-change first-attempt success.
+
+## 2026-10-22 — the critic's ordering gate sent a correct refusal back for revision
+
+**What happened.** In `outputs/run_20260831_142354.json` the question asked for a drive time along the road network. The first draft refused, with no numbers: "This system cannot answer that question. It is not a routing engine and has no access to a road network dataset or to live travel times. It can tell you which census tracts are at highest risk, but it cannot tell you how to get from one place to another or how long it would take." The critic logged cycle 1 with `numbers_checked` 0, which is correct because the draft holds no numeral, and with two `unsupported_claim` findings: "the answer orders communities by priority and names no weighting" and "the answer orders communities by priority and does not say who loses". After two revision requests the final answer keeps the refusal but adds a ten-tract priority list with eleven numbers that the question did not ask for. Re-running `Critic().check` on 2026-10-22 against the logged draft and steps reproduces both findings.
+**Where.** `src/critic.py`, `ORDERING_LANGUAGE` and `Critic._claim_findings`.
+**Why.** The ordering gate is a keyword match. It matched the phrase "highest risk" inside the refusal, and the draft names no weighting and no trade-off because it orders nothing.
+**Did the agent recover?** Partly. The refusal survived, but the run spent two revision turns (5 model calls in total) and the final answer carries unrequested content.
+**Kept as a paper failure case?** Yes, in the paper's Failure Cases subsection.
+
+## 2026-10-22 — a critic pass checked none of the six figures in an answer
+
+**What happened.** In `geo-test1/geo-agent/outputs/run_20260904_125627.json`, a 4 Sep run with a byte-identical `src/critic.py`, the critic passed the final answer on cycle 2 with `numbers_checked` 0 and `numbers_traceable` 0. The answer states six population figures (43,651, 21,509, 44,486, 24,652, 50,267 and 25,670) and 44 numerals in all. Re-running `Critic().check` on 2026-10-22 gives the same result: checked 0, traceable 0, passed True.
+**Where.** `src/critic.py`, `CODE_SPAN` in `MASKS`, applied by `masked()`.
+**Why.** The answer writes tract GEOIDs in backticks. `CODE_SPAN` matches only a backtick span that contains a letter, so it skips a digit-only span such as `` `45019002105` `` and pairs that span's closing backtick with the next opening one. The prose between them is masked as "a name in backticks", numbers included. Three such spans covered all six figures, for example "`. This list covers 43,651 residents, including 21,509 vulnerable residents. However, this choice leaves out census tracts `". `numbers_checked` is counted after masking, so the report read as a clean pass.
+**Did the agent recover?** No. The critic passed the answer and requested no revision.
+**Kept as a paper failure case?** Yes, in the paper's Failure Cases subsection.
