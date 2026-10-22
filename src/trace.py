@@ -26,6 +26,30 @@ def _fmt(value: Any) -> str:
     return text
 
 
+MASK_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("list markers", ("a list marker",)),
+    ("GEOIDs", ("an identifier of ten digits or more",)),
+    ("names", ("a name in backticks", "a name carrying a digit")),
+)
+
+
+def mask_line(report: dict[str, Any]) -> str | None:
+    seen = report.get("numerals_seen")
+    if seen is None:
+        return None
+    remaining = dict(report.get("numerals_masked_by_reason") or {})
+    total = sum(remaining.values())
+    parts = [
+        f"{name} {sum(remaining.pop(label, 0) for label in labels)}"
+        for name, labels in MASK_GROUPS
+    ]
+    parts += [f"{label} {count}" for label, count in remaining.items() if count]
+    return (
+        f"checked {report.get('numbers_checked')} of {seen} numerals, "
+        f"{total} masked ({', '.join(parts)})"
+    )
+
+
 def _render_list(key: str, items: list[Any], indent: int) -> list[str]:
     pad = "  " * indent
     if not items:
@@ -103,6 +127,9 @@ class Tracer:
             f"  {report.get('numbers_traceable')} of {report.get('numbers_checked')} "
             "number(s) traced to a logged tool result"
         )
+        coverage = mask_line(report)
+        if coverage is not None:
+            self._out(f"  {coverage}")
         for item in report.get("findings", []):
             self._out(f"  [{item.get('kind')}] {_fmt(item.get('detail'))}")
             if item.get("evidence"):
