@@ -2035,3 +2035,11 @@ zero-change first-attempt success.
 **Why.** The answer writes tract GEOIDs in backticks. `CODE_SPAN` matches only a backtick span that contains a letter, so it skips a digit-only span such as `` `45019002105` `` and pairs that span's closing backtick with the next opening one. The prose between them is masked as "a name in backticks", numbers included. Three such spans covered all six figures, for example "`. This list covers 43,651 residents, including 21,509 vulnerable residents. However, this choice leaves out census tracts `". `numbers_checked` is counted after masking, so the report read as a clean pass.
 **Did the agent recover?** No. The critic passed the answer and requested no revision.
 **Kept as a paper failure case?** Yes, in the paper's Failure Cases subsection.
+
+## 2026-10-22 — paper fingerprints held only on a CRLF checkout
+
+**What happened.** `outputs/paper/numbers.json`, generated on 2026-09-02, recorded the SHA-256 and byte count of each source as it sat on a Windows disk with `core.autocrlf=true` and no `.gitattributes`. Git stores those text files with LF endings. A check on 2026-10-22 found that 18 of the 24 recorded fingerprints matched only the CRLF bytes, so they would fail on any LF checkout (Linux, macOS, or Windows with `autocrlf=false`). They included `src/config.py`, `src/hazard.py`, `src/risk.py`, `src/sandbox.py`, `src/vulnerability.py`, `outputs/faults.json`, `outputs/paper/tradeoff.csv` and the five files of transfer run `20260901T231445085774Z-4c1011c1`. `transfer_report.json` also stored a CRLF hash of `outputs/paper/tradeoff.csv`, and git held that file as LF, so `report.py` would refuse it with "mismatched primary trade-off copy fingerprint".
+**Where.** `src/experiments/report.py`, `_sha256` as used by `_source` and `_validate_payload`. Repository line-ending configuration.
+**Why.** The fingerprints hashed raw working-tree bytes, and git converts text line endings between the index and the working tree.
+**Did the agent recover?** Not an agent run. Fixed in `6c9441e`, which fingerprints text with LF endings, and `cf36a60`, which adds `.gitattributes -text` for `outputs/paper/**` and `outputs/faults.json` and refreshes `numbers.json`. Fresh clones with `autocrlf=true` and `autocrlf=false` then matched 17 of 17 tracked fingerprints.
+**Kept as a paper failure case?** No.
