@@ -294,16 +294,17 @@ def run_agent(
 
         if not tool_calls:
             draft = message.content or ""
+            judge = critic.Critic() if critic is not None else None
             report = (
-                critic.Critic().check(draft, logger.steps, revisions.cycles + 1)
-                if critic is not None
+                judge.check(draft, logger.steps, revisions.cycles + 1)
+                if judge is not None
                 else None
             )
             if report is not None and critic is not None:
                 revisions.record(report, draft, previous)
                 previous = (report, draft)
-                logger.log(CRITIC_STEP, critic.as_result(report), iteration)
-                tracer.critic(critic.as_result(report))
+                logger.log(CRITIC_STEP, critic.as_result(report, judge), iteration)
+                tracer.critic(critic.as_result(report, judge))
 
             if report is None or report.passed or revisions.revisions >= max_revisions:
                 final_answer = draft
