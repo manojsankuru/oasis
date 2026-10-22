@@ -88,7 +88,7 @@ Same length as what it replaces, so every offset in the answer still points at
 the same character and a finding can quote the text around a number."""
 
 URL_SPAN = re.compile(r"https?://\S+")
-CODE_SPAN = re.compile(r"`[^`\n]*[A-Za-z][^`\n]*`")
+CODE_SPAN = re.compile(r"`(?P<name>[^`\n]*[A-Za-z][^`\n]*)`|`[^`\n]*`")
 """A backtick span that contains a letter is a name -- a tool, a layer, a
 scenario, a preset. Real answers write `surge_1_5m` and `tracts_joined` that way.
 
@@ -279,16 +279,48 @@ class Claim:
         return answer[left:right].replace("\n", " ").strip()
 
 
-def masked(answer: str) -> str:
-    """The answer with every identifier written over, offsets preserved."""
+NAME_WITH_DIGIT = "a name carrying a digit"
+
+
+def hides(found: re.Match[str]) -> bool:
+    return "name" not in found.re.groupindex or found.group("name") is not None
+
+
+def mask_spans(answer: str) -> tuple[str, list[tuple[str, int, int]]]:
     text = answer
-    for _, rule in MASKS:
-        text = rule.sub(lambda found: MASK * len(found.group(0)), text)
+    spans: list[tuple[str, int, int]] = []
+    for label, rule in MASKS:
+        hidden = [found for found in rule.finditer(text) if hides(found)]
+        for found in hidden:
+            spans.append((label, found.start(), found.end()))
+            text = text[: found.start()] + MASK * (found.end() - found.start()) + text[found.end() :]
     for found in WORD_TOKEN.finditer(text):
         token = found.group(0)
         if any(character.isdigit() for character in token):
+            spans.append((NAME_WITH_DIGIT, found.start(), found.end()))
             text = text[: found.start()] + MASK * len(token) + text[found.end() :]
-    return text
+    return text, spans
+
+
+def masked(answer: str) -> str:
+    """The answer with every identifier written over, offsets preserved."""
+    return mask_spans(answer)[0]
+
+
+def numeral_accounting(answer: str) -> tuple[int, dict[str, int]]:
+    _, spans = mask_spans(answer)
+    owner: dict[int, str] = {}
+    for label, start, end in spans:
+        for at in range(start, end):
+            owner.setdefault(at, label)
+    seen = 0
+    by_reason: dict[str, int] = {}
+    for found in NUMBER.finditer(answer):
+        seen += 1
+        labels = [owner[at] for at in range(found.start(), found.end()) if at in owner]
+        if labels:
+            by_reason[labels[0]] = by_reason.get(labels[0], 0) + 1
+    return seen, by_reason
 
 
 def as_value(text: str) -> float | None:
@@ -687,6 +719,8 @@ class Critic:
 
     traced: list[tuple[Claim, Candidate]] = field(default_factory=list)
     untraced: list[Claim] = field(default_factory=list)
+    numerals_seen: int = 0
+    numerals_masked: dict[str, int] = field(default_factory=dict)
 
     def check(
         self, answer: str, steps: list[dict[str, Any]], cycle: int
@@ -696,8 +730,11 @@ class Critic:
         found = claims(answer or "")
         self.traced = []
         self.untraced = []
+        self.numerals_seen, self.numerals_masked = numeral_accounting(answer or "")
 
         findings: list[CriticFinding] = []
+        if self.numerals_seen and not found:
+            findings.append(self._coverage_finding())
         if found and not calls:
             findings.append(
                 finding(
@@ -725,6 +762,18 @@ class Critic:
             findings=self._bounded(findings),
             numbers_checked=len(found),
             numbers_traceable=len(self.traced),
+        )
+
+    def _coverage_finding(self) -> CriticFinding:
+        reasons = ", ".join(
+            f"{label}: {count}"
+            for label, count in sorted(self.numerals_masked.items(), key=lambda item: -item[1])
+        )
+        return finding(
+            "untraceable_number",
+            f"the answer holds {self.numerals_seen} numeral(s) and none survived masking, "
+            "so none was checked and it cannot pass. Write each quantity outside backticks "
+            f"and list markers. Masked: {reasons}.",
         )
 
     def _number_findings(
@@ -874,9 +923,9 @@ def revision_request(report: CriticReport) -> str:
     return "\n".join(lines)
 
 
-def as_result(report: CriticReport) -> dict[str, Any]:
+def as_result(report: CriticReport, critic: Critic | None = None) -> dict[str, Any]:
     """The report as `validate_answer` sends it, for anything that wants to log one."""
-    return {
+    result: dict[str, Any] = {
         "cycle": report.cycle,
         "passed": report.passed,
         "numbers_checked": report.numbers_checked,
@@ -886,6 +935,10 @@ def as_result(report: CriticReport) -> dict[str, Any]:
             for item in report.findings
         ],
     }
+    if critic is not None:
+        result["numerals_seen"] = critic.numerals_seen
+        result["numerals_masked_by_reason"] = dict(critic.numerals_masked)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -1173,6 +1226,126 @@ def scripted_run(drafts: list[str], max_revisions: int) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+BACKTICKED_GEOID_ANSWER = (
+    "Under a three-meter storm surge, the choice of which communities to "
+    "prioritise for evacuation support is a value judgement. Different weighting "
+    "systems will produce different priority lists. I used the "
+    "`compare_scenarios` tool to evaluate the trade-offs between the three "
+    "available weightings: `svi_equal`, `svi_themes`, and `evacuation_capacity`.\n"
+    "\n"
+    "**Using the `svi_equal` weighting**, which gives equal importance to five "
+    "different social vulnerability indicators, the ten highest-priority census "
+    "tracts are `99001004609`, `99001004616`, `99001002300`, `99001002009`, "
+    "`99001002008`, `99001005002`, `99001002503`, `99001004620`, `99001004902`, "
+    "and `99001002105`. This list covers 43,651 residents, including 21,509 "
+    "vulnerable residents. However, this choice leaves out census tracts "
+    "`99001001100` and `99001004617`, which are prioritised by other weightings.\n"
+    "\n"
+    "**Using the `svi_themes` weighting**, which weights SVI themes equally, the "
+    "top ten tracts are `99001004609`, `99001002008`, `99001002009`, "
+    "`99001005002`, `99001002300`, `99001004620`, `99001002503`, `99001001100`, "
+    "`99001004616`, and `99001004902`. This covers 44,486 residents and 24,652 "
+    "vulnerable residents. This choice leaves out census tracts `99001002105` "
+    "and `99001004617`.\n"
+    "\n"
+    "**Using the `evacuation_capacity` weighting**, which focuses on residents "
+    "who cannot self-evacuate, the top ten are `99001004616`, `99001004609`, "
+    "`99001002008`, `99001002009`, `99001004902`, `99001002300`, `99001005002`, "
+    "`99001002105`, `99001002503`, and `99001004617`. This covers 50,267 "
+    "residents and 25,670 vulnerable residents. This choice leaves out census "
+    "tracts `99001001100` and `99001004620`.\n"
+    "\n"
+    "The choice of weighting is a value judgement that determines which "
+    "communities are prioritised and which are left behind. These results were "
+    "generated using the `compare_scenarios` tool for a `surge_3_0m` scenario, "
+    "based on weightings described by the `ask_user_preferences` tool."
+)
+
+BACKTICKED_GEOID_FIGURES: tuple[str, ...] = (
+    "43,651", "21,509", "44,486", "24,652", "50,267", "25,670",
+)
+
+REFUSAL_ANSWER = (
+    "This system cannot answer that question. It is not a routing engine and has "
+    "no access to a road network dataset or to live travel times. It can tell you "
+    "which census tracts are at highest risk, but it cannot tell you how to get "
+    "from one place to another or how long it would take."
+)
+
+COVERAGE_PHRASE = "none survived masking"
+
+
+def _mask_checks() -> list[tuple[str, bool]]:
+    rows = {
+        "rows": [
+            {"population_in_priority": 43651, "vulnerable_population_in_priority": 21509},
+            {"population_in_priority": 44486, "vulnerable_population_in_priority": 24652},
+            {"population_in_priority": 50267, "vulnerable_population_in_priority": 25670},
+        ]
+    }
+    steps = agent_shape([structured_call(rows)])
+    figures = [item.text for item in claims(BACKTICKED_GEOID_ANSWER)]
+    geoids = len(re.findall(r"(?<!\d)99001\d{6}(?!\d)", BACKTICKED_GEOID_ANSWER))
+    box = Critic()
+    report = box.check(BACKTICKED_GEOID_ANSWER, steps, 1)
+    masked_total = sum(box.numerals_masked.values())
+    print(f"  the 4 Sep demo answer: claims {figures}")
+    print(f"  {report.numbers_checked} of {box.numerals_seen} numerals checked, "
+          f"masked {box.numerals_masked}")
+
+    listed = "The tracts are:\n1. `99001000100`\n2. `99001000200`\n"
+    hidden_box = Critic()
+    hidden = hidden_box.check(listed, steps, 1)
+    coverage = [item for item in hidden.findings if COVERAGE_PHRASE in item.detail]
+    for item in coverage:
+        print(f"    [{item.kind}] {item.detail}")
+
+    refusal_box = Critic()
+    refusal = refusal_box.check(REFUSAL_ANSWER, [], 1)
+    logged = as_result(report, box)
+
+    return [
+        ("the 4 Sep demo answer (run 20260904_125627) keeps its six figures as claims",
+         figures == list(BACKTICKED_GEOID_FIGURES)),
+        ("that answer passes with all six figures traced",
+         report.passed and report.numbers_checked == 6 and report.numbers_traceable == 6),
+        ("every numeral in it is either checked or masked",
+         box.numerals_seen == report.numbers_checked + masked_total),
+        ("its GEOIDs are masked as identifiers, one numeral per GEOID",
+         box.numerals_masked.get("an identifier of ten digits or more") == geoids),
+        ("a correct answer with quantities raises no zero-coverage finding",
+         not any(COVERAGE_PHRASE in item.detail for item in report.findings)),
+        ("an answer whose numerals are all masked does not pass",
+         hidden_box.numerals_seen > 0 and hidden.numbers_checked == 0 and not hidden.passed),
+        ("the zero-coverage finding is an untraceable_number naming the masks",
+         len(coverage) == 1 and coverage[0].kind == "untraceable_number"
+         and "a list marker" in coverage[0].detail
+         and "an identifier of ten digits or more" in coverage[0].detail),
+        ("the zero-coverage finding is the only reason that answer fails",
+         [item.kind for item in hidden.findings] == ["untraceable_number"]),
+        ("the zero-coverage instruction survives the finding's length bound",
+         bool(coverage) and "Write each quantity outside backticks" in coverage[0].detail),
+        ("an answer with no numerals at all raises no zero-coverage finding",
+         refusal_box.numerals_seen == 0
+         and not any(COVERAGE_PHRASE in item.detail for item in refusal.findings)),
+        ("as_result carries numerals_seen and numerals_masked_by_reason",
+         logged.get("numerals_seen") == box.numerals_seen
+         and logged.get("numerals_masked_by_reason") == box.numerals_masked),
+        ("as_result without the critic keeps its earlier shape",
+         "numerals_seen" not in as_result(report)),
+    ]
+
+
+def _traces(text: str, pool: list[Candidate]) -> bool | None:
+    found = claims(text)
+    return trace(found[0], pool) is not None if found else None
+
+
+def _rounds(text: str, value: float) -> bool | None:
+    found = claims(text)
+    return rounds_to(found[0], value) if found else None
+
+
 def _one(kind: str, findings: list[CriticFinding]) -> bool:
     return len(findings) == 1 and findings[0].kind == kind
 
@@ -1239,10 +1412,6 @@ def _boundary_checks() -> list[tuple[str, bool]]:
     """The guard that stops a text blob tracing anything: whole-number boundaries."""
     pool, _ = candidates([stdout_call(SUBSTRING_STDOUT)])
     values = sorted({item.value for item in pool if item.from_text})
-    inside = claims("192")[0]
-    rounded = claims("0.659")[0]
-    whole = claims("48,192")[0]
-    partial = claims("8192")[0]
     print(f"  the blob {SUBSTRING_STDOUT!r} yields {values} from its text, "
           f"and {sorted({item.value for item in pool if not item.from_text})} "
           "from the fields around it")
@@ -1263,20 +1432,20 @@ def _boundary_checks() -> list[tuple[str, bool]]:
     return [
         ("a blob yields only its whole numbers", values == [0.65943, 22.0, 48192.0]),
         ("a number present only as a substring does not trace",
-         trace(inside, pool) is None),
-        ("a longer substring does not trace either", trace(partial, pool) is None),
-        ("the whole number does trace", trace(whole, pool) is not None),
+         _traces("192", pool) is False),
+        ("a longer substring does not trace either", _traces("8192", pool) is False),
+        ("the whole number does trace", _traces("48,192", pool) is True),
         ("a rounded number traces to the value it rounds from",
-         trace(rounded, pool) is not None),
+         _traces("0.659", pool) is True),
         ("a number nothing printed does not trace",
-         trace(claims("31337")[0], pool) is None),
+         _traces("31337", pool) is False),
         # Tracing a number to what the model ASKED for rather than to what came
         # back is option (3) in the module docstring wearing option (2)'s clothes:
         # the answer would be checked against the model's own input.
         ("a number the model passed as an argument is not evidence for it",
-         trace(claims("61616")[0], argument_pool) is None),
+         _traces("61616", argument_pool) is False),
         ("the result of that same call still traces",
-         trace(claims("99")[0], argument_pool) is not None),
+         _traces("99", argument_pool) is True),
         ("a boolean in a result is not a number",
          1.0 not in {item.value for item in argument_pool}),
     ]
@@ -1297,17 +1466,17 @@ def _tolerance_checks() -> list[tuple[str, bool]]:
         ("an integer with three trailing zeros is read as rounded",
          rounding_unit("420,000") == 10_000.0),
         ("an integer with two trailing zeros is not", rounding_unit("100") == 1.0),
-        ("0.659 traces to 0.659430", trace(claims("0.659")[0], pool) is not None),
-        ("0.660 does not trace to 0.659430", trace(claims("0.660")[0], pool) is None),
+        ("0.659 traces to 0.659430", _traces("0.659", pool) is True),
+        ("0.660 does not trace to 0.659430", _traces("0.660", pool) is False),
         ("420,000 traces to 420,264",
-         rounds_to(claims("420,000")[0], 420_264.0)),
+         _rounds("420,000", 420_264.0) is True),
         ("420,000 does not trace to 480,000",
-         not rounds_to(claims("420,000")[0], 480_000.0)),
+         _rounds("420,000", 480_000.0) is False),
         ("a percent claim traces to the same quantity stored as a fraction",
-         trace(claims("23.4%")[0], percent_pool) is not None),
+         _traces("23.4%", percent_pool) is True),
         ("a percent claim does not trace to an unrelated fraction",
-         trace(claims("23.4%")[0],
-               [Candidate(value=0.9, tool="t", path="p", from_text=False)]) is None),
+         _traces("23.4%",
+                 [Candidate(value=0.9, tool="t", path="p", from_text=False)]) is False),
     ]
 
 
@@ -1395,8 +1564,9 @@ def _answer_checks() -> list[tuple[str, bool]]:
         ("exactly one number went missing, so exactly one is reported",
          len(numbers) == 1),
         ("the finding names the number rather than the tool that did not produce it",
-         invented in numbers[0].detail),
-        ("the finding carries evidence from the answer", bool(numbers[0].evidence)),
+         bool(numbers) and invented in numbers[0].detail),
+        ("the finding carries evidence from the answer",
+         bool(numbers) and bool(numbers[0].evidence)),
         ("a cleared log is visible rather than silent",
          empty.numbers_checked > 0 and empty.numbers_traceable == 0
          and not empty.passed),
@@ -1703,6 +1873,13 @@ def _loop_checks() -> list[tuple[str, bool]]:
          and never["llm_calls"] < config.MAX_ITERATIONS),
         ("every critic firing is its own step type",
          steps.count("critic_report") == bound + 1),
+        ("every logged critic step carries the numeral accounting",
+         all(
+             step["payload"].get("numerals_seen") == 1
+             and "numerals_masked_by_reason" in step["payload"]
+             for step in never["steps"]
+             if step["step"] == agent.CRITIC_STEP
+         )),
         ("every revision is its own step type",
          steps.count("revision_request") == bound),
         ("the run reports findings per cycle rather than a total",
@@ -1750,6 +1927,8 @@ def _self_check() -> int:
     print("CRITIC -- every reported number traced to a logged tool result\n")
 
     checks = _claim_checks()
+    print()
+    checks += _mask_checks()
     print()
     checks += _boundary_checks()
     print()
