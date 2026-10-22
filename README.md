@@ -1,3 +1,11 @@
+# Write, Run, Repair: A Self-Debugging GeoAI Agent for Equity-Centered Coastal Flood-Risk Analysis
+
+This repository is an LLM agent that retrieves public geospatial data, writes and repairs its own spatial analysis code, and ranks census tracts by hurricane storm-surge risk under a weighting the user chooses. A critic traces the numbers in each answer back to logged tool results, and the same code ran on a second county after one county-neutral acquisition repair.
+
+## Phase 1 version
+
+The version submitted for Phase 1 review is tagged `phase1-submitted` (commit `4fc8bd7`). Later commits respond to the reviews. Run `git checkout phase1-submitted` to see the reviewed version.
+
 ## Reproducibility
 
 This repository implements an autonomous GeoAI risk analyst for the OASIS @ ACM SIGSPATIAL 2026 Student Challenge, Track A: Disaster Resilience and Vulnerability Analysis.
@@ -9,8 +17,6 @@ The system is decision support. It does not make operational evacuation decision
 ### Demonstration video
 
 Watch the 3-minute agent demonstration ( https://drive.google.com/file/d/1Uu94DVMjpzLivbA0tlZb_guTu6jmoFTu/view?usp=sharing)
-
-Replace `YOUR_UNLISTED_VIDEO_URL` with the final YouTube, institutional-media, or shareable Drive URL.
 
 ### Tested environment
 
@@ -309,7 +315,7 @@ A mutation sweep is successful only when every deliberate defect is detected and
 
 ### Paper artifacts
 
-Generate exactly the three manuscript figures:
+Generate the two data figures. `paper/figs/architecture.pdf` was made by hand and is not regenerated:
 
 ```powershell
 & $ProjectPython -m src.figures
@@ -392,7 +398,6 @@ Known limitations include:
 | `src/figures.py` | Deterministic manuscript figures |
 | `src/experiments/report.py` | Source-fingerprinted paper metrics |
 | `docs/DATA.md` | Data endpoints and source details |
-| `docs/RUNBOOK.md` | Development and operational record |
 | `docs/failures.md` | Honest failure and limitation record |
 | `paper/` | ACM manuscript and generated figures |
 
