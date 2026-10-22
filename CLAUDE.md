@@ -2,12 +2,27 @@
 
 Autonomous GeoAI risk analyst for the OASIS @ ACM SIGSPATIAL 2026 Student
 Challenge, **Track A: Disaster Resilience & Vulnerability Analysis**.
-Submission (short paper + this repository) is due **4 Sep 2026, 11:59 PM AoE**.
 
 The agent takes a natural-language question about hurricane risk, autonomously
 retrieves and aligns live public geospatial data, reasons over it with a mix of
 verified tools and self-written code, and reports priority communities under a
 user-chosen weighting. It is decision support. It does not act.
+
+---
+
+## Review-response phase
+
+Phase 1 was submitted as tag `phase1-submitted` (`4fc8bd7`). This phase
+responds to the program committee reviews.
+
+- The reviews and the rubric live in `docs/reviews/`. That folder is
+  git-ignored. Reviewer text never goes to the public repo.
+- Every session ends with the `invariant-reviewer` subagent on the diff, then
+  `/gate <module>`, then a proposed commit message and a wait for approval.
+- `/failure` the moment something breaks, with the real error text.
+- `src/contracts.py` stays frozen.
+- The model-visible tool count stays at 11.
+- Every number in the paper comes from `outputs/paper/numbers.json`.
 
 ---
 
@@ -155,7 +170,7 @@ limitation. Say so in the paper's limitations rather than building it.
 
 ---
 
-# Build contract (added 27 Aug — four-day plan)
+# Build contract
 
 ## `src/contracts.py` is frozen
 
@@ -172,24 +187,14 @@ system uses. Implement against it.
 This exists because the system is built across many short sessions. Without a
 frozen contract, session 6 quietly renames what session 2 produced.
 
-## The other two documents
+## The data document
 
 - `docs/DATA.md` — every endpoint, its exact parameters, its quirks, and an
   honest VERIFIED / UNVERIFIED status. Paste the relevant section into any
   acquisition prompt; the `outSR` trap in §1 costs an afternoon if it is not in
   front of you.
-- `docs/BUILD-PLAN.md` — fourteen sessions across four days, each with a
-  prompt, an acceptance gate and a cut line decided in advance.
 
-## Session discipline
-
-One module per session, then `/clear`. End every session with the
-`invariant-reviewer` subagent on the diff, then `/gate <module>`, then a commit.
-`/rubric` at the end of each day — whatever it names as weakest is the next
-morning's first hour. `/failure` the moment something breaks, with the real
-error text.
-
-## Scope changes for the four-day build
+## Scope decisions
 
 - **`src/accessibility.py` is cut.** Network travel time is Track B's named
   challenge and the largest available time sink. Distance-based accessibility,

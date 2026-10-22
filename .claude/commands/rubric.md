@@ -1,23 +1,39 @@
 ---
-description: Audit the current repository state against the four OASIS criteria
+description: Score the repository 1 to 5 on each OASIS review dimension against docs/reviews/rubric.md
 ---
 
-Audit this repository against the four OASIS criteria in `CLAUDE.md`. This is a
-critical review, not a status report — assume a program committee is reading
-the code, not my description of it.
+Score this repository against the four review dimensions in
+`docs/reviews/rubric.md`. That file holds the program committee's rubric
+verbatim. Read it first. If it is missing, stop and say so — do not score from
+memory or from the criteria summary in `CLAUDE.md`.
 
-For each of TU, RB, SG, IR:
-- What in the repository, concretely, a reviewer would find as evidence. Cite
-  files and functions. "It is designed to" does not count; only working code
-  and produced artifacts count.
-- What is claimed anywhere (README, CLAUDE.md, paper draft) but not actually
-  implemented. Be blunt about this.
-- The single cheapest thing that would most improve this criterion right now,
-  with an hour estimate.
+This is a critical review, not a status report — assume a program committee is
+reading the code, not my description of it. Only working code and produced
+artifacts count as evidence. "It is designed to" does not count. The rubric
+scores the whole submission: judge the repository and the paper draft in
+`paper/main.tex`, and say where a score depends on the demo video, which you
+cannot see.
 
-Then: name the **weakest** of the four and say what I should do next. If two
-are close, say so rather than picking arbitrarily.
+For each dimension (TU, RB, SG, IR in `CLAUDE.md`):
 
-Finish with anything you found that is actively working against a criterion —
+1. **Score.** One integer from 1 to 5, with its level name from `rubric.md`.
+   Give the highest level whose descriptor the evidence fully meets.
+2. **Evidence.** What a reviewer would find in the repository, concretely.
+   Cite files and functions.
+3. **Level-5 gap.** Quote the level-5 descriptor from `rubric.md` exactly.
+   Then quote each phrase of it the repository falls short of, and say what is
+   missing for each. If the score is 5, name the evidence that meets every
+   phrase instead.
+4. **Claimed but not implemented.** Anything the README, `CLAUDE.md` or the
+   paper draft claims that the code does not do. Be blunt about this.
+5. **Cheapest next step.** The single cheapest change that would most raise
+   this score, with an hour estimate.
+
+Then: a table of the four scores, the **weakest** dimension, and what I should
+do next. If two are close, say so rather than picking arbitrarily.
+
+Finish with anything you found that is actively working against a dimension —
 a hardcoded county, a hand-cleaned file, a mocked integration presented as
-tested, a number in the paper draft with no tool result behind it.
+tested, a number in the paper draft that is not in
+`outputs/paper/numbers.json`, or a `numbers.json` value with no tool result
+behind it.

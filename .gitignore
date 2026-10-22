@@ -10,6 +10,12 @@ application_default_credentials.json
 *.pem
 *.key
 
+docs/CODEX-S13-HANDOFF.md
+docs/S12-PROMPT.md
+docs/S13-PROMPT.md
+docs/s13.1 PROMPT.md
+docs/reviews/
+
 test_demo/
 .claude/settings.local.json
 
