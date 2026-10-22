@@ -285,7 +285,7 @@
       }
     }
   },
-  "generated_at": "2026-10-22T18:47:34.563797+00:00",
+  "generated_at": "2026-10-22T22:45:22.158296+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -653,36 +653,8 @@
       "text": "\\acmISBN{}"
     },
     {
-      "line": 56,
-      "text": "\\institution{[Institution Name]}"
-    },
-    {
-      "line": 57,
-      "text": "\\department{[Department Name]}"
-    },
-    {
-      "line": 58,
-      "text": "\\city{[City]}"
-    },
-    {
-      "line": 59,
-      "text": "\\state{[State]}"
-    },
-    {
-      "line": 60,
-      "text": "\\country{[Country]}"
-    },
-    {
       "line": 62,
       "text": "\\email{[email address]}"
-    },
-    {
-      "line": 85,
-      "text": "\\email{[email address]}"
-    },
-    {
-      "line": 343,
-      "text": "The authors thank [insert acknowledgment here]."
     }
   ],
   "risk": {
@@ -2000,9 +1972,9 @@
       "sha256": "7cdd95e291bd13e5ea1f6b7f3a249a0f1897e69ad23c6d453e50b36f4d76b131"
     },
     "outputs/pipeline_report.txt": {
-      "bytes": 27633,
+      "bytes": 27521,
       "role": "primary pipeline report",
-      "sha256": "9cc14c96025f4f771459e46224a82387542ad61747e761ed9322256649cab613"
+      "sha256": "1bebd5df45491e1b1e8125aaba0e2766a73fa320a6ceaa30c1be82bb36d86add"
     },
     "outputs/risk_surge_1_5m_svi_equal.csv": {
       "bytes": 23105,
@@ -2025,14 +1997,14 @@
       "sha256": "7868bf2ea73c8a400dc3f8faa97761e06f5de06c9caade391b0471adc1d692a2"
     },
     "paper/main.tex": {
-      "bytes": 17359,
+      "bytes": 17248,
       "role": "paper placeholder source",
-      "sha256": "3dc93aa540a3e993257e41b7bc17c7bb5e001fe523b8f13285332a9bd404c9d8"
+      "sha256": "6a788d8257a6d20bf93c270fd657617a21c4f553c3c5cd9685435b8ba5737eb3"
     },
     "src/agent.py": {
-      "bytes": 15678,
+      "bytes": 15749,
       "role": "configuration constant source: agent",
-      "sha256": "0797acef86343ea748fec8cb33fd002bb3d942aec9a0e63264d62b7c29f783ae"
+      "sha256": "16d82a9dd93d2e2ea15a3d300b468acf8f37070583b3bb930582b880152ef0a5"
     },
     "src/config.py": {
       "bytes": 6050,
@@ -3682,7 +3654,7 @@
       "selector": "line scan for explicit TODO/TBD, bracketed author placeholders, and template instructions",
       "source": "paper/main.tex",
       "unit": "prose TODO lines",
-      "value": 12
+      "value": 5
     },
     "unused_paper_keys": []
   }
