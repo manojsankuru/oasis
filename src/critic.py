@@ -280,10 +280,17 @@ class Claim:
 
 
 NAME_WITH_DIGIT = "a name carrying a digit"
-COVERAGE_EXEMPT: tuple[str, ...] = ("a URL", "a name in backticks", "a dataset vintage", NAME_WITH_DIGIT)
-IDENTIFIER_SPAN = re.compile(r"`[A-Za-z_][A-Za-z0-9_.\-]*`")
-DATASET_LABEL = re.compile(r"(?:ACS|3DEP|TIGER\w*|OSM|NFHL|SVI)\W{0,3}$")
-NAMED_DIGIT = re.compile(r"\d[A-Za-z_]|_")
+MASK_NAMES: dict[str, str] = {
+    "a URL": "URLs",
+    "a name in backticks": "backticked names",
+    "a dataset vintage": "vintages",
+    "an identifier of ten digits or more": "10+ digit identifiers",
+    "a list marker": "list markers",
+    NAME_WITH_DIGIT: "names with digits",
+}
+LABEL_MASKS: frozenset[str] = frozenset(
+    {"a URL", "a name in backticks", "a dataset vintage", NAME_WITH_DIGIT}
+)
 
 
 def hides(found: re.Match[str]) -> bool:
@@ -311,49 +318,19 @@ def masked(answer: str) -> str:
     return mask_spans(answer)[0]
 
 
-def exempt_span(label: str, answer: str, start: int, end: int) -> bool:
-    if label not in COVERAGE_EXEMPT:
-        return False
-    span = answer[start:end]
-    if label == "a URL":
-        return True
-    if label == "a name in backticks":
-        return bool(IDENTIFIER_SPAN.fullmatch(span))
-    if label == "a dataset vintage":
-        return bool(DATASET_LABEL.search(answer[max(0, start - 12):start]))
-    if label == NAME_WITH_DIGIT:
-        return bool(NAMED_DIGIT.search(span))
-    return False
-
-
-def exempt_numerals(answer: str) -> int:
-    _, spans = mask_spans(answer)
-    owner: dict[int, tuple[str, int, int]] = {}
-    for label, start, end in spans:
-        for at in range(start, end):
-            owner.setdefault(at, (label, start, end))
-    count = 0
-    for found in NUMBER.finditer(answer):
-        hits = [owner[at] for at in range(found.start(), found.end()) if at in owner]
-        if hits and exempt_span(hits[0][0], answer, hits[0][1], hits[0][2]):
-            count += 1
-    return count
-
-
-def numeral_accounting(answer: str) -> tuple[int, dict[str, int]]:
+def numeral_accounting(answer: str, found: list[Claim]) -> tuple[int, dict[str, int]]:
     _, spans = mask_spans(answer)
     owner: dict[int, str] = {}
     for label, start, end in spans:
         for at in range(start, end):
             owner.setdefault(at, label)
-    seen = 0
+    visible = "".join(character if at in owner else " " for at, character in enumerate(answer))
     by_reason: dict[str, int] = {}
-    for found in NUMBER.finditer(answer):
-        seen += 1
-        labels = [owner[at] for at in range(found.start(), found.end()) if at in owner]
-        if labels:
-            by_reason[labels[0]] = by_reason.get(labels[0], 0) + 1
-    return seen, by_reason
+    for match in NUMBER.finditer(visible):
+        if as_value(match.group(0)) is not None:
+            label = owner[match.start()]
+            by_reason[label] = by_reason.get(label, 0) + 1
+    return len(found) + sum(by_reason.values()), by_reason
 
 
 def as_value(text: str) -> float | None:
@@ -754,7 +731,6 @@ class Critic:
     untraced: list[Claim] = field(default_factory=list)
     numerals_seen: int = 0
     numerals_masked: dict[str, int] = field(default_factory=dict)
-    numerals_exempt: int = 0
 
     def check(
         self, answer: str, steps: list[dict[str, Any]], cycle: int
@@ -764,11 +740,10 @@ class Critic:
         found = claims(answer or "")
         self.traced = []
         self.untraced = []
-        self.numerals_seen, self.numerals_masked = numeral_accounting(answer or "")
-        self.numerals_exempt = exempt_numerals(answer or "")
+        self.numerals_seen, self.numerals_masked = numeral_accounting(answer or "", found)
 
         findings: list[CriticFinding] = []
-        if self._uncovered() and not found:
+        if self.numerals_seen > 0 and not found:
             findings.append(self._coverage_finding())
         if found and not calls:
             findings.append(
@@ -799,19 +774,17 @@ class Critic:
             numbers_traceable=len(self.traced),
         )
 
-    def _uncovered(self) -> int:
-        return self.numerals_seen - self.numerals_exempt
-
     def _coverage_finding(self) -> CriticFinding:
         reasons = ", ".join(
-            f"{label}: {count}"
+            f"{MASK_NAMES.get(label, label)} {count}"
             for label, count in sorted(self.numerals_masked.items(), key=lambda item: -item[1])
         )
+        advice = "Write each quantity outside backticks and list markers."
+        if set(self.numerals_masked) <= LABEL_MASKS:
+            advice += " If there is none, drop those digits."
         return finding(
             "untraceable_number",
-            f"the answer holds {self.numerals_seen} numeral(s) and none survived masking, "
-            "so none was checked and it cannot pass. Write each quantity outside backticks "
-            f"and list markers. Masked: {reasons}.",
+            f"{self.numerals_seen} numeral(s), none survived masking ({reasons}). {advice}",
         )
 
     def _number_findings(
@@ -1326,7 +1299,7 @@ def _mask_checks() -> list[tuple[str, bool]]:
     geoids = len(re.findall(r"(?<!\d)99001\d{6}(?!\d)", BACKTICKED_GEOID_ANSWER))
     box = Critic()
     report = box.check(BACKTICKED_GEOID_ANSWER, steps, 1)
-    masked_total = sum(box.numerals_masked.values())
+    raw_numerals = len(NUMBER.findall(BACKTICKED_GEOID_ANSWER))
     print(f"  the 4 Sep demo answer: claims {figures}")
     print(f"  {report.numbers_checked} of {box.numerals_seen} numerals checked, "
           f"masked {box.numerals_masked}")
@@ -1350,6 +1323,28 @@ def _mask_checks() -> list[tuple[str, bool]]:
         "Exposed population: n48200.",
     )
     invented_reports = [Critic().check(text, [], 1) for text in invented]
+    single_masks = (
+        "Only `surge_3_0m` was run.",
+        "Only surge_3_0m was run.",
+        "It holds ACS 2019-2023 estimates.",
+        "The source is https://example.org/acs/2023.",
+    )
+    single_reports = [Critic().check(text, [], 1) for text in single_masks]
+    every_mask = (
+        "See https://example.org/acs/2023 for the source. Under `surge_3_0m` and s_1_5m, "
+        "ACS 2019-2023 data:\n1. 99001000100\n2. 99001000200\n"
+    )
+    every_box = Critic()
+    every_report = every_box.check(every_mask, [], 1)
+    every_detail = " ".join(
+        item.detail for item in every_report.findings if COVERAGE_PHRASE in item.detail
+    )
+    print(f"    [untraceable_number] {every_detail}")
+    table = "GEOID,risk_score\n99001000100,0.83\n99001000200,0.81\n"
+    table_box = Critic()
+    table_report = table_box.check(
+        table, agent_shape([structured_call({"scores": [0.83, 0.81]})]), 1
+    )
     refusal_box = Critic()
     refusal = refusal_box.check(REFUSAL_ANSWER, [], 1)
     logged = as_result(report, box)
@@ -1359,8 +1354,12 @@ def _mask_checks() -> list[tuple[str, bool]]:
          figures == list(BACKTICKED_GEOID_FIGURES)),
         ("that answer passes with all six figures traced",
          report.passed and report.numbers_checked == 6 and report.numbers_traceable == 6),
-        ("every numeral in it is either checked or masked",
-         box.numerals_seen == report.numbers_checked + masked_total),
+        ("with no numeral crossing a mask edge, the count is the count before masking",
+         box.numerals_seen == raw_numerals),
+        ("a GEOID-first table row counts its GEOID as masked and its score as checked",
+         [item.text for item in claims(table)] == ["0.83", "0.81"]
+         and table_box.numerals_masked == {"an identifier of ten digits or more": 2}
+         and table_box.numerals_seen == 4 and table_report.passed),
         ("its GEOIDs are masked as identifiers, one numeral per GEOID",
          box.numerals_masked.get("an identifier of ten digits or more") == geoids),
         ("a correct answer with quantities raises no zero-coverage finding",
@@ -1369,15 +1368,26 @@ def _mask_checks() -> list[tuple[str, bool]]:
          hidden_box.numerals_seen > 0 and hidden.numbers_checked == 0 and not hidden.passed),
         ("the zero-coverage finding is an untraceable_number naming the masks",
          len(coverage) == 1 and coverage[0].kind == "untraceable_number"
-         and "a list marker" in coverage[0].detail
-         and "an identifier of ten digits or more" in coverage[0].detail),
+         and "list markers 2" in coverage[0].detail
+         and "10+ digit identifiers 2" in coverage[0].detail),
+        ("a fully masked list of identifiers is not told to drop its digits",
+         bool(coverage) and "drop those digits" not in coverage[0].detail),
         ("the zero-coverage finding is the only reason that answer fails",
          [item.kind for item in hidden.findings] == ["untraceable_number"]),
         ("the zero-coverage instruction survives the finding's length bound",
          bool(coverage) and "Write each quantity outside backticks" in coverage[0].detail),
-        ("a refusal whose only numerals sit in a name and a vintage raises no zero-coverage finding",
-         named_box.numerals_seen > 0 and named.numbers_checked == 0
-         and not any(COVERAGE_PHRASE in item.detail for item in named.findings)),
+        ("a refusal whose only numerals sit in a name and a vintage still fails as fully masked",
+         named_box.numerals_seen > 0 and named.numbers_checked == 0 and not named.passed
+         and any(COVERAGE_PHRASE in item.detail for item in named.findings)),
+        ("the zero-coverage finding tells an answer with no quantity what to drop",
+         any("If there is none, drop those digits." in item.detail for item in named.findings)),
+        ("an answer whose only numerals sit in one backticked name, bare name, vintage or URL fails",
+         all(not item.passed and any(COVERAGE_PHRASE in f.detail for f in item.findings)
+             for item in single_reports)),
+        ("with all six masks firing, the finding names every one and keeps its instruction",
+         set(every_box.numerals_masked) == set(MASK_NAMES)
+         and all(MASK_NAMES[label] in every_detail for label in every_box.numerals_masked)
+         and every_detail.endswith("Write each quantity outside backticks and list markers.")),
         ("a quantity hidden in backticks, a bare range or a digit token still raises the zero-coverage finding",
          all(any(COVERAGE_PHRASE in item.detail for item in report.findings)
              for report in invented_reports)),
@@ -2033,11 +2043,12 @@ def main() -> int:
         answer, steps, path = real
         where = str(path)
 
-    report = Critic().check(answer, steps, 1)
+    judge = Critic()
+    report = judge.check(answer, steps, 1)
     print(f"transcript: {where}\n")
     print(answer.strip())
     print()
-    print(json.dumps(as_result(report), indent=2))
+    print(json.dumps(as_result(report, judge), indent=2))
     return 0
 
 
