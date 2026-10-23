@@ -2043,3 +2043,19 @@ zero-change first-attempt success.
 **Why.** The fingerprints hashed raw working-tree bytes, and git converts text line endings between the index and the working tree.
 **Did the agent recover?** Not an agent run. Fixed in `6c9441e`, which fingerprints text with LF endings, and `cf36a60`, which adds `.gitattributes -text` for `outputs/paper/**` and `outputs/faults.json` and refreshes `numbers.json`. Fresh clones with `autocrlf=true` and `autocrlf=false` then matched 17 of 17 tracked fingerprints.
 **Kept as a paper failure case?** No.
+
+## 2026-10-23 — the critic's ordering gate replaced a data-provenance answer with a ranked list
+
+**What happened.** A live `python -m src.demo` run on 2026-10-23 (`logs/run_20261023_120753.jsonl`, `google/gemini-2.5-pro`) asked "What data is this analysis built on, where did each layer come from, and what did the cleaning stage have to fix before it could be used?". The first draft answered it: seven datasets with their sources, vintages and licences, and the alignment fixes that `describe_alignment` reported. The critic traced 18 of 18 numbers in it and still failed it with one `unsupported_claim`: "the answer orders communities by priority and names no weighting. Which units come first is a value judgement, not a fact; say which weighting decided it and where that weighting came from." The model then called `ask_user_preferences` and rewrote the answer as a ten-tract `svi_equal` ranking for `surge_1_5m`. Cycle 2 failed on an untraced `1.5`. Cycle 3 passed with 20 of 20 traced. The final answer names none of TIGER, ACS, 3DEP, OpenStreetMap or the reprojection. The run logged `revisions_that_made_it_worse: 0`. An earlier demo run the same morning, `run_20261023_113739`, answered the same question without this finding.
+**Where.** `src/critic.py`, `ORDERING_LANGUAGE` and `Critic._claim_findings`. `src/agent.py`, `Revisions.record`.
+**Why.** The ordering gate is a keyword match. Its `rank\w*` matched "rankings" in the cleaning note "This tract will be excluded from any rankings that use these indicators." The draft named no weighting because it ranks nothing. `Revisions.record` counts a revision as worse only when it raises the number of findings, and the findings per cycle were 1, 1, 0.
+**Did the agent recover?** No. The run spent two revision turns (6 model calls in total), and the final answer does not answer the question.
+**Kept as a paper failure case?** Not decided. It is a recurrence of the 2026-10-22 ordering-gate entry, which is kept.
+
+## 2026-10-23 — the ordering gate fired twice more on the data-provenance answer
+
+**What happened.** A second live `python -m src.demo` run on 2026-10-23 (`logs/run_20261023_123437.jsonl`, `google/gemini-2.5-pro`) asked the same data-provenance question. Cycle 1 failed with two findings: "the answer reports -9999, and no logged tool result produced a number that rounds to it", quoting "No non-numeric sentinel codes, like -9999, were found", and "the answer orders communities by priority and names no weighting". The revised draft dropped the `-9999` example but kept the sentence "it could not be scored and is not included in any vulnerability ranking", and cycle 2 raised the same ordering finding again. Cycle 3 dropped that sentence and passed with 15 of 15 numbers traced. The final answer still names TIGER, the American Community Survey, 3DEP and OpenStreetMap.
+**Where.** `src/critic.py`, `ORDERING_LANGUAGE` and `Critic._claim_findings`.
+**Why.** The keyword `rank\w*` matched "ranking" in a cleaning note about an unscored tract. The draft orders nothing, so it names no weighting.
+**Did the agent recover?** Yes, after two revision turns (5 model calls in total), by deleting the sentence that held the word.
+**Kept as a paper failure case?** Not decided. It is the third occurrence of the 2026-10-22 ordering-gate entry.
