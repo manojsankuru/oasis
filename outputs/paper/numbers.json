@@ -285,7 +285,7 @@
       }
     }
   },
-  "generated_at": "2026-10-22T22:45:22.158296+00:00",
+  "generated_at": "2026-10-23T15:02:05.601562+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -635,28 +635,7 @@
       "value": 2
     }
   },
-  "remaining_paper_todos": [
-    {
-      "line": 8,
-      "text": "\\acmConference[Conference Name]{Conference Full Name}{Month Day--Day, 2026}{City, State, USA}"
-    },
-    {
-      "line": 9,
-      "text": "\\acmBooktitle{Proceedings of the Conference Name}"
-    },
-    {
-      "line": 11,
-      "text": "\\acmDOI{}"
-    },
-    {
-      "line": 12,
-      "text": "\\acmISBN{}"
-    },
-    {
-      "line": 62,
-      "text": "\\email{[email address]}"
-    }
-  ],
+  "remaining_paper_todos": [],
   "risk": {
     "primary": {
       "row_counts": {
@@ -1997,9 +1976,9 @@
       "sha256": "7868bf2ea73c8a400dc3f8faa97761e06f5de06c9caade391b0471adc1d692a2"
     },
     "paper/main.tex": {
-      "bytes": 17248,
+      "bytes": 17008,
       "role": "paper placeholder source",
-      "sha256": "6a788d8257a6d20bf93c270fd657617a21c4f553c3c5cd9685435b8ba5737eb3"
+      "sha256": "2783ce6229086533220af7ec6aea64ee64c3b95625b0ca412114bbc6ed95a9b6"
     },
     "src/agent.py": {
       "bytes": 15749,
@@ -3654,7 +3633,7 @@
       "selector": "line scan for explicit TODO/TBD, bracketed author placeholders, and template instructions",
       "source": "paper/main.tex",
       "unit": "prose TODO lines",
-      "value": 5
+      "value": 0
     },
     "unused_paper_keys": []
   }
