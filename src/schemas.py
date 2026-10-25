@@ -23,26 +23,34 @@ serialised JSON, not on the dict, because the string is what crosses the wire.
 
 **Nothing here is written down twice.** The eleven names come from
 `contracts.TOOL_NAMES`, the weight arguments from
-`contracts.VULNERABILITY_INDICATORS`, the scenario names from
-`hazard.HAZARD_SCENARIOS` and the preset names from
+`contracts.VULNERABILITY_INDICATORS` and `vulnerability.WEIGHT_KEYS`, the scenario
+names from `hazard.HAZARD_SCENARIOS` and the preset names from
 `vulnerability.WEIGHT_PRESETS`. A sixth indicator added to the contract grows a
 sixth weight argument with no edit here, and a description that lists the legal
 values cannot drift from the values that are actually legal. The previous version
 of this file advertised four tools whose names were in none of those places and
 which nothing could run.
+
+**A person's own words reach the ranking through these arguments.** The model
+reads a sentence such as "older residents and households without a car matter
+most" and turns it into `weight_*` values on `risk_scenario` and
+`compare_scenarios`, with the sentence itself in `preference`. Each weight
+argument's description carries the one-sentence rationale its indicator or term
+already has, because that sentence is what the model maps the person's words onto.
 """
 
 from __future__ import annotations
 
 import json
 import sys
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from . import verify, vulnerability
 from .contracts import TOOL_NAMES, VULNERABILITY_INDICATORS
 from .hazard import HAZARD_SCENARIOS
+from .risk import COMPONENT_RATIONALE
 from .vulnerability import DEFAULT_PRESET, INDICATOR_RATIONALE, WEIGHT_PRESETS
 
 SCALAR_TYPES: frozenset[str] = frozenset({"string", "number", "integer", "boolean"})
@@ -95,9 +103,30 @@ def weighted_indicator(argument: str) -> str:
     return argument[len(WEIGHT_ARG_PREFIX):]
 
 
-def weight_arguments() -> tuple[str, ...]:
-    """One override argument per indicator, enumerated from the contract."""
-    return tuple(weight_argument(name) for name in VULNERABILITY_INDICATORS)
+def weight_arguments(keys: tuple[str, ...] = VULNERABILITY_INDICATORS) -> tuple[str, ...]:
+    """One override argument per weightable key, enumerated from the contract."""
+    return tuple(weight_argument(name) for name in keys)
+
+
+RISK_WEIGHT_KEYS: tuple[str, ...] = vulnerability.WEIGHT_KEYS
+"""What `risk_scenario` and `compare_scenarios` can weight: the five indicators
+and the four objective terms, which are the two halves of a `WeightPreset`.
+
+`vulnerability_index` weights only the first half, because the index is all it
+computes. The risk tools rank on both, so a person who says "how many people are
+flooded matters more than what they can reach" is stating an objective weight,
+and a surface that carried indicator weights alone would have nowhere to put it."""
+
+RISK_WEIGHT_TOOLS: tuple[str, ...] = ("risk_scenario", "compare_scenarios")
+"""The two tools that can rank under a weighting built from a person's words."""
+
+WEIGHT_RATIONALE: dict[str, str] = {**INDICATOR_RATIONALE, **COMPONENT_RATIONALE}
+"""One sentence per weightable key, read from the two modules that own them."""
+
+USER_WEIGHTING = "user"
+"""The name, and the `WeightPreset.origin`, of a weighting built from a person's
+own words. The frozen contract already allows `origin="user"`; this is the one
+place the name is written, so the tools and the descriptions cannot disagree."""
 
 
 SCENARIO_NAMES: tuple[str, ...] = tuple(item.name for item in HAZARD_SCENARIOS)
@@ -125,6 +154,75 @@ _TOP_N_HELP = (
     f"How many units to return, highest first, between 1 and {MAX_TOP_N}. "
     "The result always says how many units it omitted and why."
 )
+
+_PREFERENCE_HELP = (
+    "The person's own words that the weight arguments came from, copied unchanged "
+    "from ask_user_preferences' stated_preference or from their question; words "
+    "found in neither are refused. Needed whenever a weight is set, and refused when "
+    f"none is: a weighting named '{USER_WEIGHTING}' has to carry the sentence it was "
+    "built from. Leave empty to rank under a named weighting."
+)
+
+_BASE_PRESET_HELP = (
+    "The named weighting whose values fill every weight left unset, when a weight "
+    f"argument is set. One of {_named(PRESET_NAMES)}; leave empty for "
+    f"{DEFAULT_PRESET.name}. With no weight set every named weighting is compared "
+    "whichever one this names, and an unknown name is refused either way."
+)
+
+
+def _index_weight_help(name: str) -> str:
+    """What `vulnerability_index` tells the model about one indicator's weight."""
+    return (
+        f"Relative weight on {name}. {INDICATOR_RATIONALE[name]} "
+        f"Weights are relative and are scaled to sum to one, so 2 and 1 "
+        f"mean the same as 0.5 and 0.25. Leave at {UNSET_WEIGHT} to keep "
+        "the chosen weighting's own value for this indicator; a negative "
+        "weight is refused by the index itself, which is why one can mean "
+        "'unset' here."
+    )
+
+
+def _risk_weight_help(name: str) -> str:
+    """What the two risk tools tell the model about one weightable key."""
+    half = "indicators" if name in VULNERABILITY_INDICATORS else "objective terms"
+    return (
+        f"Weight on {name}, one of the {half}: {WEIGHT_RATIONALE[name]}. Relative, "
+        f"scaled to sum to one across the {half}. Leave at {UNSET_WEIGHT} to keep "
+        "the named weighting's value; set it only when the person's words name it."
+    )
+
+
+def _weight_fields(keys: tuple[str, ...], helper: Callable[[str], str]) -> dict[str, Any]:
+    """One flat float argument per key, defaulting to the unset sentinel.
+
+    Shared by the three tools that take weights, so all three are built the same
+    way: a plain `float` with a default, never `float | None`, which would emit
+    the `anyOf` this file's check refuses.
+    """
+    return {
+        weight_argument(name): (
+            float,
+            Field(default=UNSET_WEIGHT, description=helper(name)),
+        )
+        for name in keys
+    }
+
+
+_EXTRAS_REACH_THE_TOOL = ConfigDict(extra="allow")
+"""Unknown arguments reach the three tools that take weights instead of being
+dropped here.
+
+Every other model drops an argument it does not know, which is right for a stray
+`nonsense=1`. It is wrong for `weight_pct_elderly=3`: dropped here, the call
+ranks as though the person had said nothing about age, and the answer still
+reads as following them. Passed through, the tool refuses an unknown `weight_*`
+name and lists the legal ones. `parameters()` takes the `additionalProperties`
+keyword this adds back out, so the wire schema reads like every other tool's.
+
+`vulnerability_index` carries it too. Its weights are indicators only, and the
+risk tools' descriptions now teach the model four objective-term weight names it
+would otherwise pass here and lose."""
 
 
 # ---------------------------------------------------------------------------
@@ -176,23 +274,46 @@ class HazardExposureArgs(BaseModel):
     top_n: int = Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)
 
 
-class RiskScenarioArgs(BaseModel):
-    scenario: str = Field(default=UNSET_NAME, description=_SCENARIO_HELP)
-    preset: str = Field(default=UNSET_NAME, description=_PRESET_HELP)
-    top_n: int = Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)
+RiskScenarioArgs = create_model(
+    "RiskScenarioArgs",
+    __config__=_EXTRAS_REACH_THE_TOOL,
+    __doc__=(
+        "One priority ranking, under a named weighting or under one built from the "
+        "person's words. The weights are generated from vulnerability.WEIGHT_KEYS, "
+        "so both halves of a weighting are arguments."
+    ),
+    scenario=(str, Field(default=UNSET_NAME, description=_SCENARIO_HELP)),
+    preset=(str, Field(default=UNSET_NAME, description=_PRESET_HELP)),
+    top_n=(int, Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)),
+    preference=(str, Field(default=UNSET_NAME, description=_PREFERENCE_HELP)),
+    **_weight_fields(RISK_WEIGHT_KEYS, _risk_weight_help),
+)
 
 
-class CompareScenariosArgs(BaseModel):
-    scenario: str = Field(default=UNSET_NAME, description=_SCENARIO_HELP)
-    priority_units: int = Field(
-        default=DEFAULT_TOP_N,
-        ge=1,
-        le=MAX_TOP_N,
-        description=(
-            "How long each weighting's priority list is. The comparison is over "
-            "lists of this length, so who a weighting drops depends on it."
+CompareScenariosArgs = create_model(
+    "CompareScenariosArgs",
+    __config__=_EXTRAS_REACH_THE_TOOL,
+    __doc__=(
+        "The trade-off table. With weights set, the person's weighting is one more "
+        "row, compared against every named weighting pair by pair."
+    ),
+    scenario=(str, Field(default=UNSET_NAME, description=_SCENARIO_HELP)),
+    priority_units=(
+        int,
+        Field(
+            default=DEFAULT_TOP_N,
+            ge=1,
+            le=MAX_TOP_N,
+            description=(
+                "How long each weighting's priority list is. The comparison is over "
+                "lists of this length, so who a weighting drops depends on it."
+            ),
         ),
-    )
+    ),
+    preset=(str, Field(default=UNSET_NAME, description=_BASE_PRESET_HELP)),
+    preference=(str, Field(default=UNSET_NAME, description=_PREFERENCE_HELP)),
+    **_weight_fields(RISK_WEIGHT_KEYS, _risk_weight_help),
+)
 
 
 class AskUserPreferencesArgs(BaseModel):
@@ -232,6 +353,7 @@ class ValidateAnswerArgs(BaseModel):
 
 VulnerabilityIndexArgs = create_model(
     "VulnerabilityIndexArgs",
+    __config__=_EXTRAS_REACH_THE_TOOL,
     __doc__=(
         "The weighted percentile index. Weights are arguments, one per indicator, "
         "generated from contracts.VULNERABILITY_INDICATORS so that the contract and "
@@ -239,23 +361,7 @@ VulnerabilityIndexArgs = create_model(
     ),
     preset=(str, Field(default=UNSET_NAME, description=_PRESET_HELP)),
     top_n=(int, Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)),
-    **{
-        weight_argument(name): (
-            float,
-            Field(
-                default=UNSET_WEIGHT,
-                description=(
-                    f"Relative weight on {name}. {INDICATOR_RATIONALE[name]} "
-                    f"Weights are relative and are scaled to sum to one, so 2 and 1 "
-                    f"mean the same as 0.5 and 0.25. Leave at {UNSET_WEIGHT} to keep "
-                    "the chosen weighting's own value for this indicator; a negative "
-                    "weight is refused by the index itself, which is why one can mean "
-                    "'unset' here."
-                ),
-            ),
-        )
-        for name in VULNERABILITY_INDICATORS
-    },
+    **_weight_fields(VULNERABILITY_INDICATORS, _index_weight_help),
 )
 
 
@@ -326,20 +432,29 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "Combine hazard, exposed population, vulnerability and resilience into one "
         "priority ranking for a named scenario under a named weighting. Every "
         "component is reported as its own number beside the score, and the score is "
-        "county-relative: it says which units here are worst, never whether here is bad."
+        "county-relative: it says which units here are worst, never whether here is bad. "
+        "To follow a person's own words, set the weight_* arguments their words name "
+        "and pass their sentence as preference: the ranking is then made under a "
+        f"weighting named '{USER_WEIGHTING}', and the result reports the weights used."
     ),
     "compare_scenarios": (
         "Run every named weighting against one scenario and report the trade-off: "
         "who each weighting prioritises, how many residents and how many vulnerable "
         "residents that covers, and WHICH UNITS EACH WEIGHTING DROPS that another "
         "would have prioritised. Use this whenever the answer depends on a value "
-        "judgement, which is whenever it is a priority ordering."
+        "judgement, which is whenever it is a priority ordering. With weight_* "
+        "arguments and preference set, the person's weighting is added and compared "
+        "with each named weighting in turn, naming the units each pair disagrees on."
     ),
     "ask_user_preferences": (
         "Ask the human which weighting to use, and get back every available "
         "weighting with its weights, where it came from, and the URL of its source. "
         "Call this BEFORE deciding a priority order, not after: which communities "
-        "come first depends on a value judgement that is not yours to make."
+        "come first depends on a value judgement that is not yours to make. The "
+        "person may pick from the menu or answer in their own words; a sentence "
+        "comes back unchanged as stated_preference, for you to map onto weight_* "
+        "arguments. elicited says who answered: true for a person, 'scripted' for "
+        "a harness, false for nobody."
     ),
     "run_spatial_code": (
         "Write and execute Python against the cleaned layers, and get back stdout, "
@@ -378,10 +493,16 @@ def parameters(model: type[BaseModel]) -> dict[str, Any]:
     of "Top N" beside a `description` that says the same thing in a sentence -- and
     because their absence makes the emitted schema short enough to read in the gate
     output, which is where anybody checks it for a `$ref`.
+
+    `additionalProperties` is removed for the two risk tools, whose models let an
+    unknown argument through so the tool can refuse a misspelled weight by name.
+    Without the keyword JSON Schema already permits extra properties, so the wire
+    schema says the same thing and reads like every other tool's.
     """
     schema = model.model_json_schema()
     schema.pop("title", None)
     schema.pop("description", None)
+    schema.pop("additionalProperties", None)
     schema.setdefault("properties", {})
     for prop in schema["properties"].values():
         prop.pop("title", None)
@@ -578,6 +699,80 @@ def _sentinel_checks() -> list[tuple[str, bool]]:
     ]
 
 
+def _risk_weight_checks() -> list[tuple[str, bool]]:
+    """That both risk tools carry both halves of a weighting, and nothing else.
+
+    Compared against `vulnerability.WEIGHT_KEYS` directly rather than against
+    `RISK_WEIGHT_KEYS`, which is derived from it: a key pasted into the derived
+    tuple would otherwise agree with itself.
+    """
+    wanted = set(weight_arguments(vulnerability.WEIGHT_KEYS))
+    carried = {
+        name: {
+            argument
+            for argument in TOOL_ARG_MODELS[name].model_fields
+            if argument.startswith(WEIGHT_ARG_PREFIX)
+        }
+        for name in RISK_WEIGHT_TOOLS
+    }
+    described = {
+        name: {
+            argument: field.description or ""
+            for argument, field in TOOL_ARG_MODELS[name].model_fields.items()
+            if argument.startswith(WEIGHT_ARG_PREFIX)
+        }
+        for name in RISK_WEIGHT_TOOLS
+    }
+    typo = weight_argument("pct_elderly")
+    reached = {
+        name: TOOL_ARG_MODELS[name](**{typo: 3.0}).model_dump().get(typo)
+        for name in (*RISK_WEIGHT_TOOLS, "vulnerability_index")
+    }
+    dropped = TOOL_ARG_MODELS["hazard_exposure"](**{typo: 3.0}).model_dump()
+    wire = {
+        spec["function"]["name"]: spec["function"]["parameters"]
+        for spec in TOOL_SPECS
+    }
+    print(f"  weight arguments per risk tool: "
+          f"{ {name: len(found) for name, found in carried.items()} } "
+          f"of {len(vulnerability.WEIGHT_KEYS)} weightable keys")
+    print(f"  a misspelled weight reaches each tool that takes weights as {reached}")
+
+    return [
+        ("each risk tool carries one weight argument per weightable key, both halves",
+         all(found == wanted for found in carried.values())
+         and len(wanted) == len(vulnerability.WEIGHT_KEYS)
+         and len(wanted) > len(VULNERABILITY_INDICATORS)),
+        ("each risk tool takes the sentence its weights came from",
+         all("preference" in TOOL_ARG_MODELS[name].model_fields for name in RISK_WEIGHT_TOOLS)),
+        ("every weight argument carries the sentence the model maps words onto",
+         all(
+             WEIGHT_RATIONALE[weighted_indicator(argument)] in text
+             for found in described.values()
+             for argument, text in found.items()
+         )
+         and set(WEIGHT_RATIONALE) == set(vulnerability.WEIGHT_KEYS)),
+        ("a risk weight left alone is the unset sentinel, not a weight",
+         all(
+             TOOL_ARG_MODELS[name].model_fields[argument].default == UNSET_WEIGHT
+             for name in RISK_WEIGHT_TOOLS
+             for argument in carried[name]
+         )),
+        ("a misspelled weight reaches all three tools that take weights, to be refused",
+         all(value == 3.0 for value in reached.values()) and len(reached) == 3),
+        ("a tool that takes no weights still drops an argument it does not know",
+         typo not in dropped),
+        ("the risk tools' wire schema carries no additionalProperties, like every other",
+         not any("additionalProperties" in schema for schema in wire.values())),
+        ("the vulnerability index still weights the indicators only",
+         {
+             argument
+             for argument in VulnerabilityIndexArgs.model_fields
+             if argument.startswith(WEIGHT_ARG_PREFIX)
+         } == set(weight_arguments(VULNERABILITY_INDICATORS))),
+    ]
+
+
 _PLACEHOLDERS: dict[type, Any] = {str: "x", float: 1.0, int: 1, bool: True}
 
 
@@ -717,6 +912,14 @@ def _derivation_checks() -> list[tuple[str, bool]]:
          f"{DEFAULT_PRESET.name} is the default" in text),
         ("every indicator in the contract reaches the specs as an argument",
          all(weight_argument(name) in text for name in VULNERABILITY_INDICATORS)),
+        ("every weightable key reaches both risk tools' specs as an argument",
+         all(
+             weight_argument(name) in serialised([spec])
+             for spec in TOOL_SPECS
+             if spec["function"]["name"] in RISK_WEIGHT_TOOLS
+             for name in vulnerability.WEIGHT_KEYS
+         )
+         and len(RISK_WEIGHT_TOOLS) == 2),
     ]
 
 
@@ -727,6 +930,8 @@ def _self_check() -> int:
     checks += _flatness_checks()
     print()
     checks += _sentinel_checks()
+    print()
+    checks += _risk_weight_checks()
     print()
     checks += _validation_checks()
     print()
