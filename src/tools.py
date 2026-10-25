@@ -46,6 +46,8 @@ import importlib
 import importlib.util
 import io
 import json
+import math
+import os
 import re
 import sys
 import tempfile
@@ -63,6 +65,7 @@ from .contracts import (
     VULNERABILITY_INDICATORS,
     Col,
     HazardScenario,
+    ScenarioRow,
     ToolFn,
     ToolResult,
     WeightPreset,
@@ -180,9 +183,25 @@ def logged_calls() -> list[dict[str, Any]]:
     return list(CALLS)
 
 
-def forget_calls() -> None:
-    """Drop the call log. A new question is a new traceability question."""
+QUESTION = ""
+"""The question this run was asked, as `agent.run_agent` passed it to `forget_calls`.
+
+Held so a weighting built from a person's words can be traced to somewhere they
+said them. A tool never sees the conversation; this one string is the part of it
+`preference_trace` may read."""
+
+
+def forget_calls(question: str = "") -> None:
+    """Drop the call log and start a new question. A new question is a new
+    traceability question.
+
+    The scripted-reply cursor goes with it, so each question a harness asks starts
+    at the first reply its script holds rather than wherever the last one stopped.
+    """
+    global _SCRIPT_POSITION, QUESTION
     CALLS.clear()
+    _SCRIPT_POSITION = 0
+    QUESTION = question
 
 
 # ---------------------------------------------------------------------------
@@ -508,6 +527,297 @@ def overridden_weights(preset: WeightPreset, overrides: dict[str, float]) -> tup
 
 
 # ---------------------------------------------------------------------------
+# a weighting built from a person's own words
+# ---------------------------------------------------------------------------
+
+
+HEMISPHERE_PAIR = re.compile(
+    r"[NSEWnsew]?\s*-?\d+\.\d+\s*°?\s*[NSEWnsew]?"
+    r"\s*(?:[,;/|\s()\[\]]|\s-\s)+\s*"
+    r"[NSEWnsew]?\s*-?\d+\.\d+"
+)
+"""Two decimal numbers with a hemisphere letter, a degree sign, a slash, a bar, a
+semicolon or a spaced dash beside them: `20.6543 N 10.1234 W`, `N20.6543
+W10.1234`, `20.65°N, 10.12°W`, `20.6543/-10.1234`, `20.6543 - 10.1234`.
+
+The shapes `sandbox.output_faults` does not reach, because its pair rule allows
+only space, comma and brackets between the two numbers. Narrow on purpose: two
+weights a person states as "age 0.4 and car 0.4" have words between them and
+pass, and an unspaced dash is a range, as in "1.5-3.0 m"."""
+
+CARRIES_COORDINATE = "the words could carry a coordinate"
+GUARD_UNAVAILABLE = (
+    "the coordinate guard in sandbox.py could not be loaded, so no free text can be "
+    "checked and none is quoted back"
+)
+
+
+def coordinate_refusal(text: str) -> str:
+    """Why these free-text words may not be quoted into a model message, or "".
+
+    A person's words are the one free text this module quotes back, so they are
+    held to the widest rule this project has: `coordinate_faults` on the string,
+    `HEMISPHERE_PAIR` for the separators other rules do not allow, and
+    `sandbox.output_faults` on every line, which covers WKT, GeoJSON, labelled
+    pairs and pairs rounded to three places. `sandbox` imports this module, so it
+    is imported here, at call time. If it cannot be imported every reply is
+    refused, and the reason says so rather than blaming the words: a guard that
+    fails open is not a guard, and one that fails with a false reason misleads.
+
+    Not covered, stated rather than implied: degrees, minutes and seconds written
+    as integers, a single coordinate standing alone, and a pair with a word
+    between, as in "20.6543 and -10.1234" -- matching that would refuse "the 1.5
+    and 3.0 m scenarios". Refused though harmless: replies that use the word
+    "coordinates", or put a decimal right after a coordinate-like label such as x.
+    The prompt asks once more when it refuses a reply.
+    """
+    try:
+        from . import sandbox
+    except ImportError:
+        return GUARD_UNAVAILABLE
+    if coordinate_faults({"stated_preference": text}) or HEMISPHERE_PAIR.search(text):
+        return CARRIES_COORDINATE
+    if any(sandbox.output_faults(line) for line in text.splitlines() or [text]):
+        return CARRIES_COORDINATE
+    return ""
+
+
+def requested_weights(arguments: dict[str, Any]) -> tuple[dict[str, float], list[str]]:
+    """The weights a risk tool call set, by weightable name, and any misspelled.
+
+    An argument left at `schemas.UNSET_WEIGHT` was not set. One that starts
+    `weight_` and names no weightable key comes back as misspelled, so the tool can
+    refuse it by name. Any other unknown argument is ignored, as every tool
+    ignores one.
+    """
+    legal = set(schemas.weight_arguments(schemas.RISK_WEIGHT_KEYS))
+    chosen: dict[str, float] = {}
+    misspelled: list[str] = []
+    for argument, value in arguments.items():
+        if not argument.startswith(schemas.WEIGHT_ARG_PREFIX):
+            continue
+        if argument not in legal:
+            misspelled.append(argument)
+        elif value != schemas.UNSET_WEIGHT:
+            chosen[schemas.weighted_indicator(argument)] = float(value)
+    return chosen, sorted(misspelled)
+
+
+def user_weighting(
+    base: WeightPreset, arguments: dict[str, Any], preference: str
+) -> WeightPreset | None:
+    """The weighting a person's words describe, or None when no weight was set.
+
+    A weight the call left unset keeps `base`'s value, the rule
+    `vulnerability_index` already applies to its overrides. What comes back is a
+    `WeightPreset` with `origin="user"` and the person's sentence as its
+    `origin_note`, which the frozen contract already allows, so it travels through
+    `scored` and `Risk.compare_presets` exactly as a published weighting does.
+
+    Four refusals, each a way a ranking could claim to follow somebody it does not.
+    A misspelled weight drops part of what they said. Weights with no sentence are
+    a preference nobody stated. A sentence with no weight ranks under the default
+    while reading as theirs. A negative or all-zero half is refused by
+    `normalised_weights` before any unit is scored.
+    """
+    chosen, misspelled = requested_weights(arguments)
+    if misspelled:
+        raise KeyError(
+            f"{misspelled} name no weightable key; the weight arguments are "
+            f"{list(schemas.weight_arguments(schemas.RISK_WEIGHT_KEYS))}. A misspelled "
+            "weight is part of what the person said, dropped in silence"
+        )
+    unreadable = {name: value for name, value in chosen.items() if not math.isfinite(value)}
+    if unreadable:
+        raise ValueError(
+            f"the weights {unreadable} are not finite numbers. Python's JSON reader "
+            "accepts NaN and Infinity, and either one would rank every unit on a "
+            "number that means nothing"
+        )
+    stated = preference.strip()
+    if not chosen:
+        if stated:
+            raise ValueError(
+                "a stated preference arrived with no weight set, so the ranking would "
+                "be the named weighting's while reading as the person's. Map their "
+                "words to weight_* arguments first, or leave preference empty"
+            )
+        return None
+    if not stated:
+        raise ValueError(
+            f"weights for {sorted(chosen)} were set with no preference. A weighting "
+            f"named '{schemas.USER_WEIGHTING}' carries the sentence it was built from: "
+            "pass the person's words unchanged as preference, or use a named weighting"
+        )
+    refusal = coordinate_refusal(stated)
+    if refusal:
+        raise ValueError(
+            f"the preference cannot be echoed into this result: {refusal}. "
+            "Invariant 3 keeps geometry out of every model message. Pass the "
+            "person's words without the location in them"
+        )
+    weights = {**base.weights, **chosen}
+    vulnerability.normalised_weights(weights, VULNERABILITY_INDICATORS)
+    vulnerability.normalised_weights(weights, vulnerability.OBJECTIVE_TERMS)
+    return WeightPreset(
+        name=schemas.USER_WEIGHTING,
+        weights=weights,
+        origin=schemas.USER_WEIGHTING,
+        origin_note=stated,
+    )
+
+
+def _comparable(text: str) -> str:
+    """Words as compared for a trace: case folded and runs of whitespace collapsed."""
+    return " ".join(text.casefold().split())
+
+
+MIN_QUOTED_WORDS = 3
+"""The fewest words a preference may quote from the question.
+
+A single character or a single word of a question states nothing -- "?" and
+"first" are in almost every question -- and a trace that accepted them would let
+any weights rank under a label crediting whoever wrote the question."""
+
+
+def _quoted_from_question(stated: str) -> bool:
+    """Do these words appear in the question, whole and on word boundaries?
+
+    What this cannot check, stated rather than implied: that the weights follow
+    the words. That mapping is the model's, made in the open as `weight_*`
+    arguments beside the quoted words, where a reader can disagree with it.
+    """
+    if len(stated.split()) < MIN_QUOTED_WORDS:
+        return False
+    pattern = rf"(?<!\w){re.escape(stated)}(?!\w)"
+    return re.search(pattern, _comparable(QUESTION)) is not None
+
+
+def preference_trace(preference: str) -> dict[str, Any]:
+    """Who stated the sentence behind a user weighting, as far as this run shows.
+
+    A tool never sees the conversation, so two places count. A reply that
+    `ask_user_preferences` returned on this question, which says whether a person
+    or a script gave it. Or the question itself, as `forget_calls` was given it, when
+    the words appear in it unchanged. Anywhere else, `answered_by` is None, and
+    `stated_weighting` refuses to rank under words nobody on this question said.
+    """
+    stated = _comparable(preference)
+    for call in reversed(logged_calls()):
+        result = call.get("result") or {}
+        if (
+            call.get("tool") == "ask_user_preferences"
+            and stated
+            and _comparable(str(result.get("stated_preference") or "")) == stated
+        ):
+            return {
+                "answered_by": "person" if result.get("elicited") is True else "script",
+                "traced_to": "ask_user_preferences",
+                "elicited": result.get("elicited"),
+                "channel": result.get("channel"),
+            }
+    if _quoted_from_question(stated):
+        return {
+            "answered_by": "question",
+            "traced_to": "the question this run was asked",
+            "note": (
+                "these words appear unchanged in the question, so whoever wrote the "
+                "question stated them; no ask_user_preferences reply did"
+            ),
+        }
+    return {
+        "answered_by": None,
+        "traced_to": None,
+        "note": (
+            "neither an ask_user_preferences reply on this question nor the question "
+            "itself holds these words, so they are not verified as anybody's"
+        ),
+    }
+
+
+class UnstatedPreference(ValueError):
+    """A weighting called the person's, built from words nobody on this question said."""
+
+
+def stated_weighting(
+    base: WeightPreset, arguments: dict[str, Any], preference: str
+) -> tuple[WeightPreset | None, dict[str, Any]]:
+    """`user_weighting`, refused unless somebody on this question said the words.
+
+    The rule "never invent a preference the person did not state" is written in
+    `agent.RULES`, and a rule a model is only asked to follow is a rule it can
+    break. This is where it is enforced: a weighting called the person's has to
+    trace to a reply or to the question, or nothing is ranked under it.
+    """
+    user = user_weighting(base, arguments, preference)
+    if user is None:
+        return None, {}
+    trace = preference_trace(user.origin_note)
+    if trace["answered_by"] is None:
+        raise UnstatedPreference(
+            "no ask_user_preferences reply on this question and no part of the "
+            "question holds these words, so ranking under them would credit a "
+            "preference to somebody who never stated it. Pass the person's words "
+            "unchanged, or use a named weighting and say nobody chose it"
+        )
+    return user, trace
+
+
+def user_fields(
+    user: WeightPreset, base: WeightPreset, arguments: dict[str, Any], trace: dict[str, Any]
+) -> dict[str, Any]:
+    """What a ranking under a person's words adds to a result: who said the words,
+    the words, and the weights as set and as used.
+
+    The weights used are the two halves scaled by `normalised_weights`, the call
+    the index and the score make themselves, so the numbers the model is told to
+    state are numbers a tool returned -- from either risk tool, not only one.
+    """
+    chosen, _ = requested_weights(arguments)
+    return {
+        "answered_by": trace["answered_by"],
+        "stated_preference": user.origin_note,
+        "preference_trace": trace,
+        "weights_set": _numbers(chosen),
+        "unset_weights_from": base.name,
+        "indicator_weights_used": _numbers(
+            vulnerability.normalised_weights(user.weights, VULNERABILITY_INDICATORS)
+        ),
+        "component_weights": _numbers(
+            vulnerability.normalised_weights(user.weights, vulnerability.OBJECTIVE_TERMS)
+        ),
+    }
+
+
+def pairs_against(rows: list[ScenarioRow], name: str) -> list[dict[str, Any]]:
+    """One weighting's priority list against each other weighting's, a pair at a time.
+
+    Set differences over the GEOIDs `Risk.compare_presets` already chose, each kept
+    in its own list's rank order. No unit is scored here. `ScenarioRow.
+    displaced_geoids` pools every other weighting into one set, which says who a
+    weighting drops but not whose list they came from; this says whose.
+    """
+    mine = [row for row in rows if row.preset == name][0].top_geoids
+    pairs: list[dict[str, Any]] = []
+    for row in rows:
+        if row.preset == name:
+            continue
+        dropped = [geoid for geoid in row.top_geoids if geoid not in mine]
+        added = [geoid for geoid in mine if geoid not in row.top_geoids]
+        pairs.append(
+            {
+                "against": row.preset,
+                "dropped": _capped(dropped),
+                "dropped_count": len(dropped),
+                "added": _capped(added),
+                "added_count": len(added),
+                "shared_count": len(mine) - len(added),
+            }
+        )
+    return pairs
+
+
+# ---------------------------------------------------------------------------
 # the eleven tools
 # ---------------------------------------------------------------------------
 
@@ -825,13 +1135,36 @@ def hazard_exposure(scenario: str = "", top_n: int = schemas.DEFAULT_TOP_N) -> T
 def vulnerability_index(
     preset: str = "",
     top_n: int = schemas.DEFAULT_TOP_N,
-    **overrides: float,
+    **overrides: Any,
 ) -> ToolResult:
-    """The weighted percentile index, under a named weighting or an overridden one."""
+    """The weighted percentile index, under a named weighting or an overridden one.
+
+    A `weight_*` argument naming no indicator is refused by name, as the risk
+    tools refuse one. The index weights indicators only, so an objective term such
+    as `weight_exposed_population` -- legal on `risk_scenario` -- is refused here
+    with a pointer there, rather than dropped while the index ranks as though the
+    person had said nothing.
+    """
     try:
         chosen = _preset(preset)
     except KeyError as exc:
         return {**_refusal(exc, "unknown preset"), "presets": sorted(PRESETS)}
+    unknown = sorted(
+        argument
+        for argument in overrides
+        if argument.startswith(schemas.WEIGHT_ARG_PREFIX)
+        and argument not in schemas.weight_arguments()
+    )
+    if unknown:
+        return {
+            "error": "invalid weighting",
+            "detail": (
+                f"{unknown} name no indicator; the index weights only "
+                f"{list(schemas.weight_arguments())}. The objective terms are weighted "
+                "on risk_scenario and compare_scenarios"
+            ),
+            "preset": chosen.name,
+        }
 
     weights, applied = overridden_weights(
         chosen,
@@ -889,9 +1222,18 @@ def vulnerability_index(
 
 @tool
 def risk_scenario(
-    scenario: str = "", preset: str = "", top_n: int = schemas.DEFAULT_TOP_N
+    scenario: str = "",
+    preset: str = "",
+    top_n: int = schemas.DEFAULT_TOP_N,
+    preference: str = "",
+    **weights: Any,
 ) -> ToolResult:
-    """Hazard, exposure, vulnerability and resilience combined into a priority order."""
+    """Hazard, exposure, vulnerability and resilience combined into a priority order.
+
+    With no weight set this is the named weighting's ranking, unchanged and with
+    no field added. With weights set it ranks under the weighting `user_weighting`
+    builds from them and from the person's sentence, and every origin field says so.
+    """
     try:
         chosen_scenario = _scenario(scenario)
     except KeyError as exc:
@@ -900,8 +1242,15 @@ def risk_scenario(
         chosen_preset = _preset(preset)
     except KeyError as exc:
         return {**_refusal(exc, "unknown preset"), "presets": sorted(PRESETS)}
+    try:
+        user, trace = stated_weighting(chosen_preset, weights, preference)
+    except UnstatedPreference as exc:
+        return _refusal(exc, "unstated preference")
+    except (KeyError, ValueError) as exc:
+        return {**_refusal(exc, "invalid weighting"), "preset": chosen_preset.name}
+    weighting = user or chosen_preset
 
-    frame, risk, index = scored(chosen_scenario, chosen_preset)
+    frame, risk, index = scored(chosen_scenario, weighting)
     state = analysis()
     table = state.result.tables[chosen_scenario.name]
     rows, without_value, not_shown = _ranking(
@@ -919,12 +1268,12 @@ def risk_scenario(
         ),
         top_n=top_n,
     )
-    return {
+    result = {
         "scenario": chosen_scenario.name,
         "surge_height_m": chosen_scenario.surge_height_m,
         "preset": risk.preset,
         "weights_origin": risk.origin,
-        "weights_origin_note": chosen_preset.origin_note,
+        "weights_origin_note": weighting.origin_note,
         "weights_origin_url": risk.origin_url,
         "components": list(risk.components),
         "component_weights": _numbers(risk.weights),
@@ -953,11 +1302,18 @@ def risk_scenario(
         ),
         "warnings": list(risk.warnings) + list(index.warnings),
     }
+    if user is not None:
+        result.update(user_fields(user, chosen_preset, weights, trace))
+    return result
 
 
 @tool
 def compare_scenarios(
-    scenario: str = "", priority_units: int = DEFAULT_PRIORITY_UNITS
+    scenario: str = "",
+    priority_units: int = DEFAULT_PRIORITY_UNITS,
+    preset: str = "",
+    preference: str = "",
+    **weights: Any,
 ) -> ToolResult:
     """Every weighting against one scenario, including who each one drops.
 
@@ -967,11 +1323,27 @@ def compare_scenarios(
     them as compared. That was a real defect in this project, found by reading
     rather than by a check, and `_tradeoff_checks` now asserts the difference it
     should produce.
+
+    With weights set, the person's weighting joins the comparison as one more row,
+    and `pairs_against` sets it beside each named weighting in turn. With none set
+    the comparison is the named weightings alone, unchanged and with no field added.
     """
     try:
         chosen = _scenario(scenario)
     except KeyError as exc:
         return {**_refusal(exc, "unknown scenario"), "scenarios": sorted(SCENARIOS)}
+    try:
+        base = _preset(preset)
+    except KeyError as exc:
+        return {**_refusal(exc, "unknown preset"), "presets": sorted(PRESETS)}
+    try:
+        user, trace = stated_weighting(base, weights, preference)
+    except UnstatedPreference as exc:
+        return _refusal(exc, "unstated preference")
+    except (KeyError, ValueError) as exc:
+        return {**_refusal(exc, "invalid weighting"), "preset": base.name}
+    compared = WEIGHT_PRESETS if user is None else (user, *WEIGHT_PRESETS)
+    by_name = {item.name: item for item in compared}
 
     state = analysis()
     table = state.result.tables[chosen.name]
@@ -980,13 +1352,13 @@ def compare_scenarios(
             table.frame,
             scenario=chosen,
             units=state.units,
-            presets=WEIGHT_PRESETS,
+            presets=compared,
             priority_units=priority_units,
         )
     except ValueError as exc:
         return _refusal(exc, "invalid comparison")
 
-    return {
+    result = {
         "scenario": chosen.name,
         "surge_height_m": chosen.surge_height_m,
         "priority_units": priority_units,
@@ -994,8 +1366,8 @@ def compare_scenarios(
         "rows": [
             {
                 "preset": row.preset,
-                "origin": PRESETS[row.preset].origin,
-                "origin_url": PRESETS[row.preset].origin_url,
+                "origin": by_name[row.preset].origin,
+                "origin_url": by_name[row.preset].origin_url,
                 "top_geoids": _capped(row.top_geoids),
                 "population_in_priority": row.population_in_priority,
                 "vulnerable_population_in_priority": row.vulnerable_population_in_priority,
@@ -1017,6 +1389,19 @@ def compare_scenarios(
             "answers where two of them were the same answer."
         ),
     }
+    if user is not None:
+        result.update(user_fields(user, base, weights, trace))
+        for row in result["rows"]:
+            if row["preset"] == user.name:
+                row["answered_by"] = trace["answered_by"]
+        result["user_against_each_weighting"] = pairs_against(rows, user.name)
+        result["pairs_note"] = (
+            f"each pair sets the '{user.name}' weighting beside one named weighting. "
+            "dropped names the units the named weighting prioritises and the person's "
+            "does not -- who loses if their words decide -- and added names the units "
+            "their words bring in instead"
+        )
+    return result
 
 
 ELICIT = True
@@ -1031,6 +1416,22 @@ a scripted reader, so the interactive path is exercised rather than skipped."""
 
 PROMPT_LABEL = "[ask_user_preferences]"
 NO_CHANNEL = "this run has no interactive channel, so nobody was asked"
+
+SCRIPTED_REPLIES_ENV = "OASIS_SCRIPTED_REPLIES"
+"""The environment variable a harness sets to answer `ask_user_preferences`.
+
+It names a JSON file holding a list of reply strings, taken in order, one per
+`ask_user_preferences` call within a question. The cursor restarts at the first
+reply on each new question, so a harness running several questions points this at
+one file per question. A result answered this way says `elicited="scripted"` and
+`channel="script"`, so no harness result reads as a person's answer. Read at call
+time rather than at import, so a harness can point each run at its own file."""
+
+SCRIPTED = "scripted"
+"""The value `elicited` takes when a script answered: truthy, and never `True`."""
+
+_SCRIPT_POSITION = 0
+"""How many scripted replies this question has used. `forget_calls` resets it."""
 
 
 def interactive_channel() -> bool:
@@ -1049,31 +1450,156 @@ def interactive_channel() -> bool:
         return False
 
 
-def elicit(question: str, options: list[str], default: str) -> tuple[str, str]:
+def scripted_replies() -> list[str] | None:
+    """The replies a harness scripted for this process, or None when none is named.
+
+    A file that is missing or holds anything but a list of strings raises, and
+    `ask_user_preferences` turns that into a refusal. A harness pointed at a
+    broken script should fail loudly on its first question, not run every
+    question on the default as though nobody had been scripted.
+    """
+    named = os.environ.get(SCRIPTED_REPLIES_ENV, "").strip()
+    if not named:
+        return None
+    loaded = json.loads(Path(named).read_text(encoding="utf-8-sig"))
+    if not isinstance(loaded, list) or not all(isinstance(item, str) for item in loaded):
+        raise ValueError(
+            f"{SCRIPTED_REPLIES_ENV} names {named}, which holds "
+            f"{type(loaded).__name__}; it must hold a JSON list of reply strings, one "
+            "per ask_user_preferences call within a question, restarting at the first "
+            "reply on each new question"
+        )
+    return loaded
+
+
+def next_scripted_reply(replies: list[str]) -> str | None:
+    """The next unused scripted reply on this question, or None when they ran out."""
+    global _SCRIPT_POSITION
+    if _SCRIPT_POSITION >= len(replies):
+        return None
+    reply = replies[_SCRIPT_POSITION]
+    _SCRIPT_POSITION += 1
+    return reply
+
+
+def read_reply(
+    reply: str, options: list[str], default: str, who: str
+) -> tuple[str, str, str, bool]:
+    """What one reply means: (weighting chosen, words stated, how, whether it was used).
+
+    A menu pick, by number or by name, chooses that weighting. An empty reply
+    accepts the default. Anything else is the person's own words, returned
+    unchanged as the second value for the model to map onto weights.
+
+    The last value is False when the reply could not be used and the default was
+    imposed rather than chosen: a number off the menu, or words `coordinate_refusal`
+    withholds. S10's coordinate guard once leaked through its own refusal message
+    by quoting what it refused, so free text that is quoted back is held to the
+    widest rule this project has -- and the result says the default was imposed,
+    never that the person chose it.
+    """
+    text = reply.strip()
+    if not text:
+        return default, "", f"{who} accepted the default", True
+    if text.isdigit():
+        if 1 <= int(text) <= len(options):
+            return options[int(text) - 1], "", f"{who} chose by number", True
+        return default, "", f"{who} gave a number off the menu, so the default stands", False
+    for name in options:
+        if text.lower() == name.lower():
+            return name, "", f"{who} chose by name", True
+    refusal = coordinate_refusal(text)
+    if refusal:
+        return (
+            default,
+            "",
+            f"{who} answered in plain words, but {refusal}; they are withheld and "
+            "the default stands",
+            False,
+        )
+    return (
+        schemas.USER_WEIGHTING,
+        text,
+        f"{who} answered in plain words, not a menu pick",
+        True,
+    )
+
+
+RETRY_HINT = (
+    "Try once more: pick a number, press enter for the default, or say it in words "
+    "with each number labelled and no location, for example 'age 0.6, no car 0.4'."
+)
+
+
+def elicit(question: str, options: list[str], default: str) -> tuple[str, str, str, bool]:
     """Put the choice to the person and read what they say back.
 
-    The reply is never echoed into the result. A tool result is a model message
-    and the person is typing free text into it; quoting an unrecognised reply back
-    is how S10's coordinate guard leaked through its own refusal message. What
-    comes back is a name from the menu or the default, and a sentence saying which.
+    A menu pick comes back as a name. Anything else they type comes back word for
+    word as the second value, because a person's own words are the preference and
+    the menu is only a shortcut to one. `read_reply` decides which.
+
+    A reply that cannot be used is named at the prompt and asked once more, so
+    the person learns their words were not used instead of finding the default in
+    their place. Once, not until it works: a prompt that loops is a hung harness.
     """
     print()
     print(f"{PROMPT_LABEL} {question}")
     for position, name in enumerate(options, start=1):
         print(f"  {position}. {name}")
-    print(f"  press enter for the default ({default})")
-    try:
-        reply = input("  weighting> ").strip()
-    except (EOFError, KeyboardInterrupt, OSError):
-        return default, "the prompt was closed without a reply, so the default stands"
-    if not reply:
-        return default, "the person was asked and accepted the default"
-    if reply.isdigit() and 1 <= int(reply) <= len(options):
-        return options[int(reply) - 1], "the person was asked and chose by number"
-    for name in options:
-        if reply.lower() == name.lower():
-            return name, "the person was asked and chose by name"
-    return default, "the reply named no weighting on the menu, so the default stands"
+    print(f"  press enter for the default ({default}), or say what matters most in your own words")
+    for attempt in (1, 2):
+        try:
+            reply = input("  weighting> ").strip()
+        except (EOFError, KeyboardInterrupt, OSError):
+            return default, "", "the prompt was closed without a reply, so the default stands", False
+        chosen, stated, how, used = read_reply(reply, options, default, "the person was asked and")
+        if used:
+            return chosen, stated, how, used
+        print(f"  that reply was not used: {how}.")
+        if attempt == 1:
+            print(f"  {RETRY_HINT}")
+    return chosen, stated, how, used
+
+
+def answer_note(elicited: bool | str, channel: str, stated: str, used: bool) -> str:
+    """One sentence saying who answered, and what the model should do with it.
+
+    `used` is False when a reply came back but could not be used, so the default
+    was imposed. That is said in as many words: a default nobody chose is never
+    reported as somebody's choice.
+    """
+    words = (
+        " Their words are stated_preference: map them onto weight_* arguments and "
+        "pass them unchanged as preference to risk_scenario and compare_scenarios."
+    )
+    imposed = (
+        " The default stands and is not a preference anybody expressed."
+    )
+    if elicited is True:
+        if not used:
+            return "a person at a terminal was asked, but no usable reply came back." + imposed
+        if stated:
+            return "a person at a terminal answered this in their own words." + words
+        return (
+            "a person at a terminal answered this and the county was re-scored under "
+            "what they chose"
+        )
+    if elicited == SCRIPTED:
+        lead = (
+            f"a scripted reply from the file named by {SCRIPTED_REPLIES_ENV} answered "
+            "this, not a person."
+        )
+        if not used:
+            return lead + " Its reply could not be used." + imposed
+        if stated:
+            return lead + words.replace("Their", "Its")
+        return lead + " The county was re-scored under what it chose."
+    if channel == "script":
+        return (
+            "the script held no reply for this question, so nobody answered. The "
+            "choice is the default, not a preference somebody expressed."
+        )
+    return f"{NO_CHANNEL}. The choice is the default, not a preference somebody expressed."
 
 
 def weighting_effect(name: str) -> dict[str, Any]:
@@ -1126,39 +1652,75 @@ def weighting_effect(name: str) -> dict[str, Any]:
 def ask_user_preferences(question: str) -> ToolResult:
     """Put a weighting choice to the human, and score the county under their answer.
 
-    Asks for real when there is a terminal to ask at, and falls back to the menu
-    when there is not, because a tool that blocked on `input()` would hang every
+    Three channels, tried in this order. A harness that names a script in
+    `SCRIPTED_REPLIES_ENV` is answered from it, and the result says
+    `elicited="scripted"`. A person at a terminal is asked for real. With neither,
+    nobody is asked, because a tool that blocked on `input()` would hang every
     harness that runs the agent without one -- `mutate.py` among them, which still
-    has no timeout of its own. `elicited` tells the truth either way: it says
-    whether a person answered, never whether a choice was made.
+    has no timeout of its own. `elicited` tells the truth in every case: `True`
+    only when a person answered, never merely because a choice was made.
+
+    The person may pick from the menu or answer in their own words. Their words
+    come back unchanged as `stated_preference`, and mapping them onto weights is
+    the model's job, done in the open as `weight_*` arguments on the risk tools.
 
     What it does NOT do is invent an answer and present it as the human's. The
     fallback is the default, which is a published weighting with a citable origin
     rather than this system's opinion, and the result says so.
     """
     names = [item.name for item in WEIGHT_PRESETS]
-    asked = interactive_channel()
-    if asked:
-        chosen, how = elicit(question, names, DEFAULT_PRESET.name)
-    else:
-        chosen, how = DEFAULT_PRESET.name, NO_CHANNEL
     try:
-        effect = weighting_effect(chosen)
-    except Exception as exc:
-        effect = {"recomputed": False, **_refusal(exc, "could not score under this weighting")}
+        script = scripted_replies()
+    except (OSError, ValueError) as exc:
+        return {**_refusal(exc, "scripted replies unreadable"), "variable": SCRIPTED_REPLIES_ENV}
+
+    asked: bool | str
+    if script is not None:
+        channel = "script"
+        reply = next_scripted_reply(script)
+        if reply is None:
+            asked = False
+            chosen, stated, how, used = (
+                DEFAULT_PRESET.name,
+                "",
+                "the script held no reply for this question, so the default stands",
+                False,
+            )
+        else:
+            asked = SCRIPTED
+            chosen, stated, how, used = read_reply(
+                reply, names, DEFAULT_PRESET.name, "the scripted reply"
+            )
+    elif interactive_channel():
+        channel, asked = "terminal", True
+        chosen, stated, how, used = elicit(question, names, DEFAULT_PRESET.name)
+    else:
+        channel, asked = "none", False
+        chosen, stated, how, used = DEFAULT_PRESET.name, "", NO_CHANNEL, False
+
+    if stated:
+        effect: dict[str, Any] = {
+            "recomputed": False,
+            "why": (
+                "a sentence is not a weighting until it is mapped onto weights. Set "
+                "the weight_* arguments its words name on risk_scenario and "
+                "compare_scenarios, and pass it unchanged as preference; those tools "
+                "score the county under it"
+            ),
+        }
+    else:
+        try:
+            effect = weighting_effect(chosen)
+        except Exception as exc:
+            effect = {"recomputed": False, **_refusal(exc, "could not score under this weighting")}
     return {
         "question": question,
         "elicited": asked,
-        "channel": "terminal" if asked else "none",
+        "channel": channel,
         "chosen": chosen,
+        "stated_preference": stated,
         "how_it_was_chosen": how,
-        "why": (
-            "a person at a terminal answered this and the county was re-scored under "
-            "what they chose"
-            if asked
-            else f"{NO_CHANNEL}. The choice is the default, not a preference "
-            "somebody expressed."
-        ),
+        "why": answer_note(asked, channel, stated, used),
         "effect": effect,
         "default": DEFAULT_PRESET.name,
         "options": [
@@ -1174,7 +1736,12 @@ def ask_user_preferences(question: str) -> ToolResult:
         "how_to_use": (
             "pass one of these names as the preset argument to risk_scenario or "
             "vulnerability_index, or override an individual indicator weight "
-            "directly. Report which weighting you used and where it came from."
+            f"directly. When chosen is '{schemas.USER_WEIGHTING}' there is no name to "
+            "pass: stated_preference holds the person's words instead, so set the "
+            "weight_* arguments those words name on risk_scenario and "
+            "compare_scenarios, leave every other weight unset, and pass the words "
+            "unchanged as preference. Report which weighting you used and where it "
+            "came from."
         ),
         "note": (
             "two of these come from one published index by two of its own published "
@@ -1407,6 +1974,15 @@ SAMPLE_ARGUMENTS: dict[str, dict[str, Any]] = {
 no network request: the real endpoints are exercised by `acquire.py --check`,
 which is the module that owns them, and by `python -m src.demo`. A tool added
 without an entry here fails the check rather than going unexercised."""
+
+SAMPLE_PREFERENCE = "older residents and households without a car matter most"
+"""The sentence the checks map onto weights by hand. Whether a model maps it the
+same way is a question for a live run with this as its scripted reply, and only
+that run's log can answer it -- these checks cannot."""
+
+PINNED_REPLY_COORDINATE = "-10.123456, 20.654321"
+"""A coordinate pair a reply could carry. Placed nowhere near any study area on
+purpose: what is under test is the shape, not a place."""
 
 
 def _every_result() -> dict[str, ToolResult]:
@@ -2108,7 +2684,8 @@ def _elicitation_checks() -> list[tuple[str, bool]]:
         by_name = answered(other)
         by_number = answered(str(names.index(other) + 1))
         by_default = answered("")
-        unknown = answered("not-a-weighting")
+        off_menu = answered(str(len(names) + 1))
+        pinned = answered(f"start with {PINNED_REPLY_COORDINATE} please")
         # No trailing newline, so `input()` really hits EOF and raises. With one
         # appended this was byte-identical to the empty-reply case above, and the
         # except branch that survives a closed prompt had no coverage at all --
@@ -2119,14 +2696,38 @@ def _elicitation_checks() -> list[tuple[str, bool]]:
     finally:
         sys.stdin, ELICIT = real_stdin, real_elicit
 
+    # The scripted channel's two scoring paths: a menu pick, which re-scores the
+    # county, and a script that has run out, which is nobody answering. Both
+    # build the analysis, which is why they are here rather than with the
+    # scripted checks that run without one.
+    saved_env, saved_calls = os.environ.get(SCRIPTED_REPLIES_ENV), list(CALLS)
+    with tempfile.TemporaryDirectory() as folder:
+        script = Path(folder) / "replies.json"
+        script.write_text(json.dumps([other]), encoding="utf-8")
+        os.environ[SCRIPTED_REPLIES_ENV] = str(script)
+        try:
+            forget_calls()
+            scripted_pick = ask_user_preferences(question="which weighting?")
+            ran_out = ask_user_preferences(question="and which now?")
+        finally:
+            forget_calls()
+            CALLS.extend(saved_calls)
+            if saved_env is None:
+                os.environ.pop(SCRIPTED_REPLIES_ENV, None)
+            else:
+                os.environ[SCRIPTED_REPLIES_ENV] = saved_env
+
     scored_here = weighting_effect(other)
     scored_default = weighting_effect(DEFAULT_PRESET.name)
     print(f"  a person naming {other!r}: elicited={by_name['elicited']} "
           f"chosen={by_name['chosen']} channel={by_name['channel']}")
     print(f"  by number: chosen={by_number['chosen']}; "
           f"empty reply: chosen={by_default['chosen']}; "
-          f"unrecognised reply: chosen={unknown['chosen']}")
+          f"number off the menu: chosen={off_menu['chosen']}")
     print(f"  with no terminal: elicited={batch['elicited']} chosen={batch['chosen']}")
+    print(f"  a script naming {other!r}: elicited={scripted_pick['elicited']} "
+          f"chosen={scripted_pick['chosen']}; once it ran out: "
+          f"elicited={ran_out['elicited']} chosen={ran_out['chosen']}")
     print(f"  the two weightings rank differently: "
           f"{scored_here['ranking'] != scored_default['ranking']}")
 
@@ -2141,10 +2742,26 @@ def _elicitation_checks() -> list[tuple[str, bool]]:
          by_default["chosen"] == DEFAULT_PRESET.name
          and by_default["elicited"] is True
          and "accepted the default" in by_default["how_it_was_chosen"]),
-        ("a reply naming no weighting falls back rather than failing",
-         unknown["chosen"] == DEFAULT_PRESET.name and unknown["elicited"] is True),
-        ("an unrecognised reply is never quoted back into the result",
-         "not-a-weighting" not in json.dumps(unknown, default=str)),
+        ("a number off the menu falls back to the default rather than failing",
+         off_menu["chosen"] == DEFAULT_PRESET.name and off_menu["elicited"] is True
+         and off_menu["stated_preference"] == ""),
+        # The rule this replaced was "never quote a reply back", written after S10's
+        # guard leaked a coordinate by quoting what it refused. A person's own words
+        # are now the preference and come back by design, so the rule is narrowed
+        # to the thing it was for: words that carry a coordinate never come back.
+        ("words that carry a coordinate are never quoted back into the result",
+         PINNED_REPLY_COORDINATE not in json.dumps(pinned, default=str)
+         and pinned["chosen"] == DEFAULT_PRESET.name
+         and not coordinate_faults(as_sent(pinned))),
+        ("a scripted menu pick is the script's choice, marked scripted, and it scores",
+         scripted_pick["elicited"] == SCRIPTED
+         and scripted_pick["chosen"] == other
+         and scripted_pick["effect"]["recomputed"] is True),
+        ("a script that has run out is nobody answering, and the default stands",
+         ran_out["elicited"] is False
+         and ran_out["channel"] == "script"
+         and ran_out["chosen"] == DEFAULT_PRESET.name
+         and "nobody answered" in ran_out["why"]),
         ("a closed prompt is survivable and took the branch written for it",
          closed["chosen"] == DEFAULT_PRESET.name
          and "closed without a reply" in closed["how_it_was_chosen"]),
@@ -2175,10 +2792,611 @@ def _elicitation_checks() -> list[tuple[str, bool]]:
     ]
 
 
-def _self_check() -> int:
+def _user_weighting_checks() -> list[tuple[str, bool]]:
+    """That a person's words become a validated weighting, and nothing else does.
+
+    Pure: no analysis is built, so this runs on a checkout with no snapshot. The
+    expected weights are worked out here by hand from the default preset's own
+    values, not through `normalised_weights`, which is the function under test.
+    """
+    age, car = Col.PCT_AGE_65_PLUS, Col.PCT_NO_VEHICLE
+    named = {schemas.weight_argument(age): 2.0, schemas.weight_argument(car): 2.0}
+    before = dict(DEFAULT_PRESET.weights)
+    built = user_weighting(DEFAULT_PRESET, named, SAMPLE_PREFERENCE)
+    others = [name for name in VULNERABILITY_INDICATORS if name not in (age, car)]
+    total = 2.0 + 2.0 + sum(before[name] for name in others)
+    expected = {
+        name: (2.0 if name in (age, car) else before[name]) / total
+        for name in VULNERABILITY_INDICATORS
+    }
+    used = (
+        vulnerability.normalised_weights(built.weights, VULNERABILITY_INDICATORS)
+        if built is not None
+        else {}
+    )
+    every_unset = {
+        argument: schemas.UNSET_WEIGHT
+        for argument in schemas.weight_arguments(schemas.RISK_WEIGHT_KEYS)
+    }
+    on_exposure = user_weighting(
+        DEFAULT_PRESET,
+        {schemas.weight_argument(Col.EXPOSED_POPULATION): 3.0},
+        SAMPLE_PREFERENCE,
+    )
+    all_zero = {schemas.weight_argument(name): 0.0 for name in VULNERABILITY_INDICATORS}
+    # Caught rather than left to raise, so a broken sentinel reads as this check
+    # failing instead of as the whole suite crashing on an unrelated line.
+    try:
+        nothing: tuple[Any, ...] = (
+            user_weighting(DEFAULT_PRESET, every_unset, ""),
+            user_weighting(DEFAULT_PRESET, {}, ""),
+        )
+    except (KeyError, ValueError) as exc:
+        nothing = (exc,)
+    print(f"  {SAMPLE_PREFERENCE!r} as weight 2 on {age} and {car}:")
+    print(f"    normalised          {({name: round(value, 4) for name, value in used.items()})}")
+    print(f"    worked out by hand  {({name: round(value, 4) for name, value in expected.items()})}")
+
+    return [
+        ("a weight the person's words name is applied, the rest keep the named weighting's",
+         built is not None and built.weights == {**before, age: 2.0, car: 2.0}),
+        ("the indicator weights normalise to the values worked out by hand",
+         bool(used)
+         and all(abs(used[name] - expected[name]) < 1e-12 for name in VULNERABILITY_INDICATORS)),
+        ("the two indicators the words name outweigh every other",
+         bool(used) and min(used[age], used[car]) > max(used[name] for name in others)),
+        ("the objective half is untouched when the words name only indicators",
+         built is not None
+         and all(built.weights[name] == before[name] for name in vulnerability.OBJECTIVE_TERMS)),
+        ("an objective term can be weighted from the person's words too",
+         on_exposure is not None and on_exposure.weights[Col.EXPOSED_POPULATION] == 3.0),
+        ("the weighting is named, and sourced, as the person's sentence",
+         built is not None
+         and built.name == schemas.USER_WEIGHTING
+         and built.origin == schemas.USER_WEIGHTING
+         and built.origin_note == SAMPLE_PREFERENCE
+         and built.origin_url == ""),
+        ("building on the named weighting leaves it unchanged",
+         DEFAULT_PRESET.weights == before),
+        ("no weight set builds no weighting, so the tools rank as before",
+         nothing == (None, None)),
+        ("a misspelled weight is refused by name rather than dropped",
+         verify.refuses(
+             lambda: user_weighting(
+                 DEFAULT_PRESET, {**named, "weight_pct_elderly": 2.0}, SAMPLE_PREFERENCE
+             ),
+             KeyError,
+             "weight_pct_elderly",
+         )),
+        ("a negative weight is refused",
+         verify.refuses(
+             lambda: user_weighting(
+                 DEFAULT_PRESET, {schemas.weight_argument(age): -0.5}, SAMPLE_PREFERENCE
+             ),
+             ValueError,
+             "negative weight",
+         )),
+        ("a weighting whose indicators all weigh zero is refused",
+         verify.refuses(
+             lambda: user_weighting(DEFAULT_PRESET, all_zero, SAMPLE_PREFERENCE),
+             ValueError,
+             "sum to",
+         )),
+        ("a weight that is not a finite number is refused, NaN and Infinity alike",
+         all(
+             verify.refuses(
+                 lambda value=value: user_weighting(
+                     DEFAULT_PRESET, {schemas.weight_argument(age): value}, SAMPLE_PREFERENCE
+                 ),
+                 ValueError,
+                 "not finite",
+             )
+             for value in (float("nan"), float("inf"))
+         )),
+        ("weights with no sentence are refused, so nobody's preference is invented",
+         verify.refuses(
+             lambda: user_weighting(DEFAULT_PRESET, named, "  "), ValueError, "no preference"
+         )),
+        ("a sentence with no weight is refused, so the default never reads as theirs",
+         verify.refuses(
+             lambda: user_weighting(DEFAULT_PRESET, every_unset, SAMPLE_PREFERENCE),
+             ValueError,
+             "no weight set",
+         )),
+        ("an unknown argument that is not a weight is ignored, as every tool ignores one",
+         user_weighting(DEFAULT_PRESET, {**named, "nonsense": 1}, SAMPLE_PREFERENCE)
+         is not None),
+        ("a preference carrying a coordinate is refused, and the refusal does not quote it",
+         verify.refuses(
+             lambda: user_weighting(
+                 DEFAULT_PRESET, named, f"{SAMPLE_PREFERENCE} near {PINNED_REPLY_COORDINATE}"
+             ),
+             ValueError,
+             "could carry a coordinate",
+         )
+         and not verify.refuses(
+             lambda: user_weighting(
+                 DEFAULT_PRESET, named, f"{SAMPLE_PREFERENCE} near {PINNED_REPLY_COORDINATE}"
+             ),
+             ValueError,
+             PINNED_REPLY_COORDINATE,
+         )),
+        ("the person's weighting cannot collide with a named one",
+         schemas.USER_WEIGHTING not in PRESETS),
+    ]
+
+
+def _free_text_checks() -> list[tuple[str, bool]]:
+    """That a person who types a sentence at the terminal gets their words back.
+
+    Driven through the real `input()` with a scripted reader, as
+    `_elicitation_checks` is. Only the sentence path runs end to end here, because
+    it is the one reply that scores nothing until it is mapped; `read_reply` is
+    called directly for the rest, so this also runs with no snapshot.
+    """
     global ELICIT
+    names = [item.name for item in WEIGHT_PRESETS]
+    real_stdin, real_elicit = sys.stdin, ELICIT
+    pinned_reply = f"flood {PINNED_REPLY_COORDINATE} first"
+
+    def typed_in(*lines: str) -> ToolResult:
+        global ELICIT
+        stream = io.StringIO("".join(line + "\n" for line in lines))
+        stream.isatty = lambda: True  # type: ignore[method-assign]
+        sys.stdin, ELICIT = stream, True
+        try:
+            return ask_user_preferences(question="what matters most to you?")
+        finally:
+            sys.stdin, ELICIT = real_stdin, real_elicit
+
+    typed = typed_in(SAMPLE_PREFERENCE)
+    retried = typed_in(pinned_reply, SAMPLE_PREFERENCE)
+    # Two refused replies: the default is imposed, and that result scores the
+    # county under it -- with no snapshot the scoring fails and is reported in
+    # `effect`, which is not under test here. `why` and `chosen` are.
+    twice = typed_in(pinned_reply, f"then {PINNED_REPLY_COORDINATE}")
+
+    # The guard made unloadable, the way a checkout without src/sandbox.py has it.
+    package = sys.modules[__package__]
+    held = getattr(package, "sandbox", None)
+    loaded = sys.modules.get(f"{__package__}.sandbox")
+    try:
+        if held is not None:
+            delattr(package, "sandbox")
+        sys.modules[f"{__package__}.sandbox"] = None  # type: ignore[assignment]
+        unguarded = read_reply(SAMPLE_PREFERENCE, names, DEFAULT_PRESET.name, "the person")
+    finally:
+        if loaded is None:
+            sys.modules.pop(f"{__package__}.sandbox", None)
+        else:
+            sys.modules[f"{__package__}.sandbox"] = loaded
+        if held is not None:
+            setattr(package, "sandbox", held)
+
+    who = "the person was asked and"
+    padded = read_reply(f"  {SAMPLE_PREFERENCE}  ", names, DEFAULT_PRESET.name, who)
+    pinned = read_reply(pinned_reply, names, DEFAULT_PRESET.name, who)
+    off_menu = read_reply(str(len(names) + 1), names, DEFAULT_PRESET.name, who)
+    by_name = read_reply(names[1].upper(), names, DEFAULT_PRESET.name, who)
+    by_number = read_reply("2", names, DEFAULT_PRESET.name, who)
+    empty = read_reply("", names, DEFAULT_PRESET.name, who)
+    # Each shape a reviewer got through the first version of this guard, which
+    # read the string rule only. Every one came back word for word.
+    shapes = {
+        "GeoJSON": '{"type":"Polygon","coordinates":[[[-10.12,20.65],[-10.1,20.6]]]}',
+        "WKT": "POLYGON ((-10.12 20.65, -10.1 20.6, -10.12 20.65))",
+        "labelled degrees": "start at lat 20.6543 lon -10.1234",
+        "three decimal places": "start at 20.654, -10.123",
+        "easting and northing": "start at easting 1613477.7, northing 1234567.9",
+        "slash between": "start at 20.6543/-10.1234",
+        "semicolon between": "start at 20.6543;-10.1234",
+        "hemisphere letters": "start at 20.6543 N 10.1234 W",
+        "degree signs": "start at 20.65°N, 10.12°W",
+    }
+    withheld = {
+        label: read_reply(text, names, DEFAULT_PRESET.name, who)[1] == ""
+        for label, text in shapes.items()
+    }
+    stated_weights = "older residents 0.4 and households without a car 0.4"
+    numeric = read_reply(stated_weights, names, DEFAULT_PRESET.name, who)
+    print(f"  typed {SAMPLE_PREFERENCE!r}: elicited={typed['elicited']} "
+          f"chosen={typed['chosen']} stated={typed['stated_preference']!r}")
+    print(f"  words carrying a coordinate -> chosen={pinned[0]} stated={pinned[1]!r}")
+    print(f"  withheld by shape: {withheld}")
+
+    return [
+        ("a person typing a sentence is really asked, at the terminal",
+         typed["elicited"] is True and typed["channel"] == "terminal"),
+        ("their sentence comes back word for word",
+         typed["stated_preference"] == SAMPLE_PREFERENCE),
+        ("a sentence is named as the person's own weighting, not a menu pick",
+         typed["chosen"] == schemas.USER_WEIGHTING
+         and "plain words" in typed["how_it_was_chosen"]),
+        ("a sentence scores nothing until it is mapped onto weights, and says so",
+         typed["effect"]["recomputed"] is False
+         and "weight_" in typed["effect"].get("why", "")),
+        ("the result tells the model to map the words and pass them on unchanged",
+         "stated_preference" in typed["why"] and "preference" in typed["how_to_use"]),
+        ("surrounding spaces are trimmed and nothing else is changed",
+         padded[1] == SAMPLE_PREFERENCE),
+        ("words carrying a coordinate are withheld and the default stands",
+         pinned[0] == DEFAULT_PRESET.name and pinned[1] == "" and "withheld" in pinned[2]),
+        ("withheld words are marked as not used, so the default is not called a choice",
+         pinned[3] is False and off_menu[3] is False and padded[3] is True),
+        ("a number off the menu keeps the default rather than becoming a sentence",
+         off_menu[0] == DEFAULT_PRESET.name and off_menu[1] == ""),
+        ("a refused reply is asked once more, and the second answer is the one used",
+         retried["stated_preference"] == SAMPLE_PREFERENCE and retried["elicited"] is True),
+        ("two refused replies impose the default, and the result says nobody chose it",
+         twice["chosen"] == DEFAULT_PRESET.name
+         and twice["stated_preference"] == ""
+         and "no usable reply" in twice["why"]
+         and "not a preference anybody expressed" in twice["why"]),
+        ("with the guard unloadable every reply is refused, and the reason names the guard",
+         unguarded[1] == ""
+         and unguarded[3] is False
+         and "could not be loaded" in unguarded[2]
+         and CARRIES_COORDINATE not in unguarded[2]),
+        ("a menu name in any case is a menu pick, not a sentence",
+         by_name[0] == names[1] and by_name[1] == ""),
+        ("a menu number is a menu pick",
+         by_number == (names[1], "", f"{who} chose by number", True)),
+        ("an empty reply accepts the default",
+         empty[0] == DEFAULT_PRESET.name and empty[1] == ""),
+        ("every coordinate shape a reviewer got through is now withheld",
+         all(withheld.values()) and len(withheld) == len(shapes)),
+        ("weights a person states as numbers, with words between them, still pass",
+         numeric[1] == stated_weights),
+        ("the sentence result carries no coordinate, by the widest rule",
+         not coordinate_faults(as_sent(typed))
+         and not coordinate_refusal(typed["stated_preference"])),
+    ]
+
+
+def _scripted_checks() -> list[tuple[str, bool]]:
+    """That a harness can answer for a person without posing as one.
+
+    A real file, named by the real environment variable, read by the real tool. A
+    terminal is open at the same time holding a different reply, to show the
+    script wins and `input()` is never reached: a harness started from a terminal
+    must not stop and wait on somebody who is not there. Runs with no snapshot.
+
+    The call log is put back afterwards, because `forget_calls` is part of what is
+    under test and `_log_checks` later reads the log this suite built.
+
+    Every reply here is a sentence, the terminal's included, because a sentence is
+    the one reply that scores nothing. A mutant that reads the wrong channel then
+    fails a check here rather than crashing on a missing snapshot, and the script
+    holds two different sentences so that a cursor nobody reset is told apart from
+    one that was.
+    """
+    global ELICIT
+    real_stdin, real_elicit = sys.stdin, ELICIT
+    saved_env, saved_calls = os.environ.get(SCRIPTED_REPLIES_ENV), list(CALLS)
+    saved_question = QUESTION
+    terminal = io.StringIO("words typed at the terminal\n")
+    terminal.isatty = lambda: True  # type: ignore[method-assign]
+
+    def ask() -> ToolResult:
+        return ask_user_preferences(question="what matters most to you?")
+
+    with tempfile.TemporaryDirectory() as folder:
+        good = Path(folder) / "replies.json"
+        good.write_text(
+            json.dumps([SAMPLE_PREFERENCE, "a second scripted reply"]), encoding="utf-8"
+        )
+        wrong = Path(folder) / "wrong.json"
+        wrong.write_text(json.dumps({"reply": SAMPLE_PREFERENCE}), encoding="utf-8")
+        missing = Path(folder) / "absent.json"
+        try:
+            sys.stdin, ELICIT = terminal, True
+            os.environ[SCRIPTED_REPLIES_ENV] = str(good)
+            forget_calls()
+            first = ask()
+            unread = terminal.tell() == 0
+            traced = preference_trace(SAMPLE_PREFERENCE)
+            untraced = preference_trace("words nobody said")
+            forget_calls()
+            again = ask()
+            os.environ[SCRIPTED_REPLIES_ENV] = str(wrong)
+            malformed = ask()
+            os.environ[SCRIPTED_REPLIES_ENV] = str(missing)
+            absent = ask()
+            forget_calls(f"Which tracts first? For me, {SAMPLE_PREFERENCE}.")
+            from_question = preference_trace(SAMPLE_PREFERENCE.upper())
+            paraphrased = preference_trace("elderly people and the carless come first")
+            fragments = {
+                text: preference_trace(text)["answered_by"]
+                for text in ("?", "first", "me, older", "ch tracts first")
+            }
+        finally:
+            sys.stdin, ELICIT = real_stdin, real_elicit
+            forget_calls(saved_question)
+            CALLS.extend(saved_calls)
+            if saved_env is None:
+                os.environ.pop(SCRIPTED_REPLIES_ENV, None)
+            else:
+                os.environ[SCRIPTED_REPLIES_ENV] = saved_env
+
+    print(f"  scripted {SAMPLE_PREFERENCE!r}: elicited={first['elicited']!r} "
+          f"channel={first['channel']} stated={first['stated_preference']!r}")
+    print(f"  a terminal was open and left unread: {unread}; traced to "
+          f"{traced['traced_to']} (elicited={traced.get('elicited')!r})")
+    print(f"  a script holding a dict -> {malformed.get('error')!r}; "
+          f"a missing script -> {absent.get('error')!r}")
+
+    return [
+        ("a scripted reply is marked scripted, never as a person's answer",
+         first["elicited"] == SCRIPTED
+         and first["elicited"] is not True
+         and first["channel"] == "script"),
+        ("the scripted words come back word for word",
+         first["stated_preference"] == SAMPLE_PREFERENCE),
+        ("the result says a script answered, not a person", "not a person" in first["why"]),
+        ("the script wins over an open terminal, which is never read", unread),
+        ("a sentence the tool returned is traced to it, and says a script answered",
+         traced["traced_to"] == "ask_user_preferences"
+         and traced["elicited"] == SCRIPTED
+         and traced["answered_by"] == "script"),
+        ("words no reply returned and the question does not hold are not traced",
+         untraced["answered_by"] is None and "not verified" in untraced["note"]),
+        ("words the question holds unchanged are traced to the question, in any case",
+         from_question["answered_by"] == "question"),
+        ("a paraphrase of the question is not the question's words",
+         paraphrased["answered_by"] is None),
+        ("a character, a word, two words or a broken word of the question trace to nobody",
+         all(value is None for value in fragments.values()) and len(fragments) == 4),
+        ("a new question starts the script again from its first reply",
+         again["stated_preference"] == SAMPLE_PREFERENCE and again["elicited"] == SCRIPTED),
+        ("a script that is not a list of replies is refused, not read as silence",
+         malformed.get("error") == "scripted replies unreadable"
+         and malformed.get("variable") == SCRIPTED_REPLIES_ENV),
+        ("a script that is missing is refused too",
+         absent.get("error") == "scripted replies unreadable"),
+        ("the checks put the environment and the question back as they found them",
+         os.environ.get(SCRIPTED_REPLIES_ENV) == saved_env and QUESTION == saved_question),
+    ]
+
+
+def _boundary_refusal_checks() -> list[tuple[str, bool]]:
+    """The refusals, driven through `agent.execute_tool`, the path a model's call takes.
+
+    Called through the loop's own executor rather than the tool function, because
+    the thing that can break is between them: if `execute_tool` ever kept only the
+    declared fields, a misspelled weight would be dropped before the tool could
+    refuse it, and every direct call here would still pass. Each of these is
+    refused before the analysis is built, so this runs with no snapshot.
+
+    **Everything here goes through `agent.tools`, not this module's globals.** Run
+    as `python -m src.tools --check`, this file is `__main__`, and `agent` imports a
+    second copy of it as `src.tools`. A question set on the first copy is a
+    question the executor never sees -- which is how an earlier version of this
+    check asserted on state the call it made could not reach.
+
+    The last part runs `agent.run_agent` itself, with the model replaced by
+    `critic.scripted_run`'s fixed drafts, so the line in the loop that hands the
+    question to the tools is exercised. Without it, every preference quoted from a
+    question would be refused in production and no check would notice.
+    """
+    from . import agent, critic
+
+    target = agent.tools
+    saved_calls, saved_question = list(target.CALLS), target.QUESTION
+    age = schemas.weight_argument(Col.PCT_AGE_65_PLUS)
+    located = "flood POLYGON ((1.5 2.5, 3.5 4.5, 1.5 2.5)) first"
+    try:
+        target.forget_calls("which communities should come first under a three metre surge?")
+        misspelled = {
+            name: agent.execute_tool(
+                name, {"weight_pct_elderly": 2.0, "preference": SAMPLE_PREFERENCE}
+            )
+            for name in (*schemas.RISK_WEIGHT_TOOLS, "vulnerability_index")
+        }
+        objective_on_index = agent.execute_tool(
+            "vulnerability_index",
+            {schemas.weight_argument(Col.EXPOSED_POPULATION): 3.0},
+        )
+        unstated = {
+            name: agent.execute_tool(name, {age: 2.0, "preference": SAMPLE_PREFERENCE})
+            for name in schemas.RISK_WEIGHT_TOOLS
+        }
+        pinned = agent.execute_tool("risk_scenario", {age: 2.0, "preference": located})
+        run = critic.scripted_run(["no number in this answer"], 0)
+        asked = str(run["steps"][0]["payload"].get("question", ""))
+        reached = target.QUESTION
+    finally:
+        target.forget_calls(saved_question)
+        target.CALLS.extend(saved_calls)
+    print(f"  through execute_tool: misspelled -> "
+          f"{ {name: item.get('error') for name, item in misspelled.items()} }")
+    print(f"  words nobody on this question said -> "
+          f"{ {name: item.get('error') for name, item in unstated.items()} }")
+    print(f"  run_agent asked {asked!r}; the tools it calls hold {reached!r}")
+
+    return [
+        ("a misspelled weight survives validation and is refused by name, in all three",
+         all(
+             item.get("error") == "invalid weighting"
+             and "weight_pct_elderly" in item.get("detail", "")
+             for item in misspelled.values()
+         )
+         and len(misspelled) == 3),
+        ("an objective term passed to the index is refused, with a pointer to the risk tools",
+         objective_on_index.get("error") == "invalid weighting"
+         and "risk_scenario" in objective_on_index.get("detail", "")),
+        ("words neither a reply nor the question holds rank nothing, in both risk tools",
+         all(item.get("error") == "unstated preference" for item in unstated.values())),
+        ("a preference carrying a coordinate is refused without being quoted back",
+         pinned.get("error") == "invalid weighting"
+         and "1.5 2.5" not in json.dumps(pinned, default=str)),
+        ("run_agent hands its question to the tools it calls",
+         bool(asked) and reached == asked),
+        ("the checks put the executor's call log and question back",
+         target.QUESTION == saved_question and len(target.CALLS) == len(saved_calls)),
+    ]
+
+
+def _user_ranking_checks() -> list[tuple[str, bool]]:
+    """That a ranking under the person's words follows them, on the real county.
+
+    Three parts of one promise. With no weight set, both risk tools add no field,
+    and every weight left at the sentinel is the same call as no weight argument.
+    With weights set, the ranking is made under the person's weighting and every
+    origin field says so. And the comparison sets that weighting beside each named
+    one, pair by pair, with the pairs recomputed here from the rows.
+
+    What these cannot show is that the no-weights output equals the output of the
+    code before this change: both sides of every comparison here run the new code.
+    That is a one-off comparison against the previous commit, run once and
+    recorded, not a check that can live in the module it compares. The sentence is
+    put in the question, as `agent.run_agent` would, so the words trace to it.
+    """
+    age, car = Col.PCT_AGE_65_PLUS, Col.PCT_NO_VEHICLE
+    named = {schemas.weight_argument(age): 2.0, schemas.weight_argument(car): 2.0}
+    every_unset = {
+        argument: schemas.UNSET_WEIGHT
+        for argument in schemas.weight_arguments(schemas.RISK_WEIGHT_KEYS)
+    }
+    saved_calls, saved_question = list(CALLS), QUESTION
+    forget_calls(f"Which tracts come first? {SAMPLE_PREFERENCE}.")
+    try:
+        return _user_ranking_results(named, every_unset)
+    finally:
+        forget_calls(saved_question)
+        CALLS.extend(saved_calls)
+
+
+def _user_ranking_results(
+    named: dict[str, float], every_unset: dict[str, float]
+) -> list[tuple[str, bool]]:
+    """The body of `_user_ranking_checks`, run with the question in place."""
+    age, car = Col.PCT_AGE_65_PLUS, Col.PCT_NO_VEHICLE
+    added = (
+        "answered_by", "stated_preference", "preference_trace", "weights_set",
+        "unset_weights_from", "indicator_weights_used",
+        "user_against_each_weighting", "pairs_note",
+    )
+
+    plain = risk_scenario()
+    unset = risk_scenario(**every_unset)
+    theirs = risk_scenario(preference=SAMPLE_PREFERENCE, **named)
+    misspelled = risk_scenario(preference=SAMPLE_PREFERENCE, weight_pct_elderly=2.0)
+    negative = risk_scenario(
+        preference=SAMPLE_PREFERENCE, **{schemas.weight_argument(age): -0.5}
+    )
+    unworded = risk_scenario(**named)
+
+    compared_plain = compare_scenarios()
+    compared_unset = compare_scenarios(**every_unset)
+    compared = compare_scenarios(preference=SAMPLE_PREFERENCE, **named)
+    rows = {row["preset"]: row for row in compared.get("rows", [])}
+    plain_rows = {row["preset"]: row for row in compared_plain["rows"]}
+    pairs = {item["against"]: item for item in compared.get("user_against_each_weighting", [])}
+    user_top = rows.get(schemas.USER_WEIGHTING, {}).get("top_geoids", {}).get("listed", [])
+
+    used = theirs.get("indicator_weights_used", {})
+    others = [name for name in VULNERABILITY_INDICATORS if name not in (age, car)]
+    sizes = {
+        "risk_scenario": len(json.dumps(theirs, default=str)),
+        "compare_scenarios": len(json.dumps(compared, default=str)),
+    }
+    print(f"  under {SAMPLE_PREFERENCE!r}: preset={theirs.get('preset')} "
+          f"origin={theirs.get('weights_origin')}")
+    print(f"  indicator weights used: {used}")
+    print(f"  top {len(user_top)} under the person's words: {user_top}")
+    for name, item in pairs.items():
+        print(f"    against {name}: drops {item['dropped_count']}, adds "
+              f"{item['added_count']}, shares {item['shared_count']}")
+    print(f"  serialised sizes: {sizes}")
+
+    return [
+        ("every weight at the sentinel is the same risk_scenario call as no weight at all",
+         json.dumps(unset, default=str) == json.dumps(plain, default=str)),
+        ("with no weight set, risk_scenario adds no field",
+         not any(key in plain for key in added)),
+        ("every weight at the sentinel is the same compare_scenarios call as none",
+         json.dumps(compared_unset, default=str) == json.dumps(compared_plain, default=str)),
+        ("with no weight set, compare_scenarios compares the named weightings alone",
+         compared_plain["weightings_compared"] == len(WEIGHT_PRESETS)
+         and not any(key in compared_plain for key in added)),
+        ("under the person's words the ranking is the person's weighting, sourced to them",
+         theirs.get("preset") == schemas.USER_WEIGHTING
+         and theirs.get("weights_origin") == schemas.USER_WEIGHTING
+         and theirs.get("weights_origin_note") == SAMPLE_PREFERENCE
+         and theirs.get("stated_preference") == SAMPLE_PREFERENCE),
+        ("the result says at its top level who stated the words",
+         theirs.get("answered_by") == "question"
+         and compared.get("answered_by") == "question"
+         and rows.get(schemas.USER_WEIGHTING, {}).get("answered_by") == "question"),
+        ("both risk tools report the same weights used, so either one can be quoted",
+         compared.get("indicator_weights_used") == used
+         and compared.get("component_weights") == theirs.get("component_weights")),
+        ("the two indicators their words name carry the most weight in the index",
+         bool(used) and min(used[age], used[car]) > max(used[name] for name in others)),
+        ("the objective weights stay the named weighting's, as their words named none",
+         theirs.get("component_weights") == plain["component_weights"]
+         and theirs.get("unset_weights_from") == DEFAULT_PRESET.name),
+        ("their weighting reaches the ranking rather than the prose",
+         theirs.get("ranking") != plain["ranking"]),
+        ("the weights they set are reported as set",
+         theirs.get("weights_set") == {age: 2.0, car: 2.0}),
+        ("a misspelled weight is refused by name rather than ranked without it",
+         misspelled.get("error") == "invalid weighting"
+         and "weight_pct_elderly" in misspelled.get("detail", "")),
+        ("a negative weight is refused before anything is ranked",
+         negative.get("error") == "invalid weighting"
+         and "negative weight" in negative.get("detail", "")),
+        ("weights with no sentence are refused, so no ranking is credited to nobody",
+         unworded.get("error") == "invalid weighting"),
+        ("the comparison adds the person's weighting as one more row, sourced to them",
+         compared.get("weightings_compared") == len(WEIGHT_PRESETS) + 1
+         and rows.get(schemas.USER_WEIGHTING, {}).get("origin") == schemas.USER_WEIGHTING),
+        ("it is set beside every named weighting, one pair at a time",
+         set(pairs) == set(PRESETS)),
+        ("each pair's dropped units are the named list minus the person's, in rank order",
+         all(
+             pairs[name]["dropped"]["listed"]
+             == [geoid for geoid in rows[name]["top_geoids"]["listed"] if geoid not in user_top]
+             and pairs[name]["added"]["listed"]
+             == [geoid for geoid in user_top if geoid not in rows[name]["top_geoids"]["listed"]]
+             for name in pairs
+         )
+         and len(pairs) > 0),
+        ("dropped plus shared accounts for each named weighting's whole list",
+         all(
+             pairs[name]["dropped_count"] + pairs[name]["shared_count"]
+             == len(rows[name]["top_geoids"]["listed"])
+             for name in pairs
+         )),
+        ("adding the person's row changes no named weighting's own list",
+         all(
+             rows[name]["top_geoids"] == plain_rows[name]["top_geoids"]
+             for name in plain_rows
+         )),
+        ("no result under the person's words carries a coordinate",
+         not coordinate_faults(as_sent(theirs)) and not coordinate_faults(as_sent(compared))),
+        ("no result under the person's words is large enough to crowd the run",
+         max(sizes.values()) < 24_000),
+    ]
+
+
+def _self_check() -> int:
     print("TOOLS -- the eleven names in contracts.TOOL_NAMES\n")
 
+    # A harness's scripted replies are set aside for the whole suite: a shell that
+    # still names one would otherwise answer the suite's own questions from it.
+    # `_scripted_checks` names a script of its own and puts this one back.
+    scripted = os.environ.pop(SCRIPTED_REPLIES_ENV, None)
+    try:
+        return _run_checks()
+    finally:
+        if scripted is not None:
+            os.environ[SCRIPTED_REPLIES_ENV] = scripted
+
+
+def _run_checks() -> int:
+    """Every check, in order, with the environment `_self_check` prepared."""
+    global ELICIT
     # `SAMPLE_ARGUMENTS` calls every tool, `ask_user_preferences` among them, and
     # this suite is run from a real terminal as often as not. Closed here and
     # reopened by `_elicitation_checks`, which drives the prompt with a scripted
@@ -2208,6 +3426,16 @@ def _self_check() -> int:
     checks += _weighting_checks()
     print()
     checks += _elicitation_checks()
+    print()
+    checks += _user_weighting_checks()
+    print()
+    checks += _free_text_checks()
+    print()
+    checks += _scripted_checks()
+    print()
+    checks += _boundary_refusal_checks()
+    print()
+    checks += _user_ranking_checks()
     print()
     checks += _omission_checks()
     print()
