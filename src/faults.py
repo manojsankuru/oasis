@@ -67,10 +67,14 @@ path, while the report said five kinds were tested.
                   ArcGIS trap docs/DATA.md section 1 documents. Nothing raises;
                   the caller gets fewer features than exist and no signal.
 
-A content fault needs a FeatureSet to corrupt. Against a layer-metadata reply or
-a raster body there is nothing to make empty or to mis-declare, so the attempt is
-recorded as not applicable and passed through untouched rather than counted as an
-injection that did not happen.
+A content fault needs something to corrupt. Against a layer-metadata reply or a
+raster body there is nothing to make empty or to mis-declare, so the attempt is
+recorded as not applicable and passed through untouched rather than counted as
+an injection that did not happen. A `returnCountOnly` reply is faulted like any
+other call: by the two raised kinds, and by `empty`, which takes the count out
+of it. The count is what `acquire` checks every page against, which is how
+`empty` and `truncated` stop passing as success, so a bad count reply is the
+fault that check most needs to survive.
 
 OFF BY DEFAULT
 --------------
@@ -86,17 +90,26 @@ import inspect
 import json
 import random
 import re
+import socket
 import sys
+import tempfile
 import threading
+import urllib.parse
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any, Iterator, get_args
 
+import geopandas as gpd
+import numpy as np
 import requests
+from pyproj import Transformer
+from shapely.geometry import Point, box
 
 from . import acquire, config, verify
-from .contracts import FaultConfig, FaultEvent, FaultKind
+from .contracts import FaultConfig, FaultEvent, FaultKind, Provenance
+from .registry import Registry
 
 RAISED_KINDS: tuple[FaultKind, ...] = ("timeout", "server_error")
 """Injected as an exception the transport would have raised, inside the retry."""
@@ -115,6 +128,7 @@ existing policy retries it; a check asserts that membership rather than trusting
 this comment."""
 
 FEATURE_KEY = "features"
+COUNT_KEY = "count"
 LIMIT_KEY = "exceededTransferLimit"
 SR_KEY = "spatialReference"
 
@@ -177,6 +191,13 @@ def corrupt(kind: FaultKind, response: requests.Response, out_sr: int) -> reques
     shortened into a shorter page without becoming the `empty` case, and
     reporting one kind while injecting another is the failure this separation
     exists to prevent.
+
+    One reply that is not a FeatureSet is corruptible: a `returnCountOnly`
+    count. `empty` takes the count out of it, which is the bad count reply a
+    real service sends, and the one that must not let an attempt's pages through
+    unchecked. `truncated` and `wrong_crs` leave it alone. A halved count would be
+    a second wrong number that could agree with a halved page by chance, and a
+    count carries no reference to mis-declare.
     """
     if kind not in SUBSTITUTED_KINDS:
         raise FaultNotApplicable(f"{kind} is raised, not substituted")
@@ -184,6 +205,13 @@ def corrupt(kind: FaultKind, response: requests.Response, out_sr: int) -> reques
         payload = response.json()
     except ValueError as exc:
         raise FaultNotApplicable(f"body is not JSON: {type(exc).__name__}") from exc
+    if isinstance(payload, dict) and COUNT_KEY in payload and FEATURE_KEY not in payload:
+        if kind != "empty":
+            raise FaultNotApplicable(f"{kind} has nothing to corrupt in a count reply")
+        payload.pop(COUNT_KEY)
+        response._content = json.dumps(payload).encode("utf-8")
+        response._content_consumed = True
+        return response
     if not isinstance(payload, dict) or FEATURE_KEY not in payload:
         raise FaultNotApplicable("body is not a FeatureSet, so it carries no features")
 
@@ -341,13 +369,66 @@ def injecting(settings: FaultConfig, dataset: str = "") -> Iterator[FaultPlan]:
 # ---------------------------------------------------------------------------
 
 
-def sample_featureset(count: int, out_sr: int, offset: int, page: int) -> dict[str, Any]:
+METRE_ORIGIN = (1_613_477.0, 1_234_567.0)
+"""Where `FixtureSettings.metres` puts its points: projected-metre magnitudes, far
+outside any degree's range, served under a degree label. Synthetic, near no
+study area."""
+
+
+@dataclass(frozen=True, slots=True)
+class FixtureSettings:
+    """How the local service misbehaves, beyond what the injector does per call.
+
+    The injector corrupts one call at a time at a seeded rate. These are the
+    standing faults a real service can have on every call: a count that disagrees
+    with its own pages, no `returnCountOnly` support at all, or coordinates in
+    metres under a degree label. Each one is a path in `acquire` that no per-call
+    corruption reaches.
+
+    `count_replies` scripts the count request by request instead: an integer is
+    that count, a token names a bad reply, and once the script runs out the
+    standing settings answer. `count_log` records every count request's
+    parameters, which is how a check sees that the count carried the query's
+    filter -- the fixture serves the same features whatever the filter says. It is what reaches the order of outcomes -- a count
+    that disagrees and then a count that is refused -- which no rate can aim at.
+    """
+
+    count_reported: int | None = None
+    refuse_count: bool = False
+    metres: bool = False
+    count_replies: tuple[int | str, ...] = ()
+    count_log: list[dict[str, str]] = field(default_factory=list)
+
+
+REFUSE = "refuse"
+"""A scripted count reply: an ArcGIS error body with a 4xx code, the service
+saying it will not count. A standing refusal, accepted and named."""
+
+FAIL = "fail"
+"""A scripted count reply: an ArcGIS error body with a 5xx code under HTTP 200,
+which is how NFHL reports a failure. Asked again, never trusted."""
+
+BLANK = "blank"
+"""A scripted count reply with no `count` in it at all."""
+
+TEXT = "text"
+"""A scripted count reply whose count is a string, not an integer."""
+
+BUSY = "busy"
+"""A scripted count reply: an ArcGIS error body with code 429. A 4xx code, and
+still transient -- `acquire._RETRYABLE_STATUS` says so -- so never a refusal."""
+
+
+def sample_featureset(
+    count: int, out_sr: int, offset: int, page: int, *, metres: bool = False
+) -> dict[str, Any]:
     """One page of an Esri JSON FeatureSet, shaped the way TIGERweb ships one.
 
     Synthetic coordinates and synthetic identifiers. The data is not the thing
     under test; the fault path is, and it needs a real FeatureSet to travel
     through `_query_features`, `_received_crs` and the ESRIJSON driver.
     """
+    x0, y0, step = (*METRE_ORIGIN, 10.0) if metres else (-100.0, 40.0, 0.01)
     rows = [
         {
             "attributes": {
@@ -355,7 +436,7 @@ def sample_featureset(count: int, out_sr: int, offset: int, page: int) -> dict[s
                 "GEOID": f"{99_000_000_000 + index:011d}",
                 "NAME": f"unit {index + 1}",
             },
-            "geometry": {"x": -100.0 + index * 0.01, "y": 40.0 + index * 0.01},
+            "geometry": {"x": x0 + index * step, "y": y0 + index * step},
         }
         for index in range(offset, min(offset + page, count))
     ]
@@ -388,22 +469,45 @@ def sample_metadata() -> dict[str, Any]:
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
-    """Answers the two requests `fetch_arcgis_vector` makes, and nothing else."""
+    """Answers the three requests `fetch_arcgis_vector` makes, and nothing else:
+    the layer description, the `returnCountOnly` count, and a page of features."""
 
     def do_GET(self) -> None:
         path, _, query = self.path.partition("?")
-        params = {
-            key: value[0]
-            for key, value in [
-                (item.split("=", 1) + [""])[:2] for item in query.split("&") if item
-            ]
-            for value in [[value]]
-        }
-        if path.rstrip("/").endswith("/query"):
+        params = dict(urllib.parse.parse_qsl(query, keep_blank_values=True))
+        settings: FixtureSettings = getattr(self.server, "settings", FixtureSettings())
+        if path.rstrip("/").endswith("/query") and params.get("returnCountOnly") == "true":
+            settings.count_log.append(dict(params))
+            asked = getattr(self.server, "counts_asked", 0)
+            self.server.counts_asked = asked + 1  # type: ignore[attr-defined]
+            scripted = (
+                settings.count_replies[asked] if asked < len(settings.count_replies) else None
+            )
+            if scripted == REFUSE or (scripted is None and settings.refuse_count):
+                body: dict[str, Any] = {
+                    "error": {"code": 400, "message": "returnCountOnly is not supported"}
+                }
+            elif scripted == FAIL:
+                body = {"error": {"code": 500, "message": "Error performing query operation"}}
+            elif scripted == BUSY:
+                body = {"error": {"code": 429, "message": "Too many requests"}}
+            elif scripted == BLANK:
+                body = {}
+            elif scripted == TEXT:
+                body = {"count": str(SAMPLE_FEATURE_COUNT)}
+            elif scripted is not None:
+                body = {"count": scripted}
+            elif settings.count_reported is not None:
+                body = {"count": settings.count_reported}
+            else:
+                body = {"count": SAMPLE_FEATURE_COUNT}
+        elif path.rstrip("/").endswith("/query"):
             out_sr = int(params.get("outSR", 4326))
             offset = int(params.get("resultOffset", 0))
             page = int(params.get("resultRecordCount", acquire.PAGE_SIZE))
-            body = sample_featureset(SAMPLE_FEATURE_COUNT, out_sr, offset, page)
+            body = sample_featureset(
+                SAMPLE_FEATURE_COUNT, out_sr, offset, page, metres=settings.metres
+            )
         else:
             body = sample_metadata()
         encoded = json.dumps(body).encode("utf-8")
@@ -419,16 +523,17 @@ class _FixtureHandler(BaseHTTPRequestHandler):
 
 
 @contextmanager
-def local_service() -> Iterator[str]:
+def local_service(settings: FixtureSettings | None = None) -> Iterator[str]:
     """A real HTTP server on a loopback port, yielded as a service URL.
 
     A real socket, real headers and a real status line, so `_request`,
     `_query_features`, `_received_crs` and the ESRIJSON driver all run for real
     against it. Stubbing `_request` instead would have tested this module's idea
     of `acquire`, which CLAUDE.md names as the thing two green suites here have
-    already done.
+    already done. `settings` names a standing fault the service has on every call.
     """
     server = ThreadingHTTPServer(("127.0.0.1", 0), _FixtureHandler)
+    server.settings = settings or FixtureSettings()  # type: ignore[attr-defined]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -501,8 +606,8 @@ def run_retrieval(
 
     `extra_turns` is the attempts this run spent beyond the attempts the clean
     run needed. Measured, not assumed: a clean run of `fetch_arcgis_vector` costs
-    one metadata call plus one page, and a harness that hardcoded two would stop
-    being right the moment a layer needed a second page.
+    one metadata call, one count call and one page, and a harness that hardcoded
+    three would stop being right the moment a layer needed a second page.
 
     One honest limit on the `settings is None` branch. Nothing is installed
     there, which is the whole point of it, so nothing is counted either: the
@@ -746,6 +851,20 @@ def _corruption_checks() -> list[tuple[str, bool]]:
         FaultNotApplicable,
         "raised, not substituted",
     )
+    def count_reply() -> requests.Response:
+        return synthetic_response(
+            "GET", "http://x/0/query", 200, b'{"count": 10}', "application/json"
+        )
+
+    count_emptied = corrupt("empty", count_reply(), 4326).json()
+    count_untouched = all(
+        verify.refuses(
+            lambda kind=kind: corrupt(kind, count_reply(), 4326),
+            FaultNotApplicable,
+            "nothing to corrupt in a count reply",
+        )
+        for kind in ("truncated", "wrong_crs")
+    )
 
     print(f"  empty:     {len(emptied[FEATURE_KEY])} feature(s), "
           f"{SR_KEY} {emptied[SR_KEY]}, {LIMIT_KEY} present: {LIMIT_KEY in emptied}")
@@ -779,6 +898,11 @@ def _corruption_checks() -> list[tuple[str, bool]]:
         ("a reply with no features is refused rather than corrupted", not_a_featureset),
         ("a non-JSON body is refused rather than corrupted", not_json),
         ("a raised kind is refused by the substituting path", raised_kind),
+        ("empty takes the count out of a count reply, the bad reply acquire must survive",
+         COUNT_KEY not in count_emptied),
+        ("truncated and wrong_crs leave a count reply alone, so no second wrong number "
+         "can agree with a short page by chance",
+         count_untouched),
     ]
 
 
@@ -835,8 +959,8 @@ def _live_kind_checks() -> list[tuple[str, tuple[str, bool]]]:
     )))
     results.append(("clean", (
         "two independent rate-0.0 runs cost the same number of calls, and that "
-        "number is the metadata call plus at least one page",
-        counter.attempts == repeat.attempts and counter.attempts >= 2,
+        "number is the metadata call, the count call and at least one page",
+        counter.attempts == repeat.attempts and counter.attempts >= 3,
     )))
 
     timeout = outcomes["timeout"]
@@ -867,18 +991,23 @@ def _live_kind_checks() -> list[tuple[str, tuple[str, bool]]]:
         f"HTTP {INJECTED_STATUS}" in server.error,
     )))
 
+    # The two content faults that used to complete silently. The page is checked
+    # against the service's own count, so a page faulted on every attempt is
+    # asked again to the bound and then refused by name -- never returned short.
+    counted_attempts = 1 + config.MAX_RETRIES * (clean_attempts - 1)
     empty = outcomes["empty"]
     results.append(("empty", (
-        "an injected empty response raises nothing and returns zero features",
-        empty.completed and empty.features == 0 and not empty.error,
+        "an empty page on every attempt is refused by name, not returned as zero features",
+        not empty.completed and "FeatureCountMismatch" in empty.error,
     )))
     results.append(("empty", (
-        "an injected empty response still declares the CRS that was requested",
-        empty.crs == "EPSG:4326",
+        "the query was asked again to exactly config.MAX_RETRIES counted attempts",
+        empty.attempts == counted_attempts,
     )))
     results.append(("empty", (
-        "an empty response is not a recovery, because the numbers are wrong",
-        not empty.correct,
+        "with the count stripped too, the refusal says the count was unusable, and "
+        "the emptied page was not returned",
+        "no usable count" in empty.error and "not returned" in empty.error,
     )))
 
     wrong = outcomes["wrong_crs"]
@@ -887,8 +1016,8 @@ def _live_kind_checks() -> list[tuple[str, tuple[str, bool]]]:
         not wrong.completed and "CRSMismatch" in wrong.error,
     )))
     results.append(("wrong_crs", (
-        "a wrong CRS is not retried, because retrying a wrong body cannot help",
-        wrong.attempts == clean_attempts,
+        "a wrong CRS is re-requested exactly once, then refused rather than retried again",
+        wrong.attempts == clean_attempts + (clean_attempts - 1),
     )))
     results.append(("wrong_crs", (
         "the refusal names both the requested and the returned reference",
@@ -897,16 +1026,17 @@ def _live_kind_checks() -> list[tuple[str, tuple[str, bool]]]:
 
     short = outcomes["truncated"]
     results.append(("truncated", (
-        "an injected truncation raises nothing at all",
-        short.completed and not short.error,
+        "a short page on every attempt is refused by name, not returned as half the layer",
+        not short.completed and "FeatureCountMismatch" in short.error,
     )))
     results.append(("truncated", (
-        "a truncated page returns exactly half the features and no signal",
-        short.features == SAMPLE_FEATURE_COUNT // 2,
+        "the refusal names the half the page held against the count the service gave",
+        f"counted {SAMPLE_FEATURE_COUNT}" in short.error
+        and f"returned {SAMPLE_FEATURE_COUNT // 2}" in short.error,
     )))
     results.append(("truncated", (
-        "a truncated page is not a recovery, because the count is silently short",
-        not short.correct,
+        "a truncation the count caught is not a recovery and returns no features",
+        not short.correct and short.features == 0,
     )))
 
     results.append(("all", (
@@ -968,8 +1098,11 @@ def _invariant_seven_checks() -> list[tuple[str, bool]]:
             )
         server_attempts = second.attempts
 
+    counted = acquire._counted_attempt.retry
     print(f"  policy: stop_after_attempt={policy.stop.max_attempt_number}, "
           f"reraise={policy.reraise}")
+    print(f"  count policy: stop_after_attempt={counted.stop.max_attempt_number}, "
+          f"reraise={counted.reraise}, retries {counted.retry.exception_types}")
     print(f"  attempts spent at rate 1.0: timeout {attempts}, "
           f"server_error {server_attempts}, bound {config.MAX_RETRIES}")
     print(f"  timeouts carried by those calls: {timeouts}")
@@ -978,6 +1111,11 @@ def _invariant_seven_checks() -> list[tuple[str, bool]]:
          policy.stop.max_attempt_number == config.MAX_RETRIES),
         ("the retry policy still reraises rather than returning a failure object",
          policy.reraise is True),
+        ("the count policy stops at the same bound and reraises too, so it cannot loop",
+         counted.stop.max_attempt_number == config.MAX_RETRIES and counted.reraise is True),
+        ("the count policy re-asks a count mismatch only, never a transport failure",
+         counted.retry.exception_types
+         in (acquire.FeatureCountMismatch, (acquire.FeatureCountMismatch,))),
         ("a call faulted on every attempt stops at the bound, it does not loop",
          attempts == config.MAX_RETRIES),
         ("a 500 faulted on every attempt stops at the same bound",
@@ -1055,19 +1193,528 @@ def _event_checks() -> list[tuple[str, bool]]:
             expect_features=SAMPLE_FEATURE_COUNT, expect_crs="EPSG:4326",
             clean_attempts=clean_attempts, timeout_s=10.0,
         )
+    # The one silent path left. A service that refuses returnCountOnly -- every
+    # count reply in the retrieval a 4xx refusal, on every request in the bound --
+    # has no count to check a page against, so an emptied page still completes. That is the gap `acquire._feature_count` names in the
+    # provenance note. A count reply that is merely bad, or a refusal after a
+    # count, is never trusted; only this refusal is let through. Kept as a check
+    # rather than hidden, and it is the run that proves `correct` is more than
+    # `completed`.
+    with local_service(FixtureSettings(refuse_count=True)) as url:
+        silent = run_retrieval(
+            url, FaultConfig(kind="empty", rate=1.0, seed=1), dataset="tracts",
+            expect_features=SAMPLE_FEATURE_COUNT, expect_crs="EPSG:4326",
+            clean_attempts=clean_attempts, timeout_s=10.0,
+        )
     survived = good.event()
     failed = bad.event()
     print(f"  recovered event: {survived}")
-    print(f"  silent-failure event: {failed}")
+    print(f"  refused-run event: {failed}")
+    print(f"  where the service cannot count, an emptied page: completed={silent.completed} "
+          f"features={silent.features} correct={silent.correct}")
     return [
         ("an event carries the kind that was configured", survived.kind == "timeout"),
         ("an event names the dataset it was measured on", survived.dataset == "tracts"),
         ("a run with the right numbers is recorded as recovered", survived.recovered),
+        ("a run that ended in a named failure is NOT recorded as recovered",
+         not bad.completed and "FeatureCountMismatch" in bad.error and not failed.recovered),
+        ("where the service refuses to count, an emptied page still completes -- the named gap",
+         silent.completed and silent.features == 0),
         ("a run that completed with the wrong numbers is NOT recorded as recovered",
-         bad.completed and not failed.recovered),
+         silent.completed and not silent.correct and not silent.event().recovered),
         ("extra_turns is the attempts beyond the clean run", survived.extra_turns == 0),
         ("the event kind is one of the five", failed.kind in ALL_KINDS),
     ]
+
+
+@dataclass(slots=True)
+class Fetched:
+    """One `fetch_arcgis_vector` call's outcome, with a failure kept as data.
+
+    The checks below assert on what a call did, including how it failed. A call
+    left to raise would end the whole suite at that line instead of failing the
+    one check it belongs to, and a mutant would read as a crash rather than as
+    the named check that caught it.
+    """
+
+    frame: Any = None
+    record: Any = None
+    error: str = ""
+
+    @property
+    def features(self) -> int:
+        return 0 if self.frame is None else int(len(self.frame))
+
+    def noted(self, phrase: str) -> bool:
+        return self.record is not None and any(phrase in note for note in self.record.notes)
+
+
+def fetch(url: str) -> Fetched:
+    """`acquire.fetch_arcgis_vector` on the fixture layer, never raising."""
+    try:
+        frame, record = acquire.fetch_arcgis_vector(url, 0, out_sr=4326, timeout_s=10.0)
+    except acquire.AcquisitionError as exc:
+        return Fetched(error=f"{type(exc).__name__}: {exc}")
+    return Fetched(frame=frame, record=record)
+
+
+FILTER_WHERE = "GEOID LIKE '99%'"
+"""A filter for the count-filter check, with characters a URL has to encode."""
+
+
+def seed_for(pattern: tuple[bool, ...], rate: float, limit: int = 5000) -> int:
+    """The first seed whose opening decisions at `rate` are exactly `pattern`.
+
+    `FaultPlan` draws once per call, in call order, so a seed can be chosen to
+    fault one named call -- the count, or the first page -- and leave the rest
+    alone. Found by replaying the same generator the plan seeds, not guessed.
+    """
+    for seed in range(limit):
+        draws = random.Random(seed)
+        if tuple(draws.random() < rate for _ in pattern) == pattern:
+            return seed
+    raise ValueError(f"no seed below {limit} opens with {pattern} at rate {rate}")
+
+
+def _count_checks() -> list[tuple[str, bool]]:
+    """That a page is checked against the service's own count, both ways round.
+
+    The injector corrupts one call at a seeded rate; `FixtureSettings` gives the
+    service a standing fault on every call. Between them every branch of
+    `acquire._counted_query` and `acquire._feature_count` runs against a real
+    socket: agreement, a count that never agrees, a service that cannot count,
+    a page faulted once and recovered, and a fault on the count request itself.
+    """
+    meta, count, page = False, False, False
+    # metadata clean, count timed out, count again clean, page clean
+    count_timeout = seed_for((meta, True, count, page), 0.5)
+    # metadata clean, count clean, page emptied; then count and page clean
+    page_emptied = seed_for((meta, count, True, count, page), 0.5)
+
+    with local_service() as url:
+        with injecting(FaultConfig(kind="timeout", rate=0.0, seed=0)) as counter:
+            clean = fetch(url)
+        with injecting(FaultConfig(kind="timeout", rate=0.5, seed=count_timeout)) as timed:
+            timed_fetch = fetch(url)
+        with injecting(FaultConfig(kind="empty", rate=0.5, seed=page_emptied)) as emptied:
+            recovered = fetch(url)
+    with local_service(FixtureSettings(count_reported=SAMPLE_FEATURE_COUNT + 1)) as url:
+        with injecting(FaultConfig(kind="timeout", rate=0.0, seed=0)) as disagreeing:
+            never = fetch(url)
+    with local_service(FixtureSettings(refuse_count=True)) as url:
+        with injecting(FaultConfig(kind="timeout", rate=0.0, seed=0)) as refusing:
+            uncounted = fetch(url)
+    bad_once: dict[str, Fetched] = {}
+    for token in (FAIL, BUSY, BLANK, TEXT):
+        with local_service(FixtureSettings(count_replies=(token,))) as url:
+            bad_once[token] = fetch(url)
+    with local_service(FixtureSettings(count_replies=(BLANK,) * config.MAX_RETRIES)) as url:
+        never_usable = fetch(url)
+    # Refusals after a reply that was not one: two 400s and a 5xx, then 400s for
+    # good. The 5xx means this is not a service that never counts, so the later
+    # run of refusals is not believed and the layer is refused.
+    with local_service(
+        FixtureSettings(count_replies=(REFUSE, REFUSE, FAIL), refuse_count=True)
+    ) as url:
+        refused_after_failure = fetch(url)
+    # A count of 10, then 5 for the same query, with both of those attempts'
+    # pages truncated. A count that changes vouches for neither page set.
+    count_changed = seed_for((meta, count, True, count, True, count, page), 0.5)
+    with local_service(FixtureSettings(count_replies=(SAMPLE_FEATURE_COUNT, SAMPLE_FEATURE_COUNT // 2))) as url:
+        with injecting(FaultConfig(kind="truncated", rate=0.5, seed=count_changed)):
+            changed = fetch(url)
+    # A count of 11 first, then a refusal on every request after it: each later
+    # attempt's pages are checked against the 11 the service already gave, so
+    # the layer is refused rather than let through as uncountable.
+    with local_service(
+        FixtureSettings(count_replies=(SAMPLE_FEATURE_COUNT + 1,), refuse_count=True)
+    ) as url:
+        disagreed_then_refused = fetch(url)
+    # One 400 refusal from a service that otherwise counts, with that attempt's
+    # page truncated by the injector. Draws: metadata, count (refused), count
+    # (answered), page (truncated); then count and page clean.
+    short_after_refusal = seed_for((meta, count, count, True, count, page), 0.5)
+    with local_service(FixtureSettings(count_replies=(REFUSE,))) as url:
+        with injecting(
+            FaultConfig(kind="truncated", rate=0.5, seed=short_after_refusal)
+        ) as refused_short:
+            refused_once = fetch(url)
+    filtered_settings = FixtureSettings()
+    with local_service(filtered_settings) as url:
+        acquire.fetch_arcgis_vector(
+            url, 0, where=FILTER_WHERE, out_sr=4326, bbox=(-100.5, 39.5, -99.5, 40.5),
+            timeout_s=10.0,
+        )
+    filtered = filtered_settings
+    real_parser = acquire._read_esri_json
+    acquire._read_esri_json = lambda payload, crs: real_parser(payload, crs).iloc[:-1]
+    try:
+        with local_service() as url:
+            dropped = fetch(url)
+    finally:
+        acquire._read_esri_json = real_parser
+    # metadata clean, count stripped, page emptied in the same attempt; then clean
+    both_faulted = seed_for((meta, True, True, count, page), 0.5)
+    with local_service() as url:
+        with injecting(FaultConfig(kind="empty", rate=0.5, seed=both_faulted)) as stripped:
+            survived = fetch(url)
+
+    print(f"  clean: {counter.attempts} call(s); count timed out on seed {count_timeout}: "
+          f"{timed.attempts} call(s), {timed_fetch.features} feature(s)")
+    print(f"  first page emptied on seed {page_emptied}: {emptied.attempts} call(s), "
+          f"{recovered.features} feature(s) after the re-query {recovered.error[:60]}")
+    print(f"  a count that never agrees: {disagreeing.attempts} call(s), {never.error[:70]}")
+    print(f"  a service that refuses to count: {uncounted.features} feature(s) after "
+          f"{refusing.attempts} call(s) {uncounted.error[:60]}")
+    print(f"  one bad count reply each: "
+          f"{ {token: (item.features, item.error[:40]) for token, item in bad_once.items()} }")
+    print(f"  a count stripped and its page emptied on seed {both_faulted}: "
+          f"{survived.features} feature(s), {stripped.injected} injected")
+    return [
+        ("a clean retrieval asks the count and records that the pages agreed with it",
+         clean.noted(f"counted {SAMPLE_FEATURE_COUNT} and paging returned {SAMPLE_FEATURE_COUNT}")),
+        ("a timeout on the count request is retried like any other call, and recovers",
+         timed.decisions[1] is True and timed.injected == 1
+         and timed_fetch.features == SAMPLE_FEATURE_COUNT
+         and timed.attempts == counter.attempts + 1),
+        ("a page emptied once is asked again and the whole layer comes back",
+         emptied.injected == 1 and recovered.features == SAMPLE_FEATURE_COUNT),
+        ("the recovered layer's provenance says the count agreed on the second attempt",
+         recovered.noted("after 2 counted attempt(s)")),
+        ("a count that never agrees is refused by name once the bound is spent",
+         never.error.startswith("FeatureCountMismatch")
+         and f"counted {SAMPLE_FEATURE_COUNT + 1}" in never.error
+         and disagreeing.attempts == 1 + config.MAX_RETRIES * (counter.attempts - 1)),
+        ("a service that refuses to count still returns the layer, and says it went unchecked",
+         uncounted.features == SAMPLE_FEATURE_COUNT and uncounted.noted("unchecked")),
+        ("a refusal is asked again as a count only, to the bound, before it is believed",
+         refusing.attempts == counter.attempts + config.MAX_RETRIES - 1),
+        ("one bad count reply -- a 5xx body, a 429 body, a blank one, a text count -- "
+         "is asked again, and the layer is checked on the attempt that answered",
+         all(
+             item.features == SAMPLE_FEATURE_COUNT
+             and item.noted("agreeing after 2 counted attempt(s)")
+             for item in bad_once.values()
+         )
+         and len(bad_once) == 4),
+        ("refusals after a count reply that was not one are not believed",
+         refused_after_failure.error.startswith("FeatureCountMismatch")
+         and "not a refusal" in refused_after_failure.error),
+        ("a count that changes between attempts vouches for neither page set",
+         changed.features == SAMPLE_FEATURE_COUNT
+         and not changed.noted(f"counted {SAMPLE_FEATURE_COUNT // 2}")),
+        ("one refusal from a service that counts does not let a short page through",
+         refused_once.features == SAMPLE_FEATURE_COUNT and refused_short.injected == 1),
+        ("the count request carries the query's filter, not the whole layer's",
+         bool(filtered.count_log)
+         and filtered.count_log[0].get("where") == FILTER_WHERE
+         and "geometry" in filtered.count_log[0]
+         and filtered.count_log[0].get("returnCountOnly") == "true"),
+        ("a feature the parser drops is refused, not returned one short",
+         dropped.error.startswith("ServiceError") and "parser kept" in dropped.error),
+        ("a count that is never usable is refused by name, never let through unchecked",
+         never_usable.error.startswith("FeatureCountMismatch")
+         and "no usable count" in never_usable.error),
+        ("a refusal after a count the service already gave is checked against that count, "
+         "not taken as a service that cannot count",
+         disagreed_then_refused.error.startswith("FeatureCountMismatch")
+         and f"counted {SAMPLE_FEATURE_COUNT + 1}" in disagreed_then_refused.error),
+        ("a count stripped by the injector with its page emptied is asked again and recovers",
+         stripped.injected == 2 and survived.features == SAMPLE_FEATURE_COUNT),
+    ]
+
+
+def _crs_recovery_checks() -> list[tuple[str, bool]]:
+    """That a mislabelled reference is asked for once more, and coordinates are read.
+
+    Two separate defences. The re-request answers a label that is wrong once.
+    The range check answers a label that is right with numbers that are not:
+    metres under a degree label pass every label check there is, so the numbers
+    themselves are held to the declared reference's area of use.
+    """
+    meta, count, page = False, False, False
+    # metadata clean, count clean, page mislabelled; the re-request clean
+    mislabelled_once = seed_for((meta, count, True, count, page), 0.5)
+    with local_service() as url:
+        with injecting(FaultConfig(kind="wrong_crs", rate=0.5, seed=mislabelled_once)) as plan:
+            relabelled = fetch(url)
+    with local_service(FixtureSettings(metres=True)) as url:
+        in_metres = fetch(url)
+    # The first page agrees with a count of 10 and is mislabelled; the re-request
+    # is refused a count on every request. The 10 already given still checks it.
+    with local_service(
+        FixtureSettings(count_replies=(SAMPLE_FEATURE_COUNT,), refuse_count=True)
+    ) as url:
+        with injecting(FaultConfig(kind="wrong_crs", rate=0.5, seed=mislabelled_once)):
+            known_kept = fetch(url)
+    metres_error = in_metres.error if in_metres.error.startswith("CRSMismatch") else ""
+
+    def points(x0: float, y0: float, crs: str) -> gpd.GeoDataFrame:
+        return gpd.GeoDataFrame(
+            geometry=[Point(x0 + step, y0 + step) for step in (0.0, 1.0)], crs=crs
+        )
+
+    degrees = points(-100.0, 40.0, "EPSG:4326")
+    nad83 = points(-100.0, 40.0, "EPSG:4269")
+    nad83_off = points(-100.0, 200.0, "EPSG:4269")
+    nad83_wrong_side = points(20.0, 40.0, "EPSG:4269")
+    alaska_metres = points(0.0, 1_000_000.0, "EPSG:3338")
+    alaska_degrees = points(-150.0, 60.0, "EPSG:3338")
+    no_geometry = gpd.GeoDataFrame(geometry=[None, None], crs="EPSG:4326")
+    mercator = points(*METRE_ORIGIN, "EPSG:3857")
+    mislabelled = points(*METRE_ORIGIN, "EPSG:4326")
+    # One frame past each edge of the degree range and inside the other three,
+    # so each of the four comparisons is the only one that can refuse it.
+    past_one_edge = {
+        "west": points(-400.0, 40.0, "EPSG:4326"),
+        "east": points(400.0, 40.0, "EPSG:4326"),
+        "south": points(-100.0, -200.0, "EPSG:4326"),
+        "north": points(-100.0, 200.0, "EPSG:4326"),
+    }
+    edges = {side: _range_note(frame, "EPSG:4326") for side, frame in past_one_edge.items()}
+    declared = relabelled.record.declared_crs if relabelled.record is not None else "-"
+    print(f"  mislabelled once on seed {mislabelled_once}: {relabelled.features} feature(s) in "
+          f"{declared} after {plan.attempts} call(s) {relabelled.error[:60]}")
+    print(f"  metres under a degree label -> {metres_error[-120:]!r}")
+    return [
+        ("a reference mislabelled once is re-requested and the layer comes back right",
+         plan.injected == 1 and relabelled.features == SAMPLE_FEATURE_COUNT
+         and declared == "EPSG:4326"),
+        ("the provenance says the first response was mislabelled and re-requested",
+         relabelled.noted("re-requested once")),
+        ("metres under a degree label are refused, though the label matches the request",
+         "outside that reference's valid range" in metres_error),
+        ("the refusal names no coordinate, because it can reach a provenance note",
+         str(int(METRE_ORIGIN[0])) not in metres_error),
+        ("degrees under a degree label pass the range check",
+         _range_note(degrees, "EPSG:4326").startswith(INSIDE_RANGE)),
+        ("metres under a metre label pass too, so the check reads units, not size",
+         _range_note(mercator, "EPSG:3857").startswith(INSIDE_RANGE)),
+        ("the range check refuses metres under a degree label when called directly",
+         verify.refuses(
+             lambda: acquire._assert_plausible_extent(mislabelled, "EPSG:4326", "x"),
+             acquire.CRSMismatch,
+             "valid range",
+         )),
+        ("an empty layer has no range to check and says so",
+         "no features" in _range_note(degrees.iloc[0:0], "EPSG:4326")),
+        ("a layer whose features carry no geometry is noted unchecked, not as inside the range",
+         "not checked" in _range_note(no_geometry, "EPSG:4326")),
+        ("a reference whose area of use crosses the antimeridian still accepts its own "
+         "coordinates, and still refuses an impossible latitude",
+         _range_note(nad83, "EPSG:4269").startswith(INSIDE_RANGE)
+         and _range_note(nad83_off, "EPSG:4269").startswith("refused")),
+        ("a longitude outside the wrapped area of use is still refused",
+         _range_note(nad83_wrong_side, "EPSG:4269").startswith("refused")),
+        ("a projected reference crossing the antimeridian keeps its range check",
+         _range_note(alaska_metres, "EPSG:3338").startswith(INSIDE_RANGE)
+         and _range_note(alaska_degrees, "EPSG:3338").startswith("refused")),
+        ("the re-request checks its pages against the count the first attempt gave",
+         known_kept.features == SAMPLE_FEATURE_COUNT
+         and known_kept.noted(f"counted {SAMPLE_FEATURE_COUNT}")
+         and not known_kept.noted("unchecked")),
+        ("a coordinate past any one edge of the range is refused, each edge on its own",
+         all(note.startswith("refused") for note in edges.values()) and len(edges) == 4),
+    ]
+
+
+INSIDE_RANGE = "every coordinate falls inside the valid range"
+"""How `acquire._assert_plausible_extent` says a frame passed. Matched as a prefix:
+the refusal's text also says "valid range", so a check that only looked for
+those words passed on a refusal -- which is how a broken antimeridian case first
+went unnoticed here."""
+
+
+def _range_note(frame: Any, declared: str) -> str:
+    """`acquire._assert_plausible_extent`'s note, or the refusal's text as data."""
+    try:
+        return acquire._assert_plausible_extent(frame, declared, "fixture")
+    except acquire.CRSMismatch as exc:
+        return f"refused: {exc}"
+
+
+def _extent_checks() -> list[tuple[str, bool]]:
+    """That every layer after tracts has to reach the tract layer's extent.
+
+    Run against a real `Registry` in a temporary directory, with a real tract
+    file registered under a real `Provenance`, so `_within_study_area` loads the
+    tracts the way `acquire.main` does. The comparison runs in the working CRS
+    through `align`: the far-off layer below is refused in metres, and the
+    nearby one is accepted although it arrives in another reference.
+    """
+    from . import align
+    from . import provenance as prov
+
+    def square(x0: float, y0: float, crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
+        return gpd.GeoDataFrame(
+            geometry=[box(x0, y0, x0 + 0.1, y0 + 0.1)], crs=crs
+        )
+
+    tracts = square(-100.0, 40.0)
+    overlapping = square(-99.95, 40.05)
+    far_away = square(-80.0, 10.0)
+    # The same overlapping square, its corners put into web mercator by pyproj
+    # directly: this module may not reproject a frame itself, and the point is
+    # that `align` does it for the comparison.
+    to_mercator = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+    west, south = to_mercator.transform(-99.95, 40.05)
+    east, north = to_mercator.transform(-99.85, 40.15)
+    in_mercator = gpd.GeoDataFrame(geometry=[box(west, south, east, north)], crs="EPSG:3857")
+    with tempfile.TemporaryDirectory(prefix="extent_") as folder:
+        root = Path(folder)
+        path = root / "tracts.geojson"
+        tracts.to_file(path, driver="GeoJSON")
+        record = Provenance(
+            dataset=acquire.DATASET_TRACTS,
+            source_url="http://127.0.0.1/fixture",
+            retrieved_at=prov.utc_now(),
+            declared_crs="EPSG:4326",
+            working_crs=config.DEFAULT_WORKING_CRS,
+            vintage="synthetic fixture",
+            feature_count=1,
+            license="synthetic fixture, no license",
+        )
+        empty_registry = Registry(manifest_path=root / "manifest.json", root=root)
+        registry = Registry(manifest_path=root / "manifest.json", root=root)
+        registry.register(acquire.DATASET_TRACTS, "vector", path, record)
+        aligner = align.Alignment(registry)
+        accepted = _extent_note(overlapping, registry, "block_groups")
+        refused = _extent_note(far_away, registry, "flood_zones")
+        unregistered = _extent_note(overlapping, empty_registry, "facilities")
+        empty = _extent_note(overlapping.iloc[0:0], registry, "flood_zones")
+        compared = {
+            "overlapping": acquire.meets_extent(overlapping, tracts, aligner),
+            "overlapping, in another reference": acquire.meets_extent(in_mercator, tracts, aligner),
+            "far away": acquire.meets_extent(far_away, tracts, aligner),
+            "empty": acquire.meets_extent(overlapping.iloc[0:0], tracts, aligner),
+        }
+    print(f"  extent against the tracts: {compared}")
+    print(f"  accepted: {accepted}")
+    return [
+        ("a layer that overlaps the tracts is accepted, and the check is noted",
+         "meets the tract layer" in accepted and registry.working_crs in accepted),
+        ("a layer that lands somewhere else is refused as a CRS mismatch",
+         refused.startswith("refused") and "does not reach the tract layer" in refused),
+        ("the comparison says which extents meet, whatever reference each arrives in",
+         compared == {
+             "overlapping": True,
+             "overlapping, in another reference": True,
+             "far away": False,
+             "empty": False,
+         }),
+        ("with no tract layer registered the check is noted as not made, not passed",
+         "not compared" in unregistered),
+        ("an empty layer has no extent to compare and says so",
+         "no features" in empty),
+    ]
+
+
+def _raster_and_error_checks() -> list[tuple[str, bool]]:
+    """Two refusals that leave something behind if they are wrong.
+
+    A refused raster has already been written by the time its extent is compared,
+    so the refusal has to delete it -- checked on a real GeoTIFF against a real
+    registry. And a transport error names the URL it failed on, query string and
+    all, which for an envelope filter is the study extent URL-encoded -- checked
+    by sending a real request to a loopback port nothing listens on, through the
+    real `_request`.
+    """
+    import rasterio
+    from rasterio.transform import from_origin
+
+    from . import provenance as prov
+
+    with tempfile.TemporaryDirectory(prefix="raster_") as folder:
+        root = Path(folder)
+        tracts_path = root / "tracts.geojson"
+        gpd.GeoDataFrame(geometry=[box(-100.0, 40.0, -99.9, 40.1)], crs="EPSG:4326").to_file(
+            tracts_path, driver="GeoJSON"
+        )
+        registry = Registry(manifest_path=root / "manifest.json", root=root)
+        registry.register(
+            acquire.DATASET_TRACTS,
+            "vector",
+            tracts_path,
+            Provenance(
+                dataset=acquire.DATASET_TRACTS,
+                source_url="http://127.0.0.1/fixture",
+                retrieved_at=prov.utc_now(),
+                declared_crs="EPSG:4326",
+                working_crs=config.DEFAULT_WORKING_CRS,
+                vintage="synthetic fixture",
+                feature_count=1,
+                license="synthetic fixture, no license",
+            ),
+        )
+
+        def raster(name: str, west: float, north: float) -> Path:
+            path = root / name
+            with rasterio.open(
+                path, "w", driver="GTiff", width=4, height=4, count=1, dtype="float32",
+                crs="EPSG:4326", transform=from_origin(west, north, 0.025, 0.025),
+            ) as dataset:
+                dataset.write(np.zeros((1, 4, 4), dtype="float32"))
+            return path
+
+        inside = raster("inside.tif", -100.0, 40.1)
+        elsewhere = raster("elsewhere.tif", -80.0, 10.1)
+        unreadable = root / "unreadable.tif"
+        unreadable.write_bytes(b"not a raster")
+        kept_note = _raster_note(inside, registry)
+        refused_note = _raster_note(elsewhere, registry)
+        try:
+            acquire._checked_raster(unreadable, registry)
+            unreadable_refused = False
+        except Exception:
+            unreadable_refused = True
+        kept, removed = inside.exists(), not elsewhere.exists()
+        unreadable_removed = not unreadable.exists()
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        closed_port = probe.getsockname()[1]
+    hidden = "geometry"
+    transport_error = ""
+    try:
+        acquire._request(
+            "GET",
+            f"http://127.0.0.1:{closed_port}/0/query",
+            params={"where": "1=1", hidden: "-10.123456,20.654321,-10.0,20.7"},
+            timeout_s=2.0,
+        )
+    except acquire.AcquisitionError as exc:
+        transport_error = str(exc)
+    print(f"  a raster inside the tracts: {kept_note[:70]}")
+    print(f"  a raster elsewhere: {refused_note[:70]}; file removed: {removed}")
+    print(f"  transport error text: {transport_error[:110]!r}")
+    return [
+        ("a raster that reaches the tracts is kept and its check noted",
+         kept and "meets the tract layer" in kept_note),
+        ("a raster that lands elsewhere is refused and removed, not left for the old record",
+         refused_note.startswith("refused") and removed),
+        ("a raster that cannot even be compared is removed too, whatever the error",
+         unreadable_refused and unreadable_removed),
+        ("a transport error reached the real request path",
+         "ConnectionError" in transport_error),
+        ("a transport error carries no query string, so no encoded extent reaches a note",
+         hidden not in transport_error and "query withheld" in transport_error),
+    ]
+
+
+def _raster_note(path: Path, registry: Registry) -> str:
+    """`acquire._checked_raster`'s note, or the refusal's text as data."""
+    try:
+        return acquire._checked_raster(path, registry)
+    except acquire.CRSMismatch as exc:
+        return f"refused: {exc}"
+
+
+def _extent_note(frame: Any, registry: Registry, dataset: str) -> str:
+    """`acquire._within_study_area`'s note, or the refusal's text as data."""
+    try:
+        return acquire._within_study_area(frame, registry, dataset)
+    except acquire.CRSMismatch as exc:
+        return f"refused: {exc}"
 
 
 def _surface_checks() -> list[tuple[str, bool]]:
@@ -1113,6 +1760,14 @@ def _self_check() -> int:
     checks += _recovery_checks()
     print()
     checks += _event_checks()
+    print()
+    checks += _count_checks()
+    print()
+    checks += _crs_recovery_checks()
+    print()
+    checks += _extent_checks()
+    print()
+    checks += _raster_and_error_checks()
     print()
     checks += _surface_checks()
     print()
