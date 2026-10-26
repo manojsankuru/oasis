@@ -1,8 +1,10 @@
-"""Generate the two repository-owned data figures for the paper from existing evidence.
+"""Generate the three repository-owned data figures for the paper from existing evidence.
 
 This module is deliberately downstream of the analysis.  It reads the primary
-snapshot, the already-written risk and trade-off tables, and the canonical
-transfer report.  It never retrieves data and never rebuilds a pipeline result.
+snapshot, the already-written risk and trade-off tables, the canonical transfer
+report, and ``outputs/paper/numbers.json``.  The overlap heat map reads that
+numbers file and nothing else.  It never retrieves data and never rebuilds a
+pipeline result.
 Geometry is used only to draw the static risk map; no coordinate is serialized
 to a model-facing artifact.
 """
@@ -57,13 +59,14 @@ from . import acquire, config, hazard, pipeline, verify, vulnerability
 from .align import Alignment
 from .contracts import Col, HazardScenario, WeightPreset
 from .registry import Registry
-from .risk import DEFAULT_PRIORITY_UNITS, DEFAULT_VULNERABLE_QUANTILE
+from .risk import DEFAULT_PRIORITY_UNITS, DEFAULT_VULNERABLE_QUANTILE, vulnerable_label
 
 
 FIGURE_DIRECTORY = config.PROJECT_ROOT / "paper" / "figs"
 EXPECTED_FIGURES: tuple[str, ...] = (
     "risk_surface.pdf",
     "tradeoff.pdf",
+    "overlap.pdf",
 )
 HAND_MADE_FIGURES: tuple[str, ...] = ("architecture.pdf",)
 
@@ -80,6 +83,12 @@ TRADEOFF_COLUMNS: tuple[str, ...] = (
     "top_geoids",
     "displaced_geoids",
 )
+VULNERABLE_AXIS_LABEL = vulnerable_label().capitalize().replace(" at or above ", " at or above\n", 1)
+"""What `vulnerable_population_in_priority` counts, from `risk.vulnerable_label`,
+broken over two lines to fit a single-column axis."""
+NUMBERS_PATH = config.PAPER_DIR / "numbers.json"
+OVERLAP_COUNTIES: tuple[str, ...] = ("primary", "transfer")
+
 TRADEOFF_NUMERIC_COLUMNS: tuple[str, ...] = (
     "population_in_priority",
     "vulnerable_population_in_priority",
@@ -117,14 +126,25 @@ class RiskSurface:
 
 
 @dataclass(frozen=True, slots=True)
+class OverlapMatrix:
+    """One county's priority-set overlap, as `numbers.json` records it."""
+
+    area_name: str
+    runs: tuple[tuple[str, str], ...]
+    jaccard: np.ndarray
+    shared: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
 class FigureInputs:
-    """All validated evidence needed by the two renderers."""
+    """All validated evidence needed by the three renderers."""
 
     primary_name: str
     transfer_name: str
     risk: RiskSurface
     primary_tradeoff: pd.DataFrame
     transfer_tradeoff: pd.DataFrame
+    overlap: tuple[OverlapMatrix, ...]
     source_paths: tuple[Path, ...]
     transfer_run_id: str
 
@@ -492,6 +512,84 @@ def _load_risk_surface(primary_tradeoff: pd.DataFrame) -> tuple[RiskSurface, tup
     return surface, (registry.manifest_path, registry.path_of(acquire.DATASET_TRACTS), risk_path, depth_path)
 
 
+def _metric_value(record: Any, *, label: str) -> Any:
+    _require(isinstance(record, dict) and "value" in record, f"{label} is not a traceable metric")
+    return record["value"]
+
+
+def _load_overlap(payload: dict[str, Any]) -> tuple[OverlapMatrix, ...]:
+    """Read and validate both counties' overlap matrices from a numbers payload."""
+    expected = tuple(
+        (scenario.name, preset.name)
+        for scenario in hazard.HAZARD_SCENARIOS
+        for preset in vulnerability.WEIGHT_PRESETS
+    )
+    matrices: list[OverlapMatrix] = []
+    for county in OVERLAP_COUNTIES:
+        try:
+            section = payload["tradeoffs"][county]["top_ten_overlap"]
+            name = payload["study_areas"][county]["name"]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"numbers.json carries no {county} overlap matrix: {exc}") from exc
+        labels = _metric_value(section.get("runs"), label=f"{county} overlap runs")
+        _require(
+            isinstance(labels, list) and all(isinstance(item, str) and "/" in item for item in labels),
+            f"{county} overlap runs are not scenario/preset labels",
+        )
+        runs = tuple(tuple(item.split("/", 1)) for item in labels)
+        _require(runs == expected, f"{county} overlap runs do not cover every configured scenario and preset")
+        size = len(runs)
+        jaccard = np.asarray(_metric_value(section.get("jaccard"), label=f"{county} jaccard"), dtype=float)
+        shared = np.asarray(_metric_value(section.get("shared_tracts"), label=f"{county} shared"), dtype=float)
+        for title, matrix in (("jaccard", jaccard), ("shared", shared)):
+            _require(matrix.shape == (size, size), f"{county} {title} matrix is not {size} x {size}")
+            _require(bool(np.isfinite(matrix).all()), f"{county} {title} matrix holds a non-finite value")
+            _require(bool(np.array_equal(matrix, matrix.T)), f"{county} {title} matrix is not symmetric")
+        _require(bool(((jaccard >= 0.0) & (jaccard <= 1.0)).all()), f"{county} jaccard is outside [0, 1]")
+        _require(bool((np.diag(jaccard) == 1.0).all()), f"{county} jaccard diagonal is not 1")
+        matrices.append(
+            OverlapMatrix(
+                area_name=str(_metric_value(name, label=f"{county} name")),
+                runs=runs,
+                jaccard=jaccard,
+                shared=shared.astype(int),
+            )
+        )
+    return tuple(matrices)
+
+
+def _overlap_agrees(matrix: OverlapMatrix, tradeoff: pd.DataFrame, *, label: str) -> None:
+    """Require the matrix to be the one these trade-off rows produce.
+
+    The heat map is drawn from numbers.json, and the trade-off figure beside it
+    from the CSV. A numbers file older than the CSV would draw two figures of two
+    different runs without an error, so the shared counts are recomputed from the
+    rows here and must match, and every Jaccard entry must follow from its count.
+    """
+    tops = {
+        (str(row.scenario), str(row.preset)): set(_split_geoids(row.top_geoids))
+        for row in tradeoff.itertuples(index=False)
+    }
+    _require(set(matrix.runs) <= set(tops), f"{label} overlap names a run the trade-off table lacks")
+    recomputed = np.array(
+        [[len(tops[left] & tops[right]) for right in matrix.runs] for left in matrix.runs],
+        dtype=int,
+    )
+    _require(
+        bool(np.array_equal(recomputed, matrix.shared)),
+        f"{label} overlap counts disagree with the trade-off table; regenerate numbers.json",
+    )
+    _require(
+        bool((np.diag(matrix.shared) == DEFAULT_PRIORITY_UNITS).all()),
+        f"{label} overlap diagonal is not {DEFAULT_PRIORITY_UNITS} shared tracts",
+    )
+    expected = matrix.shared / (2 * DEFAULT_PRIORITY_UNITS - matrix.shared)
+    _require(
+        bool(np.allclose(matrix.jaccard, expected, atol=1e-6)),
+        f"{label} Jaccard entries do not follow from the shared counts",
+    )
+
+
 def _load_inputs() -> FigureInputs:
     transfer = _canonical_transfer_source()
     primary_tradeoff_path = config.PAPER_DIR / pipeline.TRADEOFF_NAME
@@ -513,12 +611,19 @@ def _load_inputs() -> FigureInputs:
         label="transfer trade-off",
     )
     risk_surface, risk_paths = _load_risk_surface(primary_tradeoff)
+    _require(NUMBERS_PATH.is_file(), f"the numbers file is missing: {NUMBERS_PATH}")
+    overlap = _load_overlap(_read_json(NUMBERS_PATH))
+    for matrix, tradeoff, label in zip(
+        overlap, (primary_tradeoff, transfer_tradeoff), OVERLAP_COUNTIES, strict=True
+    ):
+        _overlap_agrees(matrix, tradeoff, label=label)
     sources = (
         *risk_paths,
         pipeline_tradeoff_path,
         primary_tradeoff_path,
         transfer.report_path,
         transfer.tradeoff_path,
+        NUMBERS_PATH,
     )
     _require(all(path.is_file() for path in sources), "a validated figure source disappeared")
     return FigureInputs(
@@ -527,6 +632,7 @@ def _load_inputs() -> FigureInputs:
         risk=risk_surface,
         primary_tradeoff=primary_tradeoff,
         transfer_tradeoff=transfer_tradeoff,
+        overlap=overlap,
         source_paths=tuple(dict.fromkeys(path.resolve() for path in sources)),
         transfer_run_id=transfer.run_id,
     )
@@ -726,7 +832,7 @@ def _tradeoff_panel(
             )
     axis.set_title(title, fontsize=8.4, fontweight="bold")
     axis.set_xlabel("Population in priority set", fontsize=7.2)
-    axis.set_ylabel("Vulnerable population in priority set", fontsize=7.2)
+    axis.set_ylabel(VULNERABLE_AXIS_LABEL, fontsize=6.6)
     axis.xaxis.set_major_locator(MaxNLocator(nbins=5))
     axis.yaxis.set_major_locator(MaxNLocator(nbins=5))
     axis.xaxis.set_major_formatter(FuncFormatter(_thousands_tick))
@@ -793,12 +899,64 @@ def _tradeoff_figure(path: Path, inputs: FigureInputs) -> None:
         plt.close(figure)
 
 
+def _run_label(run: tuple[str, str]) -> str:
+    scenario, preset = run
+    height = next(item.surge_height_m for item in hazard.HAZARD_SCENARIOS if item.name == scenario)
+    return f"{height:g} m {preset.replace('_', ' ')}"
+
+
+def _overlap_figure(path: Path, matrices: tuple[OverlapMatrix, ...]) -> None:
+    """Jaccard overlap of the priority sets, one panel per county, from numbers.json only."""
+    figure, axes = plt.subplots(len(matrices), 1, figsize=(3.35, 3.9 * len(matrices)))
+    axes_list = list(np.atleast_1d(axes))
+    try:
+        cmap = matplotlib.colormaps["Greys"]
+        image = None
+        for axis, matrix in zip(axes_list, matrices, strict=True):
+            image = axis.imshow(matrix.jaccard, cmap=cmap, vmin=0.0, vmax=1.0, interpolation="nearest")
+            size = len(matrix.runs)
+            for row in range(size):
+                for column in range(size):
+                    value = matrix.jaccard[row, column]
+                    axis.text(
+                        column,
+                        row,
+                        str(int(matrix.shared[row, column])),
+                        ha="center",
+                        va="center",
+                        fontsize=5.0,
+                        color="white" if value > 0.55 else "#1A1A1A",
+                    )
+            labels = [_run_label(run) for run in matrix.runs]
+            axis.set_xticks(range(size))
+            axis.set_yticks(range(size))
+            axis.set_xticklabels(labels, rotation=90, fontsize=5.4)
+            axis.set_yticklabels(labels, fontsize=5.4)
+            axis.set_title(matrix.area_name, fontsize=8.0, fontweight="bold")
+            for boundary in range(len(vulnerability.WEIGHT_PRESETS), size, len(vulnerability.WEIGHT_PRESETS)):
+                axis.axhline(boundary - 0.5, color="#D55E00", linewidth=0.8)
+                axis.axvline(boundary - 0.5, color="#D55E00", linewidth=0.8)
+        _require(image is not None, "no overlap matrix to draw")
+        figure.subplots_adjust(left=0.30, right=0.97, top=0.965, bottom=0.205, hspace=0.62)
+        colour_axis = figure.add_axes((0.30, 0.04, 0.67, 0.012))
+        colour_bar = figure.colorbar(image, cax=colour_axis, orientation="horizontal")
+        colour_bar.set_label(
+            f"Jaccard overlap of the top-{DEFAULT_PRIORITY_UNITS} tracts (cells show tracts shared)",
+            fontsize=6.6,
+        )
+        colour_bar.ax.tick_params(labelsize=6.0)
+        _save_pdf(figure, path, title="Priority-set overlap across scenarios and weightings")
+    finally:
+        plt.close(figure)
+
+
 def _render_bundle(directory: Path, inputs: FigureInputs) -> tuple[Path, ...]:
     directory.mkdir(parents=True, exist_ok=True)
     _require(not any(directory.iterdir()), f"figure staging directory is not empty: {directory}")
     paths = tuple(directory / name for name in EXPECTED_FIGURES)
     _risk_surface_figure(paths[0], inputs.risk)
     _tradeoff_figure(paths[1], inputs)
+    _overlap_figure(paths[2], inputs.overlap)
     _validate_pdf_bundle(directory)
     return paths
 
@@ -904,7 +1062,70 @@ def _negative_guard_checks(inputs: FigureInputs) -> list[tuple[str, bool]]:
 
     primary_prefix = config.STUDY_AREA.county_geoid
     missing_tradeoff = inputs.primary_tradeoff.iloc[:-1].copy()
+
+    numbers = _read_json(NUMBERS_PATH)
+    asymmetric = deepcopy(numbers)
+    asymmetric["tradeoffs"]["primary"]["top_ten_overlap"]["jaccard"]["value"][0][1] = 0.0
+    asymmetric["tradeoffs"]["primary"]["top_ten_overlap"]["jaccard"]["value"][1][0] = 0.5
+    no_overlap = deepcopy(numbers)
+    del no_overlap["tradeoffs"]["transfer"]["top_ten_overlap"]
+    short_runs = deepcopy(numbers)
+    short_runs["tradeoffs"]["primary"]["top_ten_overlap"]["runs"]["value"].pop()
+    bare = deepcopy(numbers)
+    bare["tradeoffs"]["primary"]["top_ten_overlap"]["jaccard"] = [[1.0]]
+    stale = deepcopy(numbers)
+    stale_overlap = stale["tradeoffs"]["primary"]["top_ten_overlap"]
+    stale_overlap["shared_tracts"]["value"][0][1] -= 1
+    stale_overlap["shared_tracts"]["value"][1][0] -= 1
+    off_formula = deepcopy(numbers)
+    off_overlap = off_formula["tradeoffs"]["primary"]["top_ten_overlap"]
+    off_overlap["jaccard"]["value"][0][1] = off_overlap["jaccard"]["value"][1][0] = 0.0
+    with tempfile.TemporaryDirectory(prefix="figures-stale-numbers-") as temporary:
+        stale_path = Path(temporary) / "numbers.json"
+        stale_path.write_text(json.dumps(stale), encoding="utf-8")
+        with mock.patch(f"{__name__}.NUMBERS_PATH", stale_path):
+            loads_stale = verify.refuses(_load_inputs, ValueError, "disagree with the trade-off table")
     return [
+        (
+            "figure loading refuses a numbers file older than the trade-off table",
+            loads_stale,
+        ),
+        (
+            "an overlap matrix older than the trade-off table is refused",
+            verify.refuses(
+                lambda: _overlap_agrees(
+                    _load_overlap(stale)[0], inputs.primary_tradeoff, label="primary"
+                ),
+                ValueError,
+                "disagree with the trade-off table",
+            ),
+        ),
+        (
+            "Jaccard entries that do not follow from the shared counts are refused",
+            verify.refuses(
+                lambda: _overlap_agrees(
+                    _load_overlap(off_formula)[0], inputs.primary_tradeoff, label="primary"
+                ),
+                ValueError,
+                "do not follow",
+            ),
+        ),
+        (
+            "an asymmetric overlap matrix is refused",
+            verify.refuses(lambda: _load_overlap(asymmetric), ValueError, "symmetric"),
+        ),
+        (
+            "a numbers file without a county's overlap is refused",
+            verify.refuses(lambda: _load_overlap(no_overlap), ValueError, "no transfer overlap"),
+        ),
+        (
+            "overlap runs that miss a scenario or preset are refused",
+            verify.refuses(lambda: _load_overlap(short_runs), ValueError, "every configured"),
+        ),
+        (
+            "an overlap matrix that is not a traceable metric is refused",
+            verify.refuses(lambda: _load_overlap(bare), ValueError, "traceable metric"),
+        ),
         (
             "duplicate risk GEOIDs are refused",
             verify.refuses(
@@ -992,6 +1213,19 @@ def _self_check() -> int:
         ("the primary trade-off has nine validated rows", len(inputs.primary_tradeoff) == 9),
         ("the transfer trade-off has nine validated rows", len(inputs.transfer_tradeoff) == 9),
         ("the canonical transfer run identifier is present", bool(inputs.transfer_run_id)),
+        (
+            "the overlap figure draws one panel per county, every run on each axis",
+            len(inputs.overlap) == len(OVERLAP_COUNTIES)
+            and all(
+                len(matrix.runs) == len(hazard.HAZARD_SCENARIOS) * len(vulnerability.WEIGHT_PRESETS)
+                for matrix in inputs.overlap
+            ),
+        ),
+        (
+            "the overlap panels are titled with the counties numbers.json names",
+            tuple(matrix.area_name for matrix in inputs.overlap)
+            == (inputs.primary_name, inputs.transfer_name),
+        ),
     ]
 
     with tempfile.TemporaryDirectory(prefix="figures-check-") as temporary:
