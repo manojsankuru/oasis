@@ -126,7 +126,7 @@ scanning `fields` for `esriFieldTypeOID` and finds `OBJECTID`.
 > `resultOffset` returns page one forever with `exceededTransferLimit` stuck
 > true.
 
-> **Count check, UNVERIFIED (added 25 Oct 2026).** Before paging,
+> **Count check, VERIFIED 26 Oct 2026 (added 25 Oct 2026).** Before paging,
 > `fetch_arcgis_vector` sends the same filter (`where` plus any envelope) with
 > `returnCountOnly=true` and compares the `count` it answers with the paged
 > total. A mismatch, a count that changes between attempts, or a count reply
