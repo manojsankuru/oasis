@@ -945,6 +945,17 @@ def _fault_values(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if runs == 0 or correct > completed or completed > runs or faulted > runs:
             raise EvidenceError("inconsistent robustness counts")
+        # The silent failures: runs that returned and were wrong. Read rather than
+        # derived here, so a paper claim about them traces to the experiment's
+        # own count, and checked against completed minus correct so the two
+        # columns cannot drift apart.
+        completed_but_wrong = _integer(
+            row.get("completed_but_wrong"), f"faults.rows[{index}].completed_but_wrong"
+        )
+        if completed_but_wrong != completed - correct:
+            raise EvidenceError(
+                "robustness completed-but-wrong count is not completed minus correct"
+            )
         recovery_rate = _number(
             row.get("recovery_rate"), f"faults.rows[{index}].recovery_rate"
         )
@@ -967,7 +978,16 @@ def _fault_values(payload: dict[str, Any]) -> dict[str, Any]:
             row.get("not_applicable"), f"faults.rows[{index}].not_applicable"
         )
         attempts = _integer(row.get("attempts"), f"faults.rows[{index}].attempts")
-        if injected_faults < faulted or not_applicable > runs or attempts < runs:
+        # Every attempt is injected, not applicable, or let through untouched, so
+        # the first two together can never exceed the attempts. The bound used to
+        # be "not applicable <= runs", true while a run made one call a content
+        # fault could not corrupt; a run now also asks the service for a count on
+        # every counted attempt, and that call is not applicable too.
+        if (
+            injected_faults < faulted
+            or injected_faults + not_applicable > attempts
+            or attempts < runs
+        ):
             raise EvidenceError("inconsistent robustness attempt counts")
         parsed: dict[str, JsonValue] = {
             "source": source,
@@ -976,6 +996,7 @@ def _fault_values(payload: dict[str, Any]) -> dict[str, Any]:
             "runs": runs,
             "completed": completed,
             "correct": correct,
+            "completed_but_wrong": completed_but_wrong,
             "recovery_rate": recovery_rate,
             "recovery_rate_given_faulted": None,
             "runs_with_an_injected_fault": faulted,
@@ -1028,6 +1049,7 @@ def _fault_values(payload: dict[str, Any]) -> dict[str, Any]:
         or _integer(clean.get("runs_with_an_injected_fault"), "faults.clean.faulted") != 0
         or _integer(clean.get("injected_faults"), "faults.clean.injected_faults") != 0
         or _integer(clean.get("not_applicable"), "faults.clean.not_applicable") > clean_runs
+        or _integer(clean.get("completed_but_wrong", 0), "faults.clean.completed_but_wrong") != 0
         or _integer(clean.get("attempts"), "faults.clean.attempts") < clean_runs
     ):
         raise EvidenceError("clean robustness baseline is inconsistent")
@@ -1174,6 +1196,7 @@ def _robustness_payload(values: dict[str, Any], source: str) -> dict[str, JsonVa
         "runs",
         "completed",
         "correct",
+        "completed_but_wrong",
         "recovery_rate",
         "recovery_rate_given_faulted",
         "runs_with_an_injected_fault",
@@ -2462,6 +2485,7 @@ def _fixture_faults() -> dict[str, Any]:
                     "runs": seeds,
                     "completed": seeds,
                     "correct": correct,
+                    "completed_but_wrong": seeds - correct,
                     "recovery_rate": correct / seeds,
                     "recovery_rate_given_faulted": 1.0 if recoverable else 0.0,
                     "runs_with_an_injected_fault": faulted,
@@ -2481,6 +2505,7 @@ def _fixture_faults() -> dict[str, Any]:
         "runs": seeds,
         "completed": seeds,
         "correct": seeds,
+        "completed_but_wrong": 0,
         "recovery_rate": 1.0,
         "recovery_rate_given_faulted": None,
         "runs_with_an_injected_fault": 0,
@@ -2770,6 +2795,28 @@ def _fixture_failure(
     shutil.copytree(base, root)
     mutate(root)
     return verify.refuses(lambda: build_report(root, "2099-01-02T00:00:00+00:00"), EvidenceError, phrase)
+
+
+def _fixture_accepts(
+    base: Path,
+    cases: Path,
+    name: str,
+    mutate: Callable[[Path], None],
+) -> bool:
+    """Copy the good fixture, apply one mutation, and require the report to build.
+
+    The mirror of `_fixture_failure`, for a shape the evidence is allowed to take.
+    A validator tightened past the truth refuses real artifacts, and the only way
+    to see that offline is to hand it the shape and expect no refusal.
+    """
+    root = cases / name
+    shutil.copytree(base, root)
+    mutate(root)
+    try:
+        build_report(root, "2099-01-02T00:00:00+00:00")
+    except EvidenceError:
+        return False
+    return True
 
 
 def _tree_hashes(root: Path) -> dict[str, str]:
@@ -3171,6 +3218,56 @@ def _self_check() -> int:
                             ),
                         ),
                         "recovery rate",
+                    ),
+                ),
+                (
+                    "a completed-but-wrong count that is not completed minus correct is refused",
+                    _fixture_failure(
+                        base,
+                        cases,
+                        "silent-count-drift",
+                        _json_mutation(
+                            FAULTS_RELATIVE,
+                            lambda payload: payload["rows"][0].__setitem__(
+                                "completed_but_wrong",
+                                payload["rows"][0]["completed"]
+                                - payload["rows"][0]["correct"]
+                                + 1,
+                            ),
+                        ),
+                        "completed minus correct",
+                    ),
+                ),
+                (
+                    "a row claiming more injected and untouched calls than attempts is refused",
+                    _fixture_failure(
+                        base,
+                        cases,
+                        "attempts-overspent",
+                        _json_mutation(
+                            FAULTS_RELATIVE,
+                            lambda payload: payload["rows"][0].__setitem__(
+                                "not_applicable", payload["rows"][0]["attempts"]
+                            ),
+                        ),
+                        "attempt counts",
+                    ),
+                ),
+                (
+                    "a row with more uncorruptible calls than runs, within its attempts, is accepted",
+                    _fixture_accepts(
+                        base,
+                        cases,
+                        "count-calls-not-applicable",
+                        _json_mutation(
+                            FAULTS_RELATIVE,
+                            lambda payload: payload["rows"][0].update(
+                                not_applicable=payload["rows"][0]["runs"] + 1,
+                                attempts=payload["rows"][0]["injected_faults"]
+                                + payload["rows"][0]["runs"]
+                                + 1,
+                            ),
+                        ),
                     ),
                 ),
                 (

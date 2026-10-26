@@ -37,6 +37,26 @@ MODULE_IMPORTS: dict[str, str] = {
     "transfer": "experiments.transfer",
 }
 
+CHECKED_BY: dict[str, str] = {
+    "acquire": "faults",
+}
+"""A module whose own `--check` cannot be the one mutations are judged by.
+
+`acquire --check` is live by design: every check in it is a real request to a
+public service, and a mutation sweep that sent hundreds of them would be the
+abuse `experiments/faults.py` exists to avoid. `acquire`'s failure handling --
+the retry, the count check, the CRS re-request, the extent checks -- is checked
+offline by `faults --check` against a loopback service, so that is the suite
+that has to notice an acquire mutation. Every other module is judged by its own.
+"""
+
+CHECK_TIMEOUT_S = 1800
+"""How long one `--check` may run under a mutation before it counts as failing.
+
+A mutation that removes a retry bound does not fail a check, it hangs one: the
+call it bounded now retries forever. Without this the sweep would hang with it
+and never report the mutation as caught."""
+
 
 def import_of(module: str) -> str:
     """Resolve a mutation target name to its import path below ``src``."""
@@ -571,6 +591,23 @@ SCHEMAS_MUTATIONS: list[tuple[str, str, str]] = [
     ("the default weighting is no longer named as the default",
      'f"{DEFAULT_PRESET.name} is the default and is the one with a published origin. "',
      '"one of them is the default. "'),
+
+    # -- a person's own words as weights -------------------------------------
+    ("the risk tools weight the indicators only, so an objective preference has nowhere to go",
+     "RISK_WEIGHT_KEYS: tuple[str, ...] = vulnerability.WEIGHT_KEYS",
+     "RISK_WEIGHT_KEYS: tuple[str, ...] = VULNERABILITY_INDICATORS"),
+    ("a misspelled weight is dropped before the risk tools can refuse it",
+     '_EXTRAS_REACH_THE_TOOL = ConfigDict(extra="allow")',
+     '_EXTRAS_REACH_THE_TOOL = ConfigDict(extra="ignore")'),
+    ("the vulnerability index drops a misspelled weight before it can refuse it",
+     '    "VulnerabilityIndexArgs",\n    __config__=_EXTRAS_REACH_THE_TOOL,\n',
+     '    "VulnerabilityIndexArgs",\n'),
+    ("the risk tools' wire schema invites arguments nobody declared",
+     '    schema.pop("additionalProperties", None)\n',
+     ""),
+    ("a weight's description drops the sentence the model maps words onto",
+     'f"Weight on {name}, one of the {half}: {WEIGHT_RATIONALE[name]}. Relative, "',
+     'f"Weight on {name}, one of the {half}. Relative, "'),
 ]
 
 
@@ -666,6 +703,83 @@ TOOLS_MUTATIONS: list[tuple[str, str, str]] = [
     ("a tool result is not recorded, so no number can be traced back to it",
      "        CALLS.append(",
      "        [].append("),
+
+    # -- a person's own words as weights -------------------------------------
+    ("a misspelled weight is ignored rather than refused by name",
+     "        if argument not in legal:\n            misspelled.append(argument)",
+     "        if argument not in legal:\n            continue"),
+    ("the unset sentinel is applied as a weight the person chose",
+     "        elif value != schemas.UNSET_WEIGHT:",
+     "        else:"),
+    ("a NaN or infinite weight ranks every unit on a number that means nothing",
+     "    if unreadable:\n        raise ValueError(",
+     "    if False:\n        raise ValueError("),
+    ("weights with no sentence rank anyway, credited to nobody",
+     "    if not stated:\n        raise ValueError(",
+     "    if False:\n        raise ValueError("),
+    ("a sentence with no weight ranks under the default as though it were theirs",
+     "        if stated:\n            raise ValueError(",
+     "        if False:\n            raise ValueError("),
+    ("the person's weighting carries the base weighting's origin, not their sentence",
+     "        origin_note=stated,",
+     "        origin_note=base.origin_note,"),
+    ("risk_scenario ranks under the named weighting whatever the person said",
+     "    weighting = user or chosen_preset",
+     "    weighting = chosen_preset"),
+    ("the comparison leaves the person's weighting out",
+     "    compared = WEIGHT_PRESETS if user is None else (user, *WEIGHT_PRESETS)",
+     "    compared = WEIGHT_PRESETS"),
+    ("a pair pools every other weighting's units instead of naming the one it is against",
+     "        dropped = [geoid for geoid in row.top_geoids if geoid not in mine]",
+     "        dropped = [geoid for geoid in row.displaced_geoids if geoid not in mine]"),
+    ("any reply on record traces a sentence, whatever words it held",
+     '            and _comparable(str(result.get("stated_preference") or "")) == stated',
+     '            and result.get("stated_preference") is not None'),
+    ("a person's sentence is dropped and the default stands",
+     "        schemas.USER_WEIGHTING,\n        text,\n",
+     '        default,\n        "",\n'),
+    ("words carrying a coordinate are quoted back into a model message",
+     "    refusal = coordinate_refusal(text)",
+     '    refusal = ""'),
+    ("the free-text guard reads the string rule only, missing WKT and GeoJSON",
+     "    if any(sandbox.output_faults(line) for line in text.splitlines() or [text]):",
+     "    if False:"),
+    ("the guard blames the words when it could not be loaded",
+     "        return GUARD_UNAVAILABLE",
+     "        return CARRIES_COORDINATE"),
+    ("a preference passed to a risk tool is echoed with a coordinate in it",
+     "    refusal = coordinate_refusal(stated)",
+     '    refusal = ""'),
+    ("a weighting is ranked under words nobody on this question stated",
+     '    if trace["answered_by"] is None:',
+     "    if False:"),
+    ("words from the question are not traced to it",
+     "    if _quoted_from_question(stated):",
+     "    if False:"),
+    ("a single word of the question traces to it",
+     "    if len(stated.split()) < MIN_QUOTED_WORDS:\n        return False",
+     "    if False:\n        return False"),
+    ("a broken word of the question traces to it",
+     '    pattern = rf"(?<!\\w){re.escape(stated)}(?!\\w)"',
+     "    pattern = re.escape(stated)"),
+    ("a refused reply is not asked again",
+     "    for attempt in (1, 2):",
+     "    for attempt in (1,):"),
+    ("an imposed default is reported as the person's choice",
+     '        if not used:\n            return "a person at a terminal was asked',
+     '        if False:\n            return "a person at a terminal was asked'),
+    ("the index drops a misspelled weight instead of refusing it",
+     '    if unknown:\n        return {\n            "error": "invalid weighting",',
+     '    if False:\n        return {\n            "error": "invalid weighting",'),
+    ("a scripted reply is passed off as a person's answer",
+     "            asked = SCRIPTED",
+     "            asked = True"),
+    ("the terminal is read even though a script answers",
+     "    if script is not None:\n        channel = \"script\"",
+     "    if script is not None and not interactive_channel():\n        channel = \"script\""),
+    ("the scripted-reply cursor is never reset between questions",
+     "    CALLS.clear()\n    _SCRIPT_POSITION = 0",
+     "    CALLS.clear()"),
 ]
 
 
@@ -927,6 +1041,101 @@ CRITIC_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+ACQUIRE_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- every page against the service's own count --------------------------
+    ("a page that disagrees with the count is returned anyway",
+     "    if received != expected:\n",
+     "    if False:\n"),
+    ("a count mismatch is never asked again",
+     "    retry=retry_if_exception_type(FeatureCountMismatch),\n",
+     "    retry=retry_if_exception_type(CRSMismatch),\n"),
+    ("an unusable count reply lets that attempt's pages through unchecked",
+     '    if expected is None:\n        ledger.outcomes.append("unusable")\n',
+     '    if expected is None:\n        return payload, pages, None, note\n        ledger.outcomes.append("unusable")\n'),
+    ("an explicit refusal to count is treated as a bad reply, so no layer comes back",
+     "        if exc.code is not None and 400 <= exc.code < 500 and exc.code not in _RETRYABLE_STATUS:\n",
+     "        if False:\n"),
+    ("a 429 count reply is taken as a refusal to count instead of a busy service",
+     "        if exc.code is not None and 400 <= exc.code < 500 and exc.code not in _RETRYABLE_STATUS:\n",
+     "        if exc.code is not None and 400 <= exc.code < 500:\n"),
+    ("one refusal is believed without asking the count again",
+     "    for asked in range(1, config.MAX_RETRIES + 1):\n",
+     "    for asked in range(1, 2):\n"),
+    ("a count the service already gave is not used to check a later attempt",
+     "        if ledger.known is not None:\n            # The service counted earlier",
+     "        if False:\n            # The service counted earlier"),
+    ("the re-request forgets the count the first attempt gave",
+     "            base, layer_id, params, timeout_s=timeout_s, oid_field=oid_field, ledger=ledger\n        )\n        count_attempts.append(attempts)\n",
+     "            base, layer_id, params, timeout_s=timeout_s, oid_field=oid_field, ledger=CountLedger()\n        )\n        count_attempts.append(attempts)\n"),
+    ("the count request drops the query's filter and counts the whole layer",
+     'COUNT_FILTER_PARAMS: tuple[str, ...] = ("where", "geometry", "geometryType", "inSR", "spatialRel")\n',
+     "COUNT_FILTER_PARAMS: tuple[str, ...] = ()\n"),
+    ("a feature the parser drops is returned one short",
+     "    if counted is not None and len(gdf) != counted:\n",
+     "    if False:\n"),
+    # -- the reference the response declares ---------------------------------
+    ("a mislabelled response is refused without the one re-request",
+     "    except CRSMismatch:\n        # One re-request",
+     "    except CRSMismatch:\n        raise\n        # One re-request"),
+    ("coordinates are never held to the declared reference's range",
+     "    crs_notes.append(_assert_plausible_extent(gdf, declared_crs, query_url))\n",
+     "    crs_notes.append('range not checked')\n"),
+    ("the range check never compares the west edge",
+     "        minx < xmin - slack_x\n",
+     "        False\n"),
+    ("the range check never compares the east edge",
+     "        or maxx > xmax + slack_x\n",
+     "        or False\n"),
+    ("the range check never compares the south edge",
+     "        or miny < ymin - slack_y\n",
+     "        or False\n"),
+    ("the range check never compares the north edge",
+     "        or maxy > ymax + slack_y\n",
+     "        or False\n"),
+    ("a layer with no geometry is reported as inside the range",
+     "    if not all(math.isfinite(value) for value in (minx, miny, maxx, maxy)):\n",
+     "    if False:\n"),
+    ("a reference crossing the antimeridian refuses every one of its own coordinates",
+     "    if usable.west > usable.east and reference.is_geographic:\n",
+     "    if False:\n"),
+    ("a projected reference crossing the antimeridian loses its range check",
+     "    if usable.west > usable.east and reference.is_geographic:\n",
+     "    if usable.west > usable.east:\n"),
+    ("any longitude passes under a reference whose area of use crosses 180",
+     "        value >= usable.west - slack_x or value <= usable.east + slack_x\n",
+     "        True\n"),
+    ("refusals after a reply that was not one are believed",
+     '        elif all(outcome == "refused" for outcome in ledger.outcomes):\n',
+     "        elif True:\n"),
+    ("a count that changes between attempts is adopted",
+     "    if ledger.known is not None and expected != ledger.known:\n",
+     "    if False:\n"),
+    # -- every layer after tracts reaches the tracts --------------------------
+    ("every extent meets every other",
+     "    return bool(box(*mine.total_bounds).intersects(box(*theirs.total_bounds)))\n",
+     "    return True\n"),
+    ("extents are compared in whatever CRS each arrived in",
+     "    mine = aligner.to_working_crs(frame)\n",
+     "    mine = frame\n"),
+    ("a layer that lands elsewhere is accepted",
+     "    if not meets_extent(frame, tracts, align.Alignment(registry)):\n",
+     "    if False:\n"),
+    ("no tract layer reads as a passed extent check",
+     '        return f"{dataset}: no tract layer is registered yet, so its extent was not compared"\n',
+     '        return f"{dataset}: its extent meets the tract layer\'s"\n'),
+    ("a refused raster is left on disk for the old record to read",
+     "        # compared is as unsafe to leave for the old record as one that was refused.\n        path.unlink(missing_ok=True)\n",
+     "        # compared is as unsafe to leave for the old record as one that was refused.\n"),
+    ("a raster that could not be compared is left on disk",
+     "    except Exception:\n        # Any failure here, not only a refusal",
+     "    except CRSMismatch:\n        # Any failure here, not only a refusal"),
+    # -- what an error message may carry -------------------------------------
+    ("a transport error keeps its query string, and with it the encoded extent",
+     '    return QUERY_STRING.sub("?<query withheld>", text)\n',
+     "    return text\n"),
+]
+
+
 FAULTS_MUTATIONS: list[tuple[str, str, str]] = [
     ('the injector is armed at import, when nobody asked for it',
      '_ACTIVE: FaultPlan | None = None\n',
@@ -982,6 +1191,26 @@ FAULTS_MUTATIONS: list[tuple[str, str, str]] = [
     ('the choke-point scan looks for a pattern acquire does not contain',
      '    call_sites = len(re.findall(r"_session\\(\\)\\.request\\(", source))\n',
      '    call_sites = len(re.findall(r"_no_such_call_site\\(", source))\n'),
+
+    # -- the standing faults the count, CRS and extent checks are tested on --
+    ('the fixture tells the truth about its count when told to disagree',
+     '            elif settings.count_reported is not None:\n',
+     '            elif False:\n'),
+    ('the fixture counts when told it cannot',
+     '            if scripted == REFUSE or (scripted is None and settings.refuse_count):\n',
+     '            if scripted == REFUSE:\n'),
+    ('the fixture serves degrees when told to serve metres under a degree label',
+     '                SAMPLE_FEATURE_COUNT, out_sr, offset, page, metres=settings.metres\n',
+     '                SAMPLE_FEATURE_COUNT, out_sr, offset, page, metres=False\n'),
+    ('empty no longer reaches a count reply, so the bad count is never injected',
+     '    if isinstance(payload, dict) and COUNT_KEY in payload and FEATURE_KEY not in payload:\n',
+     '    if False:\n'),
+    ('truncated halves a count reply too, so a second wrong number can agree by chance',
+     '        if kind != "empty":\n            raise FaultNotApplicable(f"{kind} has nothing to corrupt in a count reply")\n',
+     ''),
+    ('the fixture answers a scripted refusal with a real count',
+     '            if scripted == REFUSE or (scripted is None and settings.refuse_count):\n',
+     '            if scripted is None and settings.refuse_count:\n'),
 ]
 
 
@@ -1028,6 +1257,7 @@ TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "sandbox": SANDBOX_MUTATIONS,
     "critic": CRITIC_MUTATIONS,
     "faults": FAULTS_MUTATIONS,
+    "acquire": ACQUIRE_MUTATIONS,
     "transfer": TRANSFER_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
@@ -1039,12 +1269,17 @@ disappearing into a healthy-looking total."""
 
 
 def run_check(module: str) -> tuple[int, list[str]]:
-    proc = subprocess.run(
-        [str(PYTHON), "-m", f"src.{import_of(module)}", "--check"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
+    checker = import_of(CHECKED_BY.get(module, module))
+    try:
+        proc = subprocess.run(
+            [str(PYTHON), "-m", f"src.{checker}", "--check"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=CHECK_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return 1, [f"(timed out after {CHECK_TIMEOUT_S} s: the check hung)"]
     failing = [
         line.strip()
         for line in proc.stdout.splitlines()
@@ -1111,7 +1346,7 @@ def main() -> int:
         relative_source = source_of(module).relative_to(ROOT).as_posix()
         print(
             f"-- {relative_source}, checked by "
-            f"`python -m src.{import_of(module)} --check`"
+            f"`python -m src.{import_of(CHECKED_BY.get(module, module))} --check`"
         )
         for label, code, failing in results:
             caught = code == 1 and bool(failing)

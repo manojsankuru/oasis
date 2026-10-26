@@ -126,6 +126,35 @@ scanning `fields` for `esriFieldTypeOID` and finds `OBJECTID`.
 > `resultOffset` returns page one forever with `exceededTransferLimit` stuck
 > true.
 
+> **Count check, UNVERIFIED (added 25 Oct 2026).** Before paging,
+> `fetch_arcgis_vector` sends the same filter (`where` plus any envelope) with
+> `returnCountOnly=true` and compares the `count` it answers with the paged
+> total. A mismatch, a count that changes between attempts, or a count reply
+> that is unusable (a 5xx error body, a 408, 425 or 429 body, a body with no
+> integer `count`) is asked again inside `MAX_RETRIES` and then raised as
+> `FeatureCountMismatch`. One exception is let through, and named: a service
+> whose every count reply in the retrieval is a 4xx refusal -- on every one of
+> `MAX_RETRIES` count requests, spaced by the retry backoff -- returns the layer
+> with a provenance note saying the total went unchecked, so on such a service
+> an empty or short page still passes. A response whose label is wrong
+> is re-requested once; coordinates outside the declared CRS's area of use raise
+> `CRSMismatch`; and every layer after tracts must reach the tract extent,
+> compared in the working CRS, with a refused raster deleted from the snapshot.
+>
+> The count request is one more call per retrieval that can time out: in the
+> fixture grid at fault rate 0.5, timeout and server-error runs fell from 16 to
+> 13 correct of 20, failing loudly as `TransientError` rather than silently. The
+> bound multiplies: up to `MAX_RETRIES` counted attempts, each up to
+> `MAX_RETRIES` count requests plus every page, each request with its own
+> `MAX_RETRIES` transport retries, and the whole bound twice when a mislabelled
+> reference is re-requested. The parser-loss guard (counted features against
+> parsed ones) is exercised only by a stub of the parser, because no fixture
+> page makes the ESRIJSON driver drop a feature.
+> Every one of these paths ran against the loopback fixture in `src/faults.py`
+> only. The extent checks have no live check at all, and
+> `python -m src.acquire --check`, which asserts the count against this service,
+> has not been run since the change.
+
 > **Error bodies.** A bad `where` returns **HTTP 200** with
 > `{"error":{"code":400,...}}` and no `features` key. Measured. `_get_json`
 > raises on it rather than letting it reach disk, and does not retry it: only

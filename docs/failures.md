@@ -2059,3 +2059,59 @@ zero-change first-attempt success.
 **Why.** The keyword `rank\w*` matched "ranking" in a cleaning note about an unscored tract. The draft orders nothing, so it names no weighting.
 **Did the agent recover?** Yes, after two revision turns (5 model calls in total), by deleting the sentence that held the word.
 **Kept as a paper failure case?** Not decided. It is the third occurrence of the 2026-10-22 ordering-gate entry.
+
+## 2026-10-25 — report.py refused the regenerated fault table
+
+**What happened.** After Session 4's count check, `python -m src.experiments.faults` regenerated `outputs/faults.json`. Feeding that file to `report._fault_values` raised `src.experiments.report.EvidenceError: inconsistent robustness attempt counts`. The `empty` and `truncated` rows at rate 0.50 recorded 27 not-applicable calls against 20 runs. `python -m src.experiments.report --check` still passed, because it validates a fixture of its own rather than the real file, so the next `numbers.json` build would have failed with nothing in the checks to warn of it.
+**Where.** `src/experiments/report.py`, `_fault_values`, the bound `not_applicable > runs`.
+**Why.** The bound held while a run made one call that a content fault cannot corrupt (the layer-metadata call). The count check adds a `returnCountOnly` request on every counted attempt, and a raised fault on it is not applicable to a content kind, so not-applicable calls can now exceed runs.
+**Did the agent recover?** Yes, before commit. The bound became `injected + not_applicable > attempts`, and `report --check` gained a refusal case and an acceptance case for the new shape. Restoring the old bound and removing the bound each fail one of them.
+**Kept as a paper failure case?** No.
+
+## 2026-10-25 — one bad count reply let a short page through as the whole layer
+
+**What happened.** The invariant reviewer, probing the uncommitted Session 4 diff, served a fixture whose first `returnCountOnly` reply was bad while that attempt's page was short. For all three bad replies tried (`{"error":{"code":500,...}}` under HTTP 200, `{}`, `{"count":"10"}`), `fetch_arcgis_vector` returned 5 of 10 features with `feature_count=5`, and the only trace was a provenance note saying the total went "unchecked". The regenerated fault table showed 0 completed-but-wrong runs because the injector could not reach this path: `corrupt()` refused every count reply as "not a FeatureSet".
+**Where.** `src/acquire.py`, `_feature_count` and `_counted_query` as first written. `src/faults.py`, `corrupt`.
+**Why.** Any count reply without a usable count returned None, and the attempt then accepted whatever its pages held, with no second ask. A 5xx error body, which NFHL sends under HTTP 200, was treated the same as a service that cannot count.
+**Did the agent recover?** Yes, before commit. Only an explicit refusal (an error body with a 4xx code) now lets a layer through unchecked, and then not after an attempt whose count disagreed. Every other missing count is asked again and raised as `FeatureCountMismatch` when the bound runs out. `empty` now strips the count from count replies, so the injector reaches the path.
+**Kept as a paper failure case?** Not decided.
+
+## 2026-10-25 — acquire's contract check would have failed offline after the count policy was added
+
+**What happened.** The invariant reviewer ran `acquire._contract_checks()` offline on the uncommitted Session 4 diff and got `FAIL exactly one retry policy, which faults.py in session 12 assumes`. The count check had added a second `@retry(`. The check needs no network, but `python -m src.acquire --check` reaches it only after its live calls, and the network policy in this container refuses those, so it had not run.
+**Where.** `src/acquire.py`, `_contract_checks`.
+**Why.** The contract check counted retry decorators and assumed one.
+**Did the agent recover?** Yes, before commit. The check now names both policies and asserts that each stops at `config.MAX_RETRIES` and reraises, and `faults --check` asserts the same of the count policy.
+**Kept as a paper failure case?** No.
+
+## 2026-10-26 — one 400 count reply from a service that counts let a short page through
+
+**What happened.** The second invariant review of the uncommitted Session 4 diff served a loopback service that answered every count request with `{"count": 10}` except the first, which was an ArcGIS error body with code 400 ("Unable to complete operation."). With that attempt's page short, `fetch_arcgis_vector` completed with 5 of 10 features and `feature_count=5`, after one count request. A code 429 reply on the first count request completed with 3 of 10. When the first query agreed with a count of 10 but carried a wrong CRS label, a re-request that drew one 400 count reply and a short page completed with 5 of 10, discarding the 10 already given. The fault table's 0 completed-but-wrong runs could not show any of this, because the injector never produces a 4xx body.
+**Where.** `src/acquire.py`, `_feature_count` and `_counted_attempt` as fixed after the first review; the CRS re-request in `fetch_arcgis_vector`.
+**Why.** The first fix treated any 4xx count reply as the service refusing to count every time, and acted on one reply. ArcGIS also uses code 400 for a query that failed once, and 429 is transient by this module's own `_RETRYABLE_STATUS`. Each `_counted_query` started a fresh history, so the re-request forgot the earlier count.
+**Did the agent recover?** Yes, before commit. A refusal is now believed only after it is the answer to every one of `MAX_RETRIES` count requests, 408 and 429 are never refusals, and one `CountLedger` per retrieval keeps the last usable count, so a later refusal is checked against it. Each case has a check in `faults --check`.
+**Kept as a paper failure case?** Not decided. It is the second recurrence of the 2026-10-25 count-check entry.
+
+## 2026-10-26 — acquire --check would have crashed on its new count check
+
+**What happened.** The second invariant review found that `python -m src.acquire --check` raised `ValueError: too many values to unpack (expected 2)` at `counted, count_note = _feature_count(...)`. The first review's fix had made `_feature_count` return three values, and the live check written before it still unpacked two. The check never ran in this container, because the network policy refuses the data services, so nothing caught it.
+**Where.** `src/acquire.py`, `_self_check`.
+**Why.** A signature change was made after the only caller that exercises it was written, and that caller can run only with network access.
+**Did the agent recover?** Yes, before commit, by unpacking three values. The live check is still unrun.
+**Kept as a paper failure case?** No.
+
+## 2026-10-26 — a range check passed on the refusal it was meant to rule out
+
+**What happened.** The `acquire` mutation sweep reported `[SURVIVED] exit=0  a reference crossing the antimeridian refuses every one of its own coordinates`. Probing directly, `_assert_plausible_extent` refused two points at (-100, 40) declared EPSG:4269 (NAD83) with the fix in place, as it had without it. The check written for the fix, "a reference whose area of use crosses the antimeridian still accepts its own coordinates", asserted `"valid range" in note`, and the refusal's own text reads "its coordinates fall outside that reference's valid range", so the check passed on a refusal. The two checks beside it, for degrees under EPSG:4326 and metres under EPSG:3857, had the same flaw.
+**Where.** `src/acquire.py`, `_assert_plausible_extent`. `src/faults.py`, `_crs_recovery_checks`.
+**Why.** Two defects, one hiding the other. The fix tested `xmin > xmax` after `Transformer.transform_bounds`, but for NAD83's area of use (167.65 E round to 40.73 W) pyproj 3.7.2 returns the box from 40.73 W to 167.65 E, so the crossing never showed and every US longitude was refused. The checks matched a phrase that both outcomes contain.
+**Did the agent recover?** Yes, before commit. The crossing is now read off the raw `area_of_use` bounds, and the checks match the pass note as a prefix. Under EPSG:4269, points at (-100, 40) pass and a latitude of 200 is refused.
+**Kept as a paper failure case?** Not decided.
+
+## 2026-10-26 — refusals after a 5xx count reply were still believed
+
+**What happened.** The third invariant review ran every count-reply and page ordering through the real `_counted_query`. 43 orderings completed short with no known count, 42 of them after a count reply that was not a refusal. On the loopback fixture, count replies of two 400 refusals and a 5xx, then 400 refusals for good, with the second attempt's page truncated, completed with 5 of 10 features and `feature_count=5`. The note read "on all 3 count requests" after 6 count requests, one of them a 5xx. The same review found that a count of 10 followed by a count of 5 for the same query, with both pages truncated, completed with 5 of 10 and a note saying the service counted 5.
+**Where.** `src/acquire.py`, `_counted_attempt` and `_settled_count` as fixed after the second review.
+**Why.** "Believed only if every request refused" held within one counted attempt, not across the retrieval, and `CountLedger.known` was overwritten by a later count without comparing the two. The refusal re-asks also had no wait, so a short burst of transient 400s could read as a standing refusal.
+**Did the agent recover?** Yes, before commit. A refusal is believed only when every count reply in the retrieval was a refusal, a count that changes between attempts raises `FeatureCountMismatch` naming both, and the re-asks wait with the retry backoff. Both orderings have checks in `faults --check`.
+**Kept as a paper failure case?** Not decided. It is the third recurrence of the 2026-10-25 count-check entry.

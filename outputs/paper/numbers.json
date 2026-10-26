@@ -285,7 +285,7 @@
       }
     }
   },
-  "generated_at": "2026-10-23T15:02:05.601562+00:00",
+  "generated_at": "2026-10-26T01:32:41.562624+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -718,7 +718,7 @@
         "selector": "$.clean.attempts",
         "source": "outputs/faults.json",
         "unit": "value",
-        "value": 40
+        "value": 60
       },
       "completed": {
         "derivation": "read from the separately measured clean fixture baseline",
@@ -726,6 +726,13 @@
         "source": "outputs/faults.json",
         "unit": "value",
         "value": 20
+      },
+      "completed_but_wrong": {
+        "derivation": "read from the separately measured clean fixture baseline",
+        "selector": "$.clean.completed_but_wrong",
+        "source": "outputs/faults.json",
+        "unit": "value",
+        "value": 0
       },
       "correct": {
         "derivation": "read from the separately measured clean fixture baseline",
@@ -880,7 +887,7 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 52
+            "value": 80
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -888,6 +895,13 @@
             "source": "outputs/faults.json",
             "unit": "value",
             "value": 20
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -908,7 +922,7 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 12
+            "value": 20
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -922,7 +936,7 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.6
+            "value": 1.0
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -964,7 +978,7 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.25].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 8
+            "value": 10
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -980,21 +994,28 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 60
+            "value": 93
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].completed",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 16
+            "value": 13
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].correct",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 16
+            "value": 13
           },
           "failure_kinds": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1010,7 +1031,7 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 27
+            "value": 47
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1024,7 +1045,7 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 1.0
+            "value": 1.65
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1045,14 +1066,14 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].recovery_rate",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.8
+            "value": 0.65
           },
           "recovery_rate_given_faulted": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.714
+            "value": 0.588
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1066,7 +1087,7 @@
             "selector": "$.rows[source=fixture,kind=timeout,rate=0.5].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 14
+            "value": 17
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1082,7 +1103,7 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 52
+            "value": 80
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1090,6 +1111,13 @@
             "source": "outputs/faults.json",
             "unit": "value",
             "value": 20
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1110,7 +1138,7 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 12
+            "value": 20
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1124,7 +1152,7 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.6
+            "value": 1.0
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1166,7 +1194,7 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.25].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 8
+            "value": 10
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1182,21 +1210,28 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 60
+            "value": 93
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].completed",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 16
+            "value": 13
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].correct",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 16
+            "value": 13
           },
           "failure_kinds": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1212,7 +1247,7 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 27
+            "value": 47
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1226,7 +1261,7 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 1.0
+            "value": 1.65
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1247,14 +1282,14 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].recovery_rate",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.8
+            "value": 0.65
           },
           "recovery_rate_given_faulted": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.714
+            "value": 0.588
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1268,7 +1303,7 @@
             "selector": "$.rows[source=fixture,kind=server_error,rate=0.5].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 14
+            "value": 17
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1284,14 +1319,21 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.25].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 40
+            "value": 84
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=empty,rate=0.25].completed",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 20
+            "value": 17
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.25].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1305,14 +1347,16 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.25].failure_kinds",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": []
+            "value": [
+              "FeatureCountMismatch"
+            ]
           },
           "injected_faults": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=empty,rate=0.25].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 3
+            "value": 16
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1326,7 +1370,7 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.25].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 1.2
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1354,7 +1398,7 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.25].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.5
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1368,7 +1412,7 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.25].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 3
+            "value": 6
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1384,35 +1428,44 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 40
+            "value": 106
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].completed",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 20
+            "value": 12
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=empty,rate=0.5].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].correct",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 14
+            "value": 12
           },
           "failure_kinds": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].failure_kinds",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": []
+            "value": [
+              "FeatureCountMismatch"
+            ]
           },
           "injected_faults": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 40
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1426,7 +1479,7 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 2.3
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1447,14 +1500,14 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].recovery_rate",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.7
+            "value": 0.6
           },
           "recovery_rate_given_faulted": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.333
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1468,7 +1521,7 @@
             "selector": "$.rows[source=fixture,kind=empty,rate=0.5].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 12
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1484,21 +1537,28 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 40
+            "value": 66
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].completed",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 17
+            "value": 18
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].correct",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 17
+            "value": 18
           },
           "failure_kinds": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1514,7 +1574,7 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 3
+            "value": 5
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1528,14 +1588,14 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.3
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].not_applicable",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 10
           },
           "rate": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1549,14 +1609,14 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].recovery_rate",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.85
+            "value": 0.9
           },
           "recovery_rate_given_faulted": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.25].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.333
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1586,7 +1646,7 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 40
+            "value": 78
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1594,6 +1654,13 @@
             "source": "outputs/faults.json",
             "unit": "value",
             "value": 14
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1616,7 +1683,7 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 15
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1630,14 +1697,14 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.9
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].not_applicable",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 12
+            "value": 24
           },
           "rate": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1658,7 +1725,7 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.333
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1672,7 +1739,7 @@
             "selector": "$.rows[source=fixture,kind=wrong_crs,rate=0.5].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 9
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1688,7 +1755,7 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 40
+            "value": 70
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1697,12 +1764,19 @@
             "unit": "value",
             "value": 20
           },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
+          },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].correct",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 17
+            "value": 20
           },
           "failure_kinds": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1716,7 +1790,7 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 3
+            "value": 5
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1730,14 +1804,14 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.5
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].not_applicable",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 11
           },
           "rate": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1751,14 +1825,14 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].recovery_rate",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.85
+            "value": 1.0
           },
           "recovery_rate_given_faulted": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.25].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 1.0
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1788,35 +1862,44 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].attempts",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 40
+            "value": 90
           },
           "completed": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].completed",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 20
+            "value": 17
+          },
+          "completed_but_wrong": {
+            "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
+            "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].completed_but_wrong",
+            "source": "outputs/faults.json",
+            "unit": "value",
+            "value": 0
           },
           "correct": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].correct",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 14
+            "value": 17
           },
           "failure_kinds": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].failure_kinds",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": []
+            "value": [
+              "FeatureCountMismatch"
+            ]
           },
           "injected_faults": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].injected_faults",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 18
           },
           "kind": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1830,14 +1913,14 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].mean_extra_calls",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 1.5
           },
           "not_applicable": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].not_applicable",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 12
+            "value": 27
           },
           "rate": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1851,14 +1934,14 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].recovery_rate",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.7
+            "value": 0.85
           },
           "recovery_rate_given_faulted": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].recovery_rate_given_faulted",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 0.0
+            "value": 0.667
           },
           "runs": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1872,7 +1955,7 @@
             "selector": "$.rows[source=fixture,kind=truncated,rate=0.5].runs_with_an_injected_fault",
             "source": "outputs/faults.json",
             "unit": "value",
-            "value": 6
+            "value": 9
           },
           "source": {
             "derivation": "read from one labeled experiment cell; fixture and live cells remain separate",
@@ -1906,9 +1989,9 @@
       "sha256": "b4cd69d7ce045db86c8100e644d88136791b6bb6e6fc7ed59c46c4ed84c47b1e"
     },
     "outputs/faults.json": {
-      "bytes": 30946,
+      "bytes": 31421,
       "role": "fault-injection measurements",
-      "sha256": "64fbb90493370f18308b148116dcfc5fe1859f60a0e6548f64b7d21e4309856c"
+      "sha256": "acaff44e52bacbc01b5753e5da7a196b4e7a4e3684a766cb293aec0cd354c292"
     },
     "outputs/paper/tradeoff.csv": {
       "bytes": 1982,
@@ -1981,9 +2064,9 @@
       "sha256": "2783ce6229086533220af7ec6aea64ee64c3b95625b0ca412114bbc6ed95a9b6"
     },
     "src/agent.py": {
-      "bytes": 15749,
+      "bytes": 16446,
       "role": "configuration constant source: agent",
-      "sha256": "16d82a9dd93d2e2ea15a3d300b468acf8f37070583b3bb930582b880152ef0a5"
+      "sha256": "eec4224bcf4edbdcab8459f03804cb26f823f2576361797273c9331c007f765e"
     },
     "src/config.py": {
       "bytes": 6050,

@@ -63,6 +63,15 @@ RULES = """How to work:
 - A priority ordering is a value judgement, not a fact. Call ask_user_preferences
   BEFORE you decide one, use the weighting it names, and say which weighting you
   used and where it came from.
+- If the person answers in their own words, stated_preference holds their exact
+  sentence. Map it onto weight_* arguments on risk_scenario and compare_scenarios:
+  set a weight only for what their words name, leave every other weight unset, and
+  pass the sentence unchanged as preference. Before you give any ranking, state
+  the weights the tool reports in indicator_weights_used and component_weights,
+  and quote the sentence they came from.
+- Never invent a preference the person did not state. If nobody answered, or their
+  words name nothing a weight can carry, use a named weighting and say that nobody
+  chose it. If elicited is "scripted", say a script answered, not a person.
 - Report who loses. compare_scenarios names the units that another weighting
   would have prioritised and yours does not. An answer that lists winners and not
   losers has hidden the trade-off it was asked about.
@@ -240,7 +249,7 @@ def run_agent(
     client = llm_client.make_client()
     model = model or config.MODEL
     specs = tools.tool_specs()
-    tools.forget_calls()
+    tools.forget_calls(question)
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt()},
