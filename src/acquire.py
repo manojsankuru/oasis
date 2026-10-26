@@ -36,7 +36,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -46,6 +46,7 @@ import pandas as pd
 import rasterio
 import requests
 from pyproj import CRS, Transformer
+from shapely.geometry import box
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from . import config
@@ -58,7 +59,7 @@ from .contracts import (
     DatasetRecord,
     Provenance,
 )
-from .registry import Registry
+from .registry import DatasetNotRegistered, Registry
 
 USER_AGENT = (
     "oasis-geo-agent/0.1 (ACM SIGSPATIAL 2026 Student Challenge, Track A; "
@@ -258,6 +259,32 @@ class CRSMismatch(AcquisitionError):
     """The service returned a different CRS from the one requested."""
 
 
+class FeatureCountMismatch(TransientError):
+    """Paging returned a different number of features from the service's own count,
+    or the service gave no usable count to check the pages against.
+
+    An empty page, a short one, or a page whose transfer-limit flag was dropped
+    all look like success to the paging loop: nothing raises and the layer is
+    simply smaller than it is. The count is the one number that says how many
+    there should have been. Transient, so the query is asked again inside the
+    retry bound; raised by name once the bound is spent, so a short result is
+    never returned as the whole layer.
+    """
+
+
+class ArcGISErrorBody(ServiceError):
+    """ArcGIS answered HTTP 200 with an error body. Carries the code it stated.
+
+    The code is what tells a standing refusal from a failure: a 4xx code says
+    the service will not do what was asked, every time, and a 5xx code -- NFHL
+    sends those under HTTP 200 -- says it failed this once.
+    """
+
+    def __init__(self, message: str, code: int | None) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class NonJsonResponse(ServiceError):
     """The service answered with something that is not JSON.
 
@@ -303,6 +330,21 @@ class NonImageResponse(ServiceError):
         )
 
 
+QUERY_STRING = re.compile(r"\?[^\s'\")]*")
+
+
+def _without_query(text: str) -> str:
+    """A transport error's text with every URL query string cut out.
+
+    `requests` names the full URL it failed on, and a query URL carries its
+    parameters -- an envelope filter is the study extent, URL-encoded, which no
+    coordinate pattern written for prose recognises. The error text can reach a
+    provenance note that a tool result quotes, so the parameters go; the path
+    stays, and the parameters were recorded in the provenance already.
+    """
+    return QUERY_STRING.sub("?<query withheld>", text)
+
+
 def _html_title(body: str) -> str:
     match = re.search(r"<title[^>]*>(.*?)</title>", body, flags=re.IGNORECASE | re.DOTALL)
     return " ".join(match.group(1).split()) if match else ""
@@ -333,8 +375,9 @@ def _raise_for_arcgis_error(payload: Any, url: str) -> None:
     details = "; ".join(str(item) for item in (error.get("details") or []))
     code = error.get("code", "?")
     message = error.get("message", "")
-    raise ServiceError(
-        f"{url}: HTTP 200 with an ArcGIS error body (code {code}): {message} {details}".strip()
+    raise ArcGISErrorBody(
+        f"{url}: HTTP 200 with an ArcGIS error body (code {code}): {message} {details}".strip(),
+        code if isinstance(code, int) and not isinstance(code, bool) else None,
     )
 
 
@@ -371,9 +414,9 @@ def _request(
             method, url, params=params, data=data, timeout=timeout_s
         )
     except _RETRYABLE_TRANSPORT as exc:
-        raise TransientError(f"{url}: {type(exc).__name__}: {exc}") from exc
+        raise TransientError(f"{url}: {type(exc).__name__}: {_without_query(str(exc))}") from exc
     except requests.exceptions.RequestException as exc:
-        raise ServiceError(f"{url}: {type(exc).__name__}: {exc}") from exc
+        raise ServiceError(f"{url}: {type(exc).__name__}: {_without_query(str(exc))}") from exc
 
     if response.status_code in _RETRYABLE_STATUS:
         raise TransientError(f"{url}: HTTP {response.status_code}")
@@ -639,6 +682,339 @@ def _query_features(
     return envelope, pages
 
 
+COUNT_FILTER_PARAMS: tuple[str, ...] = ("where", "geometry", "geometryType", "inSR", "spatialRel")
+"""The query parameters that decide WHICH features match, and so the only ones a
+count request carries. Fields, geometry and output reference change what comes
+back for each feature, never how many features there are."""
+
+
+def _feature_count(
+    service_url: str, layer_id: int, params: dict[str, Any], timeout_s: float
+) -> tuple[int | None, str, bool]:
+    """How many features this query matches, by the service's own count.
+
+    The same filter as the query, with `returnCountOnly=true`. A transport
+    failure is retried by `_request` like any other call. Returns the count, a
+    note, and whether the service REFUSED to count.
+
+    Two ways to get no count, kept apart because they mean opposite things. An
+    error body with a 4xx code -- other than 408, 425 and 429, which
+    `_RETRYABLE_STATUS` already calls transient -- may be the service saying it
+    will not count. It is
+    only taken as that once `_settled_count` has heard it on every request in the
+    bound, because ArcGIS also uses 400 for a query that failed this once.
+    Anything else -- a 5xx error body, a non-JSON reply, a body with no integer
+    `count` -- is a reply that failed, and `_counted_attempt` asks again rather
+    than trusting pages it cannot check.
+    """
+    url = f"{service_url.rstrip('/')}/{layer_id}/query"
+    count_params: dict[str, Any] = {
+        key: value for key, value in params.items() if key in COUNT_FILTER_PARAMS
+    }
+    count_params["returnCountOnly"] = "true"
+    count_params["f"] = "json"
+    try:
+        payload = _get_json(url, count_params, timeout_s)
+    except ArcGISErrorBody as exc:
+        if exc.code is not None and 400 <= exc.code < 500 and exc.code not in _RETRYABLE_STATUS:
+            return None, (
+                f"the service refused returnCountOnly (ArcGIS error {exc.code}), so the "
+                "paged total is unchecked against the service's own count"
+            ), True
+        return None, f"the count request failed with ArcGIS error {exc.code}", False
+    except ServiceError as exc:
+        return None, f"the count request failed ({type(exc).__name__})", False
+    count = payload.get("count")
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        return None, "the count reply carried no usable count", False
+    return count, "", False
+
+
+@dataclass(slots=True)
+class CountLedger:
+    """What the counted attempts of one retrieval have seen.
+
+    One per `fetch_arcgis_vector` call, shared by the CRS re-request, so a count
+    the service gave on one attempt is not forgotten on the next. `known` is the
+    last usable count. A later attempt whose count is refused is checked against
+    it rather than let through, which is how one refusal after a good count can
+    never pass a short page.
+    """
+
+    outcomes: list[str] = field(default_factory=list)
+    known: int | None = None
+
+
+def _settled_count(
+    service_url: str, layer_id: int, params: dict[str, Any], timeout_s: float
+) -> tuple[int | None, str, bool]:
+    """`_feature_count`, asked again while the service refuses, to the same bound.
+
+    A refusal is a standing gap only if it is the answer every time. ArcGIS also
+    uses code 400 for a query that failed once, so one refusal is asked again --
+    only the count, not the pages, which keeps a service that really cannot count
+    from costing a page set per refusal. A reply that is not a refusal ends it.
+    """
+    note = ""
+    for asked in range(1, config.MAX_RETRIES + 1):
+        count, note, refused = _feature_count(service_url, layer_id, params, timeout_s)
+        if not refused:
+            return count, note, False
+        if asked < config.MAX_RETRIES:
+            # The backoff `_request` uses, so a burst of transient 400s has time
+            # to pass rather than being read as a standing refusal.
+            time.sleep(min(30.0, config.RETRY_BACKOFF_S * 2 ** (asked - 1)))
+    return None, f"{note}, on all {config.MAX_RETRIES} count requests", True
+
+
+@retry(
+    retry=retry_if_exception_type(FeatureCountMismatch),
+    stop=stop_after_attempt(config.MAX_RETRIES),
+    wait=wait_exponential(multiplier=config.RETRY_BACKOFF_S, max=30.0),
+    reraise=True,
+)
+def _counted_attempt(
+    service_url: str,
+    layer_id: int,
+    params: dict[str, Any],
+    *,
+    timeout_s: float,
+    oid_field: str | None,
+    ledger: CountLedger,
+) -> tuple[dict[str, Any], int, int | None, str]:
+    """One counted attempt: the count, then the pages, and the two compared.
+
+    Returns the envelope, its page requests, the count it agreed with and a note.
+    The count is None only when the service refused to count on every request in
+    the bound and gave no usable count earlier in this retrieval; then the note
+    says the total is unchecked. An unusable count raises, so it is asked again
+    and never let through.
+
+    The count is asked first and the pages after it, so a retry asks both again.
+    The bound is `config.MAX_RETRIES` counted attempts, and it multiplies: every
+    attempt is up to MAX_RETRIES count requests plus every page, each request
+    with its own MAX_RETRIES transport retries inside `_request`, and
+    `fetch_arcgis_vector` can run the whole bound twice when it re-requests a
+    mislabelled reference. Bounded at every level; the cost of a fault is
+    stated, not hidden.
+    """
+    query_url = f"{service_url.rstrip('/')}/{layer_id}/query"
+    expected, note, refused = _settled_count(service_url, layer_id, params, timeout_s)
+    payload, pages = _query_features(
+        service_url, layer_id, params, timeout_s=timeout_s, oid_field=oid_field
+    )
+    received = len(payload.get("features") or [])
+    if expected is None and refused:
+        if ledger.known is not None:
+            # The service counted earlier in this retrieval and refuses now. Its
+            # earlier count is still the best evidence of how many there are.
+            expected = ledger.known
+            note = ""
+        elif all(outcome == "refused" for outcome in ledger.outcomes):
+            ledger.outcomes.append("refused")
+            return payload, pages, None, note
+        else:
+            # An earlier attempt heard something other than a refusal -- a 5xx,
+            # a blank reply -- so this is not a service that never counts.
+            note = f"{note}, after an earlier count reply that was not a refusal"
+    if expected is None:
+        ledger.outcomes.append("unusable")
+        raise FeatureCountMismatch(
+            f"{query_url}: {note}, so this attempt's {received} feature(s) cannot be "
+            "checked and are not returned"
+        )
+    if ledger.known is not None and expected != ledger.known:
+        ledger.outcomes.append("changed")
+        raise FeatureCountMismatch(
+            f"{query_url}: the service counted {ledger.known} feature(s) and then "
+            f"{expected} for the same query; a count that changes cannot vouch for "
+            "a page set, so neither is adopted"
+        )
+    ledger.known = expected
+    ledger.outcomes.append("agreed" if received == expected else "disagreed")
+    if received != expected:
+        raise FeatureCountMismatch(
+            f"{query_url}: the service counted {expected} "
+            f"feature(s) for this query and paging returned {received}; an empty or "
+            "short page would otherwise be returned as the whole layer"
+        )
+    return payload, pages, expected, ""
+
+
+def _counted_query(
+    service_url: str,
+    layer_id: int,
+    params: dict[str, Any],
+    *,
+    timeout_s: float,
+    oid_field: str | None,
+    ledger: CountLedger,
+) -> tuple[dict[str, Any], int, int | None, str, int]:
+    """`_counted_attempt` to its bound, and how many counted attempts it took.
+
+    Returns the envelope, its page requests, the count it agreed with (None only
+    for a refusal to count that never relented), the note for that case, and the
+    number of counted attempts -- read off the ledger rather than tenacity's
+    statistics, which are shared and whose keys may change. A mismatch or an
+    unusable count that outlasts the bound is raised as `FeatureCountMismatch`.
+    """
+    before = len(ledger.outcomes)
+    payload, pages, expected, note = _counted_attempt(
+        service_url,
+        layer_id,
+        params,
+        timeout_s=timeout_s,
+        oid_field=oid_field,
+        ledger=ledger,
+    )
+    return payload, pages, expected, note, len(ledger.outcomes) - before
+
+
+PLAUSIBLE_SLACK = 0.01
+"""How far past a CRS's area of use a coordinate may fall, as a share of that
+area's span. Slack for a feature that straddles the edge of a projection's
+published extent, not for a coordinate in different units."""
+
+
+def _assert_plausible_extent(gdf: gpd.GeoDataFrame, declared_crs: str, url: str) -> str:
+    """Refuse coordinates that cannot be in the CRS the response declared.
+
+    `_received_crs` reads the label; this reads the numbers. A response labelled
+    with the requested reference and filled with coordinates in another one --
+    metres under a degree label is the usual case -- passes the label check and
+    puts the layer somewhere else with no error at all. The test is the declared
+    CRS's own area of use, carried by pyproj, put into that CRS's units: every
+    coordinate has to fall inside it. The refusal names no coordinate, because it
+    can end up in a provenance note that a tool result quotes.
+    """
+    if gdf.empty:
+        return "no features, so there was no coordinate range to check"
+    reference = CRS.from_user_input(declared_crs)
+    usable = reference.area_of_use
+    if usable is None:
+        return f"{declared_crs} publishes no area of use, so the coordinate range was not checked"
+    to_declared = Transformer.from_crs(CRS.from_epsg(4326), reference, always_xy=True)
+    minx, miny, maxx, maxy = (float(value) for value in gdf.total_bounds)
+    if not all(math.isfinite(value) for value in (minx, miny, maxx, maxy)):
+        return "no feature carries a coordinate, so the coordinate range was not checked"
+    if usable.west > usable.east and reference.is_geographic:
+        return _assert_wrapped_range((minx, miny, maxx, maxy), usable, declared_crs, url)
+    xmin, ymin, xmax, ymax = to_declared.transform_bounds(*usable.bounds)
+    slack_x = (xmax - xmin) * PLAUSIBLE_SLACK
+    slack_y = (ymax - ymin) * PLAUSIBLE_SLACK
+    if (
+        minx < xmin - slack_x
+        or maxx > xmax + slack_x
+        or miny < ymin - slack_y
+        or maxy > ymax + slack_y
+    ):
+        raise CRSMismatch(
+            f"{url}: the response declares {declared_crs}, but its coordinates fall "
+            "outside that reference's valid range; they are in another CRS under the "
+            "wrong label"
+        )
+    return f"every coordinate falls inside the valid range of {declared_crs}"
+
+
+def _assert_wrapped_range(
+    bounds: tuple[float, float, float, float], usable: Any, declared_crs: str, url: str
+) -> str:
+    """The range check for a geographic reference whose area of use crosses 180.
+
+    NAD83's area of use runs from 167.65 E round to 40.73 W, so its west bound is
+    east of its east bound, and pyproj's `transform_bounds` hands it back as the
+    box from 40.73 W to 167.65 E -- the complement, which refuses every US
+    longitude. Read off the raw bounds instead: a longitude is valid if it lies
+    east of the west bound or west of the east bound, and a latitude between the
+    two. A projected reference keeps the ordinary check, because its
+    `transform_bounds` box is sane.
+    """
+    minx, miny, maxx, maxy = bounds
+    span = 360.0 - (usable.west - usable.east)
+    slack_x = span * PLAUSIBLE_SLACK
+    slack_y = (usable.north - usable.south) * PLAUSIBLE_SLACK
+    longitude_ok = all(
+        value >= usable.west - slack_x or value <= usable.east + slack_x
+        for value in (minx, maxx)
+    )
+    if (
+        not longitude_ok
+        or miny < usable.south - slack_y
+        or maxy > usable.north + slack_y
+    ):
+        raise CRSMismatch(
+            f"{url}: the response declares {declared_crs}, but its coordinates fall "
+            "outside that reference's valid range; they are in another CRS under the "
+            "wrong label"
+        )
+    return f"every coordinate falls inside the valid range of {declared_crs}"
+
+
+def meets_extent(frame: Any, reference: Any, aligner: Any) -> bool:
+    """Does `frame`'s extent reach `reference`'s, compared in the working CRS?
+
+    Both go through `aligner.to_working_crs`, the one choke point invariant 2
+    names: two extents in two CRSs cannot be compared at all, and two in degrees
+    compare distorted. An empty frame has no extent and reaches nothing.
+    """
+    mine = aligner.to_working_crs(frame)
+    theirs = aligner.to_working_crs(reference)
+    if len(mine) == 0 or len(theirs) == 0:
+        return False
+    return bool(box(*mine.total_bounds).intersects(box(*theirs.total_bounds)))
+
+
+def _within_study_area(frame: Any, registry: Registry, dataset: str) -> str:
+    """Refuse a layer that does not reach the tract layer's extent, and note the check.
+
+    Every layer after tracts is retrieved for the area the tracts cover, so one
+    that lands somewhere else came back in a CRS other than the one it declares,
+    or for a different place. `align` imports this module, so it is imported here
+    at call time. A layer with no features, or a registry with no tract layer
+    yet, is noted as unchecked rather than refused.
+    """
+    from . import align
+
+    if len(frame) == 0:
+        return f"{dataset}: no features, so there was no extent to compare with the tracts"
+    try:
+        tracts = registry.load(DATASET_TRACTS)
+    except DatasetNotRegistered:
+        return f"{dataset}: no tract layer is registered yet, so its extent was not compared"
+    if not meets_extent(frame, tracts, align.Alignment(registry)):
+        raise CRSMismatch(
+            f"{dataset}: its extent does not reach the tract layer's, compared in "
+            f"{registry.working_crs}; it came back in a CRS other than the one it "
+            "declares, or for a different place"
+        )
+    return f"{dataset}: its extent meets the tract layer's, compared in {registry.working_crs}"
+
+
+def _checked_raster(path: Path, registry: Registry) -> str:
+    """`_within_study_area` for a raster already on disk, which it deletes if refused.
+
+    `fetch_arcgis_raster` writes the file before anything compares its extent.
+    Left in place after a refusal, the manifest's previous elevation record would
+    point at the refused raster, and the next build would read it under the old
+    provenance -- a run that completes and is wrong. The `_verify_raster` refusal
+    deletes for the same reason.
+    """
+    try:
+        return _within_study_area(_raster_footprint(path), registry, DATASET_ELEVATION)
+    except Exception:
+        # Any failure here, not only a refusal: a raster that could not be
+        # compared is as unsafe to leave for the old record as one that was refused.
+        path.unlink(missing_ok=True)
+        raise
+
+
+def _raster_footprint(path: Path) -> gpd.GeoDataFrame:
+    """A raster's bounds as one polygon in the raster's own CRS, for `_within_study_area`."""
+    with rasterio.open(path) as dataset:
+        bounds, crs = dataset.bounds, dataset.crs
+    return gpd.GeoDataFrame(geometry=[box(*bounds)], crs=crs.to_string() if crs else None)
+
+
 def _read_esri_json(payload: dict[str, Any], declared_crs: str) -> gpd.GeoDataFrame:
     """Parse an Esri JSON FeatureSet through GDAL's ESRIJSON driver.
 
@@ -702,11 +1078,34 @@ def fetch_arcgis_vector(
             }
         )
 
-    payload, pages = _query_features(
-        base, layer_id, params, timeout_s=timeout_s, oid_field=oid_field
+    ledger = CountLedger()
+    payload, pages, counted, count_note, attempts = _counted_query(
+        base, layer_id, params, timeout_s=timeout_s, oid_field=oid_field, ledger=ledger
     )
-    declared_crs = _received_crs(payload, out_sr, query_url)
+    count_attempts = [attempts]
+    crs_notes: list[str] = []
+    try:
+        declared_crs = _received_crs(payload, out_sr, query_url)
+    except CRSMismatch:
+        # One re-request, not a retry loop: a service that mislabels twice in a
+        # row is mislabelling, and `_received_crs` raises the second time.
+        crs_notes.append(
+            f"the first response declared a spatialReference other than outSR={out_sr}; "
+            "re-requested once with the same explicit outSR"
+        )
+        payload, pages, counted, count_note, attempts = _counted_query(
+            base, layer_id, params, timeout_s=timeout_s, oid_field=oid_field, ledger=ledger
+        )
+        count_attempts.append(attempts)
+        declared_crs = _received_crs(payload, out_sr, query_url)
+        crs_notes.append("the re-request declared the requested reference")
     gdf = _read_esri_json(payload, declared_crs)
+    if counted is not None and len(gdf) != counted:
+        raise ServiceError(
+            f"{query_url}: the service counted {counted} feature(s) and the parser kept "
+            f"{len(gdf)}; features were lost between the response and the frame"
+        )
+    crs_notes.append(_assert_plausible_extent(gdf, declared_crs, query_url))
 
     layer_name = str(meta.get("name") or f"layer {layer_id}")
     service_version = str(meta.get("currentVersion", ""))
@@ -717,10 +1116,22 @@ def fetch_arcgis_vector(
         if oid_field
         else "layer publishes no object-id field; paging order is the service default"
     )
+    spent = " and then ".join(
+        f"{number} counted attempt(s) within a bound of {config.MAX_RETRIES}"
+        for number in count_attempts
+    )
+    count_check = (
+        f"{count_note}; {spent}"
+        if count_note
+        else f"feature count checked against returnCountOnly: the service counted "
+        f"{counted} and paging returned {len(gdf)}, agreeing after {spent}"
+    )
     notes = [
         f"requested outSR={out_sr}; response spatialReference={payload.get('spatialReference')}",
         "CRS verified against the response body, not assumed from the format (f=json)",
+        *crs_notes,
         f"retrieved in {pages} page(s) of up to {PAGE_SIZE} features",
+        count_check,
         order_note,
         f"outFields=* returned {len(gdf.columns)} columns",
     ]
@@ -844,6 +1255,10 @@ def acquire_boundaries(
             raise ServiceError(
                 f"{dataset_name}: {where} matched no features in layer {layer['id']}; "
                 "the study area or the service field names are wrong"
+            )
+        if dataset_name != DATASET_TRACTS:
+            provenance = with_notes(
+                provenance, (_within_study_area(gdf, registry, dataset_name),)
             )
         path = _write_vector(gdf, dataset_name)
         records.append(
@@ -1249,6 +1664,7 @@ def acquire_elevation(
         cell_size_m=cell_size_m,
         timeout_s=timeout_s,
     )
+    provenance = with_notes(provenance, (_checked_raster(path, registry),))
     return registry.register(
         DATASET_ELEVATION, "raster", path, as_dataset(provenance, DATASET_ELEVATION)
     )
@@ -1961,6 +2377,9 @@ def acquire_facilities(
     the filter is a parameter.
     """
     gdf, provenance = fetch_osm(bbox, dict(tags or FACILITY_TAGS), timeout_s=timeout_s)
+    provenance = with_notes(
+        provenance, (_within_study_area(gdf, registry, DATASET_FACILITIES),)
+    )
     path = _write_vector(gdf, DATASET_FACILITIES)
     return registry.register(
         DATASET_FACILITIES, "vector", path, as_dataset(provenance, DATASET_FACILITIES)
@@ -2020,10 +2439,12 @@ def acquire_flood_zones(
             bbox=bbox,
             timeout_s=timeout_s,
         )
+        extent_note = _within_study_area(gdf, registry, DATASET_FLOOD_ZONES)
         matched = ", ".join(f"{item['id']}:{item['name']}" for item in layers)
         provenance = with_notes(
             provenance,
             (
+                extent_note,
                 f"discovery on name_contains={FLOOD_ZONES_DISCOVERY_HINT!r} matched "
                 f"{matched}; layer {layer['id']} was chosen by name and geometry type, "
                 "never by a literal id",
@@ -2936,12 +3357,32 @@ def _contract_checks() -> list[tuple[str, bool]]:
     module = sys.modules[__name__]
     source = Path(__file__).read_text(encoding="utf-8")
 
+    # Two policies, each named. `_request` retries a transport failure, which is
+    # where faults.py injects; `_counted_attempt` re-asks a count the pages
+    # disagreed with. A third, or either one unbounded, is the drift to catch.
     decorators = len(re.findall(r"^@retry\(", source, flags=re.MULTILINE))
-    print(f"\ncontract: {decorators} retry policy in this module")
+    policies = {"_request": _request.retry, "_counted_attempt": _counted_attempt.retry}
+    print(f"\ncontract: {decorators} retry policies in this module: {sorted(policies)}")
     checks.append(
         (
-            "exactly one retry policy, which faults.py in session 12 assumes",
-            decorators == 1,
+            "exactly two retry policies, the transport one and the count one",
+            decorators == len(policies) == 2,
+        )
+    )
+    checks.append(
+        (
+            "each retry policy stops at config.MAX_RETRIES and reraises",
+            all(
+                policy.stop.max_attempt_number == config.MAX_RETRIES and policy.reraise
+                for policy in policies.values()
+            ),
+        )
+    )
+    checks.append(
+        (
+            "the count policy re-asks a count mismatch only, never a transport failure",
+            policies["_counted_attempt"].retry.exception_types
+            in (FeatureCountMismatch, (FeatureCountMismatch,)),
         )
     )
     checks.append(
@@ -3078,6 +3519,21 @@ def _self_check() -> int:
     checks.append(("paging returns no duplicate rows", len(paged["features"]) == len(paged_ids)))
     checks.append(("paged and unpaged retrieval agree exactly", bool(whole_ids) and paged_ids == whole_ids))
 
+    counted, count_note, _ = _feature_count(base, layer_id, params, timeout_s)
+    everywhere, _, _ = _feature_count(base, layer_id, {**params, "where": "1=1"}, timeout_s)
+    print(
+        f"count: returnCountOnly answers {counted} for this county and {everywhere} for "
+        f"the whole layer{f' ({count_note})' if count_note else ''}"
+    )
+    checks.append(
+        ("returnCountOnly counts exactly the features paging returns",
+         counted is not None and counted == len(whole["features"]))
+    )
+    checks.append(
+        ("the count carries the query's filter, so it is not the whole layer's",
+         counted is not None and everywhere is not None and counted < everywhere)
+    )
+
     declared = _received_crs(whole, out_sr, query_url)
     checks.append(("declared CRS is read from the response body", declared == config.STORAGE_CRS))
     try:
@@ -3198,12 +3654,20 @@ def _self_check() -> int:
         checks.append(("the optional hazard layer degrades instead of failing the run", True))
 
     print()
-    groups_gdf, _ = fetch_arcgis_vector(
+    groups_gdf, groups_record = fetch_arcgis_vector(
         groups_layer["service_url"],
         groups_layer["id"],
         where=where,
         out_sr=out_sr,
         timeout_s=timeout_s,
+    )
+    checks.append(
+        ("a live retrieval records that its pages agreed with the service's own count",
+         any(f"counted {len(groups_gdf)} and paging returned" in note for note in groups_record.notes))
+    )
+    checks.append(
+        ("a live retrieval records that its coordinates fit the reference it declares",
+         any("valid range of" in note for note in groups_record.notes))
     )
     checks.extend(
         _acs_checks(
