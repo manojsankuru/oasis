@@ -72,7 +72,7 @@ from .contracts import (
 )
 from .hazard import HAZARD_SCENARIOS
 from .registry import Registry
-from .risk import DEFAULT_PRIORITY_UNITS, Risk
+from .risk import DEFAULT_PRIORITY_UNITS, Risk, vulnerable_label
 from .vulnerability import DEFAULT_PRESET, WEIGHT_PRESETS, PRESETS
 
 TOOL_FUNCTIONS: dict[str, ToolFn] = {}
@@ -1226,6 +1226,7 @@ def risk_scenario(
     preset: str = "",
     top_n: int = schemas.DEFAULT_TOP_N,
     preference: str = "",
+    export_map: bool = False,
     **weights: Any,
 ) -> ToolResult:
     """Hazard, exposure, vulnerability and resilience combined into a priority order.
@@ -1233,6 +1234,8 @@ def risk_scenario(
     With no weight set this is the named weighting's ranking, unchanged and with
     no field added. With weights set it ranks under the weighting `user_weighting`
     builds from them and from the person's sentence, and every origin field says so.
+    With `export_map` the same ranking is also written as a map, and only the two
+    file paths are added to the result.
     """
     try:
         chosen_scenario = _scenario(scenario)
@@ -1304,7 +1307,126 @@ def risk_scenario(
     }
     if user is not None:
         result.update(user_fields(user, chosen_preset, weights, trace))
+    if export_map is True:
+        try:
+            result["map_files"] = export_ranked_map(
+                frame,
+                state.units,
+                state.engine.aligner,
+                stem=f"{RISK_TABLE_PREFIX}_{chosen_scenario.name}_{weighting.name}",
+                outlined=tuple(str(row[Col.GEOID]) for row in rows),
+                title=f"{chosen_scenario.name} under {weighting.name}",
+            )
+        except Exception as exc:  # noqa: BLE001 -- a failed map must not lose the ranking
+            result["map_error"] = _refusal(exc, "map export failed")
     return result
+
+
+MAP_DIRECTORY = config.OUTPUTS_DIR / "maps"
+"""Where `export_map` writes. Git-ignored, like every output that is not paper evidence."""
+RISK_TABLE_PREFIX = pipeline.TABLE_PREFIX
+MAP_COLUMNS: tuple[str, ...] = (
+    Col.GEOID,
+    Col.PRIORITY_RANK,
+    Col.RISK_SCORE,
+    Col.POPULATION,
+    Col.INUNDATED_FRACTION,
+    Col.EXPOSED_POPULATION,
+    Col.VULNERABILITY,
+    Col.RESILIENCE,
+)
+
+
+def export_ranked_map(
+    frame: pd.DataFrame,
+    units: Any,
+    aligner: align.Alignment,
+    *,
+    stem: str,
+    outlined: tuple[str, ...],
+    title: str,
+    directory: Path | None = None,
+) -> dict[str, str]:
+    """Write a ranking as a GeoPackage and a PNG, and return only their two paths.
+
+    The shapes come from the tract layer the ranking was computed over, joined on
+    the shared index, and pass through `to_working_crs` like every other spatial
+    step. A frame whose rows are not exactly those tracts, in that order and with
+    those GEOIDs, is refused rather than joined by position, which would draw one
+    tract's score on another's shape. `outlined` is the GEOIDs the tool returned
+    as its ranking, so the map outlines exactly the list the model was given,
+    ties included. The paths are the whole return value: a shape never reaches
+    the model.
+    """
+    if not frame.index.equals(units.index) or not frame[Col.GEOID].astype(str).reset_index(
+        drop=True
+    ).equals(units[Col.GEOID].astype(str).reset_index(drop=True)):
+        raise ValueError(
+            "the ranking and the tract layer do not hold the same rows in the same "
+            "order, so no score can be put on a shape"
+        )
+    absent = [column for column in MAP_COLUMNS if column not in frame.columns]
+    if absent:
+        raise KeyError(f"the ranking carries no {absent} to map")
+    safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in stem)
+    target = Path(directory) if directory is not None else MAP_DIRECTORY
+    target.mkdir(parents=True, exist_ok=True)
+
+    import geopandas as gpd
+
+    shapes = aligner.to_working_crs(units)
+    ranked = gpd.GeoDataFrame(
+        frame[list(MAP_COLUMNS)].copy(), geometry=shapes.geometry, crs=shapes.crs
+    )
+    ranked[Col.GEOID] = ranked[Col.GEOID].astype(str)
+    for column in MAP_COLUMNS[1:]:
+        ranked[column] = pd.to_numeric(ranked[column], errors="coerce").astype(float)
+    geopackage = target / f"{safe}.gpkg"
+    if geopackage.exists():
+        geopackage.unlink()
+    ranked.to_file(geopackage, layer=safe, driver="GPKG")
+
+    picture = target / f"{safe}.png"
+    _draw_ranked_map(ranked, picture, outlined=outlined, title=title)
+    return {
+        "geopackage": pipeline.shown_path(geopackage),
+        "png": pipeline.shown_path(picture),
+        "note": "files only; open them in a GIS or an image viewer",
+    }
+
+
+def _draw_ranked_map(ranked: Any, path: Path, *, outlined: tuple[str, ...], title: str) -> None:
+    """Risk score as a choropleth, the returned tracts outlined, unscored hatched."""
+    os.environ.setdefault(
+        "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "geo-agent-matplotlib-cache")
+    )
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    figure, axis = plt.subplots(figsize=(6.0, 6.0))
+    try:
+        ranked.plot(
+            column=Col.RISK_SCORE,
+            ax=axis,
+            cmap="cividis",
+            vmin=0.0,
+            vmax=1.0,
+            edgecolor="white",
+            linewidth=0.2,
+            legend=True,
+            legend_kwds={"label": "risk score (county-relative, 0-1)", "shrink": 0.6},
+            missing_kwds={"color": "#BDBDBD", "hatch": "///", "label": "unscored"},
+        )
+        top = ranked[ranked[Col.GEOID].isin(set(outlined))]
+        if len(top):
+            top.plot(ax=axis, facecolor="none", edgecolor="#D55E00", linewidth=1.2)
+        axis.set_title(f"{title}: the {len(top)} tracts listed are outlined", fontsize=10)
+        axis.set_axis_off()
+        figure.savefig(path, format="png", dpi=150, bbox_inches="tight")
+    finally:
+        plt.close(figure)
 
 
 @tool
@@ -1377,6 +1499,11 @@ def compare_scenarios(
             }
             for row in rows
         ],
+        "vulnerable_population_means": (
+            f"vulnerable_population_in_priority is the {vulnerable_label()}. Call it "
+            "that, not the vulnerable population: the cut is a point on this county's "
+            "own distribution, so a share of tracts qualifies by construction"
+        ),
         "who_loses": (
             "displaced_geoids names the units that ANOTHER weighting in this "
             "comparison prioritises and this one does not -- the people whose "
@@ -3236,6 +3363,125 @@ def _boundary_refusal_checks() -> list[tuple[str, bool]]:
     ]
 
 
+def _live_map_checks() -> list[tuple[str, bool]]:
+    """`risk_scenario(export_map=True)` on the real analysis, written to a temporary folder."""
+    global MAP_DIRECTORY
+    kept = MAP_DIRECTORY
+    with tempfile.TemporaryDirectory(prefix="oasis-live-map-") as temporary:
+        MAP_DIRECTORY = Path(temporary)
+        try:
+            plain = risk_scenario(scenario=HAZARD_SCENARIOS[0].name)
+            mapped = risk_scenario(scenario=HAZARD_SCENARIOS[0].name, export_map=True)
+            files = mapped.get("map_files", {})
+            written = sorted(path.name for path in MAP_DIRECTORY.iterdir())
+        finally:
+            MAP_DIRECTORY = kept
+    print(f"  live map export wrote {written}; result carries {files}")
+    return [
+        ("risk_scenario without export_map adds no map field",
+         "map_files" not in plain and "map_error" not in plain),
+        ("risk_scenario with export_map writes both files and names them",
+         isinstance(files, dict) and len(written) == 2
+         and {Path(files.get("geopackage", "")).name, Path(files.get("png", "")).name} == set(written)),
+        ("export_map changes nothing in the ranking it maps",
+         mapped.get("ranking") == plain.get("ranking")),
+        ("the mapped result still carries no coordinate", not coordinate_faults(mapped)),
+    ]
+
+
+def _map_fixture() -> tuple[pd.DataFrame, Any]:
+    """Four square tracts in geographic degrees, one of them unscored.
+
+    Degrees rather than the working CRS, so the export has to reproject them and
+    the check that the GeoPackage is in the working CRS can fail.
+    """
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    side = 0.01
+    west, south = -90.0, 35.0
+    shapes = [
+        box(west + column * side, south, west + (column + 1) * side, south + side)
+        for column in range(4)
+    ]
+    units = gpd.GeoDataFrame(
+        {Col.GEOID: [f"0000000000{index}" for index in range(4)]},
+        geometry=shapes,
+        crs="EPSG:4326",
+    )
+    frame = pd.DataFrame(index=units.index)
+    frame[Col.GEOID] = units[Col.GEOID].astype("string")
+    frame[Col.PRIORITY_RANK] = pd.Series([1, 2, 3, pd.NA], index=units.index, dtype="Int64")
+    frame[Col.RISK_SCORE] = pd.Series([0.9, 0.6, 0.3, pd.NA], index=units.index, dtype="Float64")
+    for column in MAP_COLUMNS[3:]:
+        frame[column] = pd.Series([0.5, 0.4, 0.3, 0.2], index=units.index, dtype="Float64")
+    return frame, units
+
+
+def _map_export_checks() -> list[tuple[str, bool]]:
+    """That `export_map` writes a real GeoPackage and PNG and hands back only paths.
+
+    Runs on a fixture, with the real geopandas driver and the real matplotlib
+    backend, so a missing driver fails here rather than in a demo. The read-back is
+    of the file, not of the frame that was written.
+    """
+    import geopandas as gpd
+
+    frame, units = _map_fixture()
+    aligner = align.Alignment()
+    with tempfile.TemporaryDirectory(prefix="oasis-map-check-") as temporary:
+        directory = Path(temporary)
+        try:
+            paths = export_ranked_map(
+                frame, units, aligner, stem="risk_fixture_user",
+                outlined=("00000000000", "00000000001"), title="fixture", directory=directory,
+            )
+            again = export_ranked_map(
+                frame, units, aligner, stem="risk_fixture_user",
+                outlined=("00000000000", "00000000001"), title="fixture", directory=directory,
+            )
+            geopackage = directory / "risk_fixture_user.gpkg"
+            picture = directory / "risk_fixture_user.png"
+            read = gpd.read_file(geopackage)
+            ranks = dict(zip(read[Col.GEOID].astype(str), read[Col.PRIORITY_RANK]))
+            written = True
+        except Exception as exc:  # noqa: BLE001 -- the check reports, it does not crash
+            print(f"  map export failed: {type(exc).__name__}: {exc}")
+            paths, again, ranks, read, written = {}, {}, {}, None, False
+            geopackage = picture = directory / "missing"
+        checks = [
+            ("export_map writes a GeoPackage and a PNG", written and geopackage.is_file() and picture.is_file()),
+            ("the PNG is a real PNG", written and picture.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"),
+            ("the GeoPackage reads back every tract with its rank, the unscored one blank",
+             written and len(read) == len(units)
+             and ranks.get("00000000000") == 1 and ranks.get("00000000002") == 3
+             and pd.isna(ranks.get("00000000003"))),
+            ("the GeoPackage is in the working CRS",
+             written and str(read.crs) == str(gpd.GeoSeries([], crs=config.STUDY_AREA.working_crs).crs)),
+            ("a second export replaces the first rather than failing", written and again == paths),
+            ("the result is file paths and a note, all strings, with no coordinate",
+             written and set(paths) == {"geopackage", "png", "note"}
+             and all(isinstance(value, str) for value in paths.values())
+             and not coordinate_faults(paths)),
+        ]
+    shuffled = frame.iloc[::-1]
+    relabelled = frame.copy()
+    relabelled[Col.GEOID] = relabelled[Col.GEOID].iloc[::-1].to_numpy()
+    for name, wrong in (("reordered", shuffled), ("relabelled", relabelled)):
+        checks.append(
+            (f"a {name} ranking is refused, not joined by position",
+             verify.refuses(
+                 lambda wrong=wrong: export_ranked_map(
+                     wrong, units, aligner, stem="x", outlined=(), title="x",
+                     directory=Path(tempfile.gettempdir()),
+                 ),
+                 ValueError,
+                 "same rows",
+             ))
+        )
+    return checks
+
+
 def _user_ranking_checks() -> list[tuple[str, bool]]:
     """That a ranking under the person's words follows them, on the real county.
 
@@ -3436,6 +3682,8 @@ def _run_checks() -> int:
     checks += _boundary_refusal_checks()
     print()
     checks += _user_ranking_checks()
+    checks += _map_export_checks()
+    checks += _live_map_checks()
     print()
     checks += _omission_checks()
     print()
