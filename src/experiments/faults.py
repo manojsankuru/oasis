@@ -10,14 +10,17 @@ through `acquire.fetch_arcgis_vector`, so the retry policy, the CRS assertion an
 the paging loop are the shipped ones. `src/faults.py` says where the fault is
 injected and why; this module only decides what to count.
 
-Four columns exist because "it ran" and "it was right" are different questions
+Five columns exist because "it ran" and "it was right" are different questions
 and criterion RB asks the second one:
 
 * `completed`   -- the call returned instead of raising.
 * `correct`     -- it returned AND the feature count and declared CRS match the
-                   clean run. `empty` and `truncated` complete without raising
-                   and are wrong, which is the whole reason they are in the
-                   suite. Recovery rate is computed on this column.
+                   clean run. Recovery rate is computed on this column.
+* `completed but wrong` -- it returned and was NOT correct: a silent failure,
+                   the one outcome worse than a loud one. `empty` and
+                   `truncated` used to land here on every run they fired on;
+                   `acquire` now checks each page against the service's own
+                   count, and this column is what says whether any still do.
 * `extra calls` -- mean network attempts beyond the clean run's attempt count,
                    which is measured from a clean run rather than assumed.
 * `injected`    -- faults actually fired, so a row that injected nothing is
@@ -84,10 +87,10 @@ def clean_attempt_count(service_url: str, *, where: str, timeout_s: float) -> in
     """How many network calls one clean retrieval of this layer costs.
 
     Measured by watching a real run through a rate-0.0 plan rather than assuming
-    two. `fetch_arcgis_vector` costs one metadata call plus one page, and a layer
-    that needs a second page would make a hardcoded two wrong in the direction
-    that flatters the harness -- every faulted run would report a spare attempt
-    it never spent.
+    three. `fetch_arcgis_vector` costs one metadata call, one count call and one
+    page, and a layer that needs a second page would make a hardcoded three wrong
+    in the direction that flatters the harness -- every faulted run would report a
+    spare attempt it never spent.
     """
     with faults.injecting(FaultConfig(kind="timeout", rate=0.0, seed=0)) as plan:
         acquire.fetch_arcgis_vector(
@@ -130,6 +133,7 @@ def summarise(source: str, kind: str, rate: float, runs: list[faults.RunOutcome]
     """One table row, with the denominators it was computed against."""
     completed = [run for run in runs if run.completed]
     correct = [run for run in runs if run.correct]
+    silent = [run for run in completed if not run.correct]
     faulted = [run for run in runs if run.injected > 0]
     faulted_correct = [run for run in faulted if run.correct]
     errors = sorted({run.error.split(":")[0] for run in runs if run.error})
@@ -140,6 +144,7 @@ def summarise(source: str, kind: str, rate: float, runs: list[faults.RunOutcome]
         "runs": len(runs),
         "completed": len(completed),
         "correct": len(correct),
+        "completed_but_wrong": len(silent),
         "recovery_rate": round(len(correct) / len(runs), 3) if runs else 0.0,
         "recovery_rate_given_faulted": round(len(faulted_correct) / len(faulted), 3)
         if faulted
@@ -165,14 +170,14 @@ def events(runs: Iterable[faults.RunOutcome]) -> list[FaultEvent]:
 def render(rows: list[dict[str, Any]], clean: dict[str, Any]) -> str:
     """The table, as markdown, with the clean run above it as the baseline."""
     lines: list[str] = []
-    lines.append("| source | fault | rate | runs | completed | correct | recovery | "
-                 "recovery when faulted | mean extra calls | calls | injected | "
+    lines.append("| source | fault | rate | runs | completed | correct | completed but wrong | "
+                 "recovery | recovery when faulted | mean extra calls | calls | injected | "
                  "not applicable | failure |")
-    lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
+    lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | "
                  "---: | ---: | --- |")
     lines.append(
         f"| {clean['source']} | none (baseline) | 0.00 | {clean['runs']} | "
-        f"{clean['completed']} | {clean['correct']} | "
+        f"{clean['completed']} | {clean['correct']} | {clean['completed_but_wrong']} | "
         f"{clean['recovery_rate']:.0%} | n/a | {clean['mean_extra_calls']:.2f} | "
         f"{clean['attempts']} | 0 | 0 | - |"
     )
@@ -182,7 +187,8 @@ def render(rows: list[dict[str, Any]], clean: dict[str, Any]) -> str:
         given = "n/a" if conditional is None else f"{conditional:.0%}"
         lines.append(
             f"| {row['source']} | `{row['kind']}` | {row['rate']:.2f} | {row['runs']} | "
-            f"{row['completed']} | {row['correct']} | {row['recovery_rate']:.0%} | "
+            f"{row['completed']} | {row['correct']} | {row['completed_but_wrong']} | "
+            f"{row['recovery_rate']:.0%} | "
             f"{given} | {row['mean_extra_calls']:.2f} | {row['attempts']} | "
             f"{row['injected_faults']} | {row['not_applicable']} | {failure} |"
         )
@@ -230,6 +236,7 @@ def fixture_suite(timeout_s: float = 10.0) -> tuple[dict[str, Any], list[dict[st
                     f"  {kind:<13} rate {rate:.2f}  "
                     f"completed {row['completed']}/{row['runs']}  "
                     f"correct {row['correct']}/{row['runs']}  "
+                    f"completed-but-wrong {row['completed_but_wrong']}  "
                     f"extra calls {row['mean_extra_calls']:.2f}  "
                     f"recovery-when-faulted {row['recovery_rate_given_faulted']}  "
                     f"injected {row['injected_faults']}/{row['attempts']} calls  "
@@ -339,11 +346,19 @@ def write(clean: dict[str, Any], rows: list[dict[str, Any]], recorded: list[Faul
         f"`rate` is per network attempt, not per dataset -- see the module docstring "
         f"in `src/faults.py`. Each fixture cell is {SEEDS} seeded runs; each live cell "
         f"is {LIVE_SEEDS}. `correct` means the run returned the same feature count and declared "
-        f"CRS as the clean run; `completed` means only that it returned.\n\n"
+        f"CRS as the clean run; `completed` means only that it returned; `completed but "
+        f"wrong` counts the runs that returned and were not correct -- the silent "
+        f"failures, which should be zero.\n\n"
         f"{table}\n\n"
         f"Rows marked `{FIXTURE}` ran against a real HTTP server on loopback serving a "
         f"synthetic FeatureSet; rows marked `{LIVE}` ran against the service the "
-        f"snapshot came from. Nothing here writes to `data/snapshot/`.\n"
+        f"snapshot came from. Nothing here writes to `data/snapshot/`.\n\n"
+        f"Every row retrieves through `acquire.fetch_arcgis_vector`, so the "
+        f"`completed but wrong` column covers ArcGIS vector layers. It says nothing "
+        f"about the Overpass or raster retrievals, and nothing about a service that "
+        f"refuses `returnCountOnly` on every count request, where a short page still "
+        f"passes with a provenance note saying the total went unchecked. The injector "
+        f"never produces that refusal.\n"
     )
     path = OUTPUT_DIR / TABLE_NAME
     path.write_text(document, encoding="utf-8")
@@ -386,6 +401,12 @@ def main() -> int:
     print(f"\nwritten to {path}")
     print(f"every call carried a timeout: "
           f"{all(row['every_call_had_a_timeout'] for row in rows)}")
+    silent = {
+        f"{row['source']} {row['kind']} {row['rate']:.2f}": row["completed_but_wrong"]
+        for row in rows
+        if row["completed_but_wrong"]
+    }
+    print(f"runs that completed but were wrong: {silent or 'none'}")
     print(f"the injector is armed after the suite: {faults.armed()}")
     return 0
 
