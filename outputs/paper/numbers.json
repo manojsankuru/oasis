@@ -285,7 +285,7 @@
       }
     }
   },
-  "generated_at": "2026-10-26T01:32:41.562624+00:00",
+  "generated_at": "2026-10-26T16:03:26.095616+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -2078,15 +2078,20 @@
       "role": "configuration constant source: contracts",
       "sha256": "d2c9cb41cb764e95198d35de1781a3092b197ac182a62c70d2ecc305cd7e7e2e"
     },
+    "src/experiments/report.py": {
+      "bytes": 174788,
+      "role": "configuration constant source: report",
+      "sha256": "edd071804f3e304e091196cffdde915ff8ea8074c2f7ddada0f5c1b9289046b4"
+    },
     "src/hazard.py": {
       "bytes": 66600,
       "role": "configuration constant source: hazard",
       "sha256": "2783ae99e3c1752d05c5e5a3f7bc097cce3790238e411790bf04d3306cb62512"
     },
     "src/risk.py": {
-      "bytes": 67965,
+      "bytes": 68761,
       "role": "configuration constant source: risk",
-      "sha256": "2fbc6c24916b2a5c349c70af12c0bb09a914506ac1b896e4837dd65bfd635da1"
+      "sha256": "194de9351b14c735d499621d9530fab9a16233ee0da227dd8b37a7740c30d123"
     },
     "src/sandbox.py": {
       "bytes": 79370,
@@ -2228,6 +2233,559 @@
   },
   "tradeoffs": {
     "primary": {
+      "priority_changes": {
+        "pairs": [
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019000100",
+                  "population": 2267
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 2267
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019002004",
+                  "population": 870
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 870
+            },
+            "scenario": "surge_1_5m",
+            "to_preset": "svi_themes",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 1
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": []
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 0
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": []
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 0
+            },
+            "scenario": "surge_1_5m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 0
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019002004",
+                  "population": 870
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 870
+            },
+            "from_preset": "svi_themes",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019000100",
+                  "population": 2267
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 2267
+            },
+            "scenario": "surge_1_5m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 1
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019001100",
+                  "population": 3143
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 3143
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019002105",
+                  "population": 2308
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 2308
+            },
+            "scenario": "surge_3_0m",
+            "to_preset": "svi_themes",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 1
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019004617",
+                  "population": 10984
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 10984
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019004620",
+                  "population": 4368
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4368
+            },
+            "scenario": "surge_3_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 1
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019002105",
+                  "population": 2308
+                },
+                {
+                  "GEOID": "45019004617",
+                  "population": 10984
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 13292
+            },
+            "from_preset": "svi_themes",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019004620",
+                  "population": 4368
+                },
+                {
+                  "GEOID": "45019001100",
+                  "population": 3143
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 7511
+            },
+            "scenario": "surge_3_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019000700",
+                  "population": 2879
+                },
+                {
+                  "GEOID": "45019005602",
+                  "population": 6960
+                },
+                {
+                  "GEOID": "45019002008",
+                  "population": 4116
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 13955
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019002613",
+                  "population": 5903
+                },
+                {
+                  "GEOID": "45019002300",
+                  "population": 1613
+                },
+                {
+                  "GEOID": "45019002006",
+                  "population": 5041
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 12557
+            },
+            "scenario": "surge_5_0m",
+            "to_preset": "svi_themes",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 3
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019004617",
+                  "population": 10984
+                },
+                {
+                  "GEOID": "45019002008",
+                  "population": 4116
+                },
+                {
+                  "GEOID": "45019004902",
+                  "population": 2472
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 17572
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019000400",
+                  "population": 3495
+                },
+                {
+                  "GEOID": "45019005300",
+                  "population": 4275
+                },
+                {
+                  "GEOID": "45019001100",
+                  "population": 3143
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 10913
+            },
+            "scenario": "surge_5_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 3
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019004617",
+                  "population": 10984
+                },
+                {
+                  "GEOID": "45019002613",
+                  "population": 5903
+                },
+                {
+                  "GEOID": "45019002006",
+                  "population": 5041
+                },
+                {
+                  "GEOID": "45019002300",
+                  "population": 1613
+                },
+                {
+                  "GEOID": "45019004902",
+                  "population": 2472
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 26013
+            },
+            "from_preset": "svi_themes",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "45019000400",
+                  "population": 3495
+                },
+                {
+                  "GEOID": "45019005300",
+                  "population": 4275
+                },
+                {
+                  "GEOID": "45019001100",
+                  "population": 3143
+                },
+                {
+                  "GEOID": "45019000700",
+                  "population": 2879
+                },
+                {
+                  "GEOID": "45019005602",
+                  "population": 6960
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 20752
+            },
+            "scenario": "surge_5_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "tracts",
+              "value": 5
+            }
+          }
+        ],
+        "totals": {
+          "pair_count": {
+            "derivation": "count of pairs compared",
+            "selector": "every unordered pair of presets within every scenario",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset pairs",
+            "value": 9
+          },
+          "pairs_without_change": {
+            "derivation": "count of pairs with nothing entering and nothing leaving",
+            "selector": "pairs whose two priority lists hold the same tracts",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "preset pairs",
+            "value": 1
+          },
+          "population_entering": {
+            "derivation": "summed by this module over the pairs; each pair's population traces to its scenario's risk table: ['outputs/risk_surge_1_5m_svi_equal.csv', 'outputs/risk_surge_3_0m_svi_equal.csv', 'outputs/risk_surge_5_0m_svi_equal.csv']",
+            "selector": "sum of pairs[*].entering_population",
+            "source": "src/experiments/report.py",
+            "unit": "people",
+            "value": 88096
+          },
+          "population_leaving": {
+            "derivation": "summed by this module over the pairs; each pair's population traces to its scenario's risk table: ['outputs/risk_surge_1_5m_svi_equal.csv', 'outputs/risk_surge_3_0m_svi_equal.csv', 'outputs/risk_surge_5_0m_svi_equal.csv']",
+            "selector": "sum of pairs[*].leaving_population",
+            "source": "src/experiments/report.py",
+            "unit": "people",
+            "value": 61546
+          },
+          "tracts_changed": {
+            "derivation": "sum over pairs of the tracts entering; a tract counts once per pair it moves in",
+            "selector": "column=top_geoids; every pair",
+            "source": "outputs/paper/tradeoff.csv",
+            "unit": "tract changes",
+            "value": 17
+          }
+        }
+      },
       "row_count": {
         "derivation": "validated scenario-by-preset Cartesian product; copy is byte-identical to outputs/tradeoff.csv",
         "selector": "all data rows",
@@ -2300,7 +2858,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2371,7 +2929,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2442,7 +3000,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2514,7 +3072,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2586,7 +3144,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2658,7 +3216,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2733,7 +3291,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2808,7 +3366,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
@@ -2883,16 +3441,998 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
             "source": "outputs/paper/tradeoff.csv",
             "unit": "people",
             "value": 32757
           }
         }
-      ]
+      ],
+      "top_ten_overlap": {
+        "jaccard": {
+          "derivation": "intersection over union of the two priority sets, rounded to six decimals",
+          "selector": "column=top_geoids; every pair of rows",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "Jaccard index",
+          "value": [
+            [
+              1.0,
+              0.818182,
+              1.0,
+              0.666667,
+              0.538462,
+              0.538462,
+              0.25,
+              0.25,
+              0.333333
+            ],
+            [
+              0.818182,
+              1.0,
+              0.818182,
+              0.666667,
+              0.538462,
+              0.538462,
+              0.25,
+              0.25,
+              0.333333
+            ],
+            [
+              1.0,
+              0.818182,
+              1.0,
+              0.666667,
+              0.538462,
+              0.538462,
+              0.25,
+              0.25,
+              0.333333
+            ],
+            [
+              0.666667,
+              0.666667,
+              0.666667,
+              1.0,
+              0.818182,
+              0.818182,
+              0.333333,
+              0.333333,
+              0.538462
+            ],
+            [
+              0.538462,
+              0.538462,
+              0.538462,
+              0.818182,
+              1.0,
+              0.666667,
+              0.428571,
+              0.428571,
+              0.538462
+            ],
+            [
+              0.538462,
+              0.538462,
+              0.538462,
+              0.818182,
+              0.666667,
+              1.0,
+              0.333333,
+              0.333333,
+              0.666667
+            ],
+            [
+              0.25,
+              0.25,
+              0.25,
+              0.333333,
+              0.428571,
+              0.333333,
+              1.0,
+              0.538462,
+              0.538462
+            ],
+            [
+              0.25,
+              0.25,
+              0.25,
+              0.333333,
+              0.428571,
+              0.333333,
+              0.538462,
+              1.0,
+              0.333333
+            ],
+            [
+              0.333333,
+              0.333333,
+              0.333333,
+              0.538462,
+              0.538462,
+              0.666667,
+              0.538462,
+              0.333333,
+              1.0
+            ]
+          ]
+        },
+        "lowest_jaccard_between_presets": {
+          "derivation": "minimum Jaccard index between two weightings of the same hazard: how far the value judgement alone moves the priority list",
+          "selector": "column=top_geoids; pairs of different presets within one scenario",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "Jaccard index",
+          "value": 0.333333
+        },
+        "lowest_jaccard_between_scenarios": {
+          "derivation": "minimum Jaccard index between two hazards under the same weighting: how far the surge height alone moves the priority list",
+          "selector": "column=top_geoids; pairs of different scenarios under one preset",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "Jaccard index",
+          "value": 0.25
+        },
+        "runs": {
+          "derivation": "row and column order of both matrices",
+          "selector": "columns=scenario,preset; scenarios outer, presets inner",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "scenario/preset labels",
+          "value": [
+            "surge_1_5m/svi_equal",
+            "surge_1_5m/svi_themes",
+            "surge_1_5m/evacuation_capacity",
+            "surge_3_0m/svi_equal",
+            "surge_3_0m/svi_themes",
+            "surge_3_0m/evacuation_capacity",
+            "surge_5_0m/svi_equal",
+            "surge_5_0m/svi_themes",
+            "surge_5_0m/evacuation_capacity"
+          ]
+        },
+        "shared_tracts": {
+          "derivation": "size of the intersection of the two priority sets",
+          "selector": "column=top_geoids; every pair of rows",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "tracts",
+          "value": [
+            [
+              10,
+              9,
+              10,
+              8,
+              7,
+              7,
+              4,
+              4,
+              5
+            ],
+            [
+              9,
+              10,
+              9,
+              8,
+              7,
+              7,
+              4,
+              4,
+              5
+            ],
+            [
+              10,
+              9,
+              10,
+              8,
+              7,
+              7,
+              4,
+              4,
+              5
+            ],
+            [
+              8,
+              8,
+              8,
+              10,
+              9,
+              9,
+              5,
+              5,
+              7
+            ],
+            [
+              7,
+              7,
+              7,
+              9,
+              10,
+              8,
+              6,
+              6,
+              7
+            ],
+            [
+              7,
+              7,
+              7,
+              9,
+              8,
+              10,
+              5,
+              5,
+              8
+            ],
+            [
+              4,
+              4,
+              4,
+              5,
+              6,
+              5,
+              10,
+              7,
+              7
+            ],
+            [
+              4,
+              4,
+              4,
+              5,
+              6,
+              5,
+              7,
+              10,
+              5
+            ],
+            [
+              5,
+              5,
+              5,
+              7,
+              7,
+              8,
+              7,
+              5,
+              10
+            ]
+          ]
+        }
+      },
+      "vulnerable_threshold_sensitivity": {
+        "labels": {
+          "q50": "population in tracts at or above the county median vulnerability",
+          "q80": "population in tracts at or above the county 0.8 quantile of vulnerability"
+        },
+        "quantiles": {
+          "derivation": "the pipeline default, risk.DEFAULT_VULNERABLE_QUANTILE, then one stricter point",
+          "selector": "SENSITIVITY_QUANTILES",
+          "source": "src/experiments/report.py",
+          "unit": "quantile of county vulnerability",
+          "value": [
+            0.5,
+            0.8
+          ]
+        },
+        "rows": [
+          {
+            "preset": "svi_equal",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_1_5m; preset=svi_equal; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 21509
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_1_5m; preset=svi_equal; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 4343
+            },
+            "scenario": "surge_1_5m"
+          },
+          {
+            "preset": "svi_themes",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_1_5m; preset=svi_themes; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 23776
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_1_5m; preset=svi_themes; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 2730
+            },
+            "scenario": "surge_1_5m"
+          },
+          {
+            "preset": "evacuation_capacity",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_1_5m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 18011
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_1_5m; preset=evacuation_capacity; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 4343
+            },
+            "scenario": "surge_1_5m"
+          },
+          {
+            "preset": "svi_equal",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_3_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 21509
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_3_0m; preset=svi_equal; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4343
+            },
+            "scenario": "surge_3_0m"
+          },
+          {
+            "preset": "svi_themes",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_3_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 24652
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_3_0m; preset=svi_themes; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 5873
+            },
+            "scenario": "surge_3_0m"
+          },
+          {
+            "preset": "evacuation_capacity",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_3_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 25670
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_3_0m; preset=evacuation_capacity; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4343
+            },
+            "scenario": "surge_3_0m"
+          },
+          {
+            "preset": "svi_equal",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_5_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 31025
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_5_0m; preset=svi_equal; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 12113
+            },
+            "scenario": "surge_5_0m"
+          },
+          {
+            "preset": "svi_themes",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_5_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 25463
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_5_0m; preset=svi_themes; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 16522
+            },
+            "scenario": "surge_5_0m"
+          },
+          {
+            "preset": "evacuation_capacity",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_5_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/tradeoff.csv",
+              "unit": "people",
+              "value": 32757
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_5_0m; preset=evacuation_capacity; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4343
+            },
+            "scenario": "surge_5_0m"
+          }
+        ]
+      }
     },
     "transfer": {
+      "priority_changes": {
+        "pairs": [
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051010815",
+                  "population": 3528
+                },
+                {
+                  "GEOID": "13051010503",
+                  "population": 2195
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 5723
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051004212",
+                  "population": 5595
+                },
+                {
+                  "GEOID": "13051011007",
+                  "population": 2559
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 8154
+            },
+            "scenario": "surge_1_5m",
+            "to_preset": "svi_themes",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011111",
+                  "population": 1785
+                },
+                {
+                  "GEOID": "13051011104",
+                  "population": 4533
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 6318
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051004212",
+                  "population": 5595
+                },
+                {
+                  "GEOID": "13051011007",
+                  "population": 2559
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 8154
+            },
+            "scenario": "surge_1_5m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_1_5m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011111",
+                  "population": 1785
+                },
+                {
+                  "GEOID": "13051011104",
+                  "population": 4533
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 6318
+            },
+            "from_preset": "svi_themes",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "selector": "scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051010815",
+                  "population": 3528
+                },
+                {
+                  "GEOID": "13051010503",
+                  "population": 2195
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 5723
+            },
+            "scenario": "surge_1_5m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_1_5m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051010815",
+                  "population": 3528
+                },
+                {
+                  "GEOID": "13051011113",
+                  "population": 3861
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 7389
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011007",
+                  "population": 2559
+                },
+                {
+                  "GEOID": "13051004212",
+                  "population": 5595
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 8154
+            },
+            "scenario": "surge_3_0m",
+            "to_preset": "svi_themes",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011104",
+                  "population": 4533
+                },
+                {
+                  "GEOID": "13051011113",
+                  "population": 3861
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 8394
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051010901",
+                  "population": 4162
+                },
+                {
+                  "GEOID": "13051004212",
+                  "population": 5595
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 9757
+            },
+            "scenario": "surge_3_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_3_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011104",
+                  "population": 4533
+                },
+                {
+                  "GEOID": "13051011007",
+                  "population": 2559
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 7092
+            },
+            "from_preset": "svi_themes",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "selector": "scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051010815",
+                  "population": 3528
+                },
+                {
+                  "GEOID": "13051010901",
+                  "population": 4162
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 7690
+            },
+            "scenario": "surge_3_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_3_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011112",
+                  "population": 2907
+                },
+                {
+                  "GEOID": "13051000601",
+                  "population": 4658
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 7565
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051004209",
+                  "population": 4251
+                },
+                {
+                  "GEOID": "13051011007",
+                  "population": 2559
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 6810
+            },
+            "scenario": "surge_5_0m",
+            "to_preset": "svi_themes",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=svi_themes; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011112",
+                  "population": 2907
+                },
+                {
+                  "GEOID": "13051011108",
+                  "population": 2604
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 5511
+            },
+            "from_preset": "svi_equal",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051004209",
+                  "population": 4251
+                },
+                {
+                  "GEOID": "13051011007",
+                  "population": 2559
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 6810
+            },
+            "scenario": "surge_5_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_5_0m; from=svi_equal; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 2
+            }
+          },
+          {
+            "entering": {
+              "derivation": "set difference of the two priority lists (to minus from), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051011108",
+                  "population": 2604
+                }
+              ]
+            },
+            "entering_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is entering (scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 2604
+            },
+            "from_preset": "svi_themes",
+            "leaving": {
+              "derivation": "set difference of the two priority lists (from minus to), in rank order, with each tract's population read from outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "selector": "scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "GEOIDs with residents",
+              "value": [
+                {
+                  "GEOID": "13051000601",
+                  "population": 4658
+                }
+              ]
+            },
+            "leaving_population": {
+              "derivation": "sum of the tract populations of the listed GEOIDs",
+              "selector": "column=population; rows whose GEOID is leaving (scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4658
+            },
+            "scenario": "surge_5_0m",
+            "to_preset": "evacuation_capacity",
+            "tracts_changed": {
+              "derivation": "count of tracts entering, equal to the count leaving because both lists have the same length",
+              "selector": "scenario=surge_5_0m; from=svi_themes; to=evacuation_capacity; column=top_geoids",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "tracts",
+              "value": 1
+            }
+          }
+        ],
+        "totals": {
+          "pair_count": {
+            "derivation": "count of pairs compared",
+            "selector": "every unordered pair of presets within every scenario",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset pairs",
+            "value": 9
+          },
+          "pairs_without_change": {
+            "derivation": "count of pairs with nothing entering and nothing leaving",
+            "selector": "pairs whose two priority lists hold the same tracts",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "preset pairs",
+            "value": 0
+          },
+          "population_entering": {
+            "derivation": "summed by this module over the pairs; each pair's population traces to its scenario's risk table: ['outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv', 'outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv', 'outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv']",
+            "selector": "sum of pairs[*].entering_population",
+            "source": "src/experiments/report.py",
+            "unit": "people",
+            "value": 56914
+          },
+          "population_leaving": {
+            "derivation": "summed by this module over the pairs; each pair's population traces to its scenario's risk table: ['outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv', 'outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv', 'outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv']",
+            "selector": "sum of pairs[*].leaving_population",
+            "source": "src/experiments/report.py",
+            "unit": "people",
+            "value": 65910
+          },
+          "tracts_changed": {
+            "derivation": "sum over pairs of the tracts entering; a tract counts once per pair it moves in",
+            "selector": "column=top_geoids; every pair",
+            "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+            "unit": "tract changes",
+            "value": 17
+          }
+        }
+      },
       "row_count": {
         "derivation": "validated scenario-by-preset Cartesian product and matched to canonical scenario_rows",
         "selector": "all data rows",
@@ -2968,7 +4508,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_1_5m; preset=svi_equal; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3042,7 +4582,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_1_5m; preset=svi_themes; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3116,7 +4656,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_1_5m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3189,7 +4729,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_3_0m; preset=svi_equal; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3262,7 +4802,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_3_0m; preset=svi_themes; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3335,7 +4875,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_3_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3408,7 +4948,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_5_0m; preset=svi_equal; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3481,7 +5021,7 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_5_0m; preset=svi_themes; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
@@ -3554,14 +5094,441 @@
             ]
           },
           "vulnerable_population_in_priority": {
-            "derivation": "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+            "derivation": "pipeline-produced population in tracts at or above the county median vulnerability among the selected tracts (risk.DEFAULT_VULNERABLE_QUANTILE)",
             "selector": "row where scenario=surge_5_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
             "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
             "unit": "people",
             "value": 11287
           }
         }
-      ]
+      ],
+      "top_ten_overlap": {
+        "jaccard": {
+          "derivation": "intersection over union of the two priority sets, rounded to six decimals",
+          "selector": "column=top_geoids; every pair of rows",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+          "unit": "Jaccard index",
+          "value": [
+            [
+              1.0,
+              0.666667,
+              0.666667,
+              0.818182,
+              0.666667,
+              0.666667,
+              0.538462,
+              0.333333,
+              0.333333
+            ],
+            [
+              0.666667,
+              1.0,
+              0.666667,
+              0.538462,
+              0.818182,
+              0.538462,
+              0.538462,
+              0.428571,
+              0.428571
+            ],
+            [
+              0.666667,
+              0.666667,
+              1.0,
+              0.666667,
+              0.818182,
+              0.818182,
+              0.666667,
+              0.538462,
+              0.538462
+            ],
+            [
+              0.818182,
+              0.538462,
+              0.666667,
+              1.0,
+              0.666667,
+              0.666667,
+              0.538462,
+              0.333333,
+              0.333333
+            ],
+            [
+              0.666667,
+              0.818182,
+              0.818182,
+              0.666667,
+              1.0,
+              0.666667,
+              0.666667,
+              0.538462,
+              0.538462
+            ],
+            [
+              0.666667,
+              0.538462,
+              0.818182,
+              0.666667,
+              0.666667,
+              1.0,
+              0.818182,
+              0.538462,
+              0.538462
+            ],
+            [
+              0.538462,
+              0.538462,
+              0.666667,
+              0.538462,
+              0.666667,
+              0.818182,
+              1.0,
+              0.666667,
+              0.666667
+            ],
+            [
+              0.333333,
+              0.428571,
+              0.538462,
+              0.333333,
+              0.538462,
+              0.538462,
+              0.666667,
+              1.0,
+              0.818182
+            ],
+            [
+              0.333333,
+              0.428571,
+              0.538462,
+              0.333333,
+              0.538462,
+              0.538462,
+              0.666667,
+              0.818182,
+              1.0
+            ]
+          ]
+        },
+        "lowest_jaccard_between_presets": {
+          "derivation": "minimum Jaccard index between two weightings of the same hazard: how far the value judgement alone moves the priority list",
+          "selector": "column=top_geoids; pairs of different presets within one scenario",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+          "unit": "Jaccard index",
+          "value": 0.666667
+        },
+        "lowest_jaccard_between_scenarios": {
+          "derivation": "minimum Jaccard index between two hazards under the same weighting: how far the surge height alone moves the priority list",
+          "selector": "column=top_geoids; pairs of different scenarios under one preset",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+          "unit": "Jaccard index",
+          "value": 0.428571
+        },
+        "runs": {
+          "derivation": "row and column order of both matrices",
+          "selector": "columns=scenario,preset; scenarios outer, presets inner",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+          "unit": "scenario/preset labels",
+          "value": [
+            "surge_1_5m/svi_equal",
+            "surge_1_5m/svi_themes",
+            "surge_1_5m/evacuation_capacity",
+            "surge_3_0m/svi_equal",
+            "surge_3_0m/svi_themes",
+            "surge_3_0m/evacuation_capacity",
+            "surge_5_0m/svi_equal",
+            "surge_5_0m/svi_themes",
+            "surge_5_0m/evacuation_capacity"
+          ]
+        },
+        "shared_tracts": {
+          "derivation": "size of the intersection of the two priority sets",
+          "selector": "column=top_geoids; every pair of rows",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+          "unit": "tracts",
+          "value": [
+            [
+              10,
+              8,
+              8,
+              9,
+              8,
+              8,
+              7,
+              5,
+              5
+            ],
+            [
+              8,
+              10,
+              8,
+              7,
+              9,
+              7,
+              7,
+              6,
+              6
+            ],
+            [
+              8,
+              8,
+              10,
+              8,
+              9,
+              9,
+              8,
+              7,
+              7
+            ],
+            [
+              9,
+              7,
+              8,
+              10,
+              8,
+              8,
+              7,
+              5,
+              5
+            ],
+            [
+              8,
+              9,
+              9,
+              8,
+              10,
+              8,
+              8,
+              7,
+              7
+            ],
+            [
+              8,
+              7,
+              9,
+              8,
+              8,
+              10,
+              9,
+              7,
+              7
+            ],
+            [
+              7,
+              7,
+              8,
+              7,
+              8,
+              9,
+              10,
+              8,
+              8
+            ],
+            [
+              5,
+              6,
+              7,
+              5,
+              7,
+              7,
+              8,
+              10,
+              9
+            ],
+            [
+              5,
+              6,
+              7,
+              5,
+              7,
+              7,
+              8,
+              9,
+              10
+            ]
+          ]
+        }
+      },
+      "vulnerable_threshold_sensitivity": {
+        "labels": {
+          "q50": "population in tracts at or above the county median vulnerability",
+          "q80": "population in tracts at or above the county 0.8 quantile of vulnerability"
+        },
+        "quantiles": {
+          "derivation": "the pipeline default, risk.DEFAULT_VULNERABLE_QUANTILE, then one stricter point",
+          "selector": "SENSITIVITY_QUANTILES",
+          "source": "src/experiments/report.py",
+          "unit": "quantile of county vulnerability",
+          "value": [
+            0.5,
+            0.8
+          ]
+        },
+        "rows": [
+          {
+            "preset": "svi_equal",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_1_5m; preset=svi_equal; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 26647
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_1_5m; preset=svi_equal; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 18977
+            },
+            "scenario": "surge_1_5m"
+          },
+          {
+            "preset": "svi_themes",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_1_5m; preset=svi_themes; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 20688
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_1_5m; preset=svi_themes; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 6357
+            },
+            "scenario": "surge_1_5m"
+          },
+          {
+            "preset": "evacuation_capacity",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_1_5m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 19700
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_1_5m; preset=evacuation_capacity; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_1_5m_svi_equal.csv",
+              "unit": "people",
+              "value": 13382
+            },
+            "scenario": "surge_1_5m"
+          },
+          {
+            "preset": "svi_equal",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_3_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 26647
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_3_0m; preset=svi_equal; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 18977
+            },
+            "scenario": "surge_3_0m"
+          },
+          {
+            "preset": "svi_themes",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_3_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 18493
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_3_0m; preset=svi_themes; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4162
+            },
+            "scenario": "surge_3_0m"
+          },
+          {
+            "preset": "evacuation_capacity",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_3_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 18097
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_3_0m; preset=evacuation_capacity; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_3_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 9220
+            },
+            "scenario": "surge_3_0m"
+          },
+          {
+            "preset": "svi_equal",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_5_0m; preset=svi_equal; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 16890
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_5_0m; preset=svi_equal; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 9220
+            },
+            "scenario": "surge_5_0m"
+          },
+          {
+            "preset": "svi_themes",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_5_0m; preset=svi_themes; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 14738
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_5_0m; preset=svi_themes; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4658
+            },
+            "scenario": "surge_5_0m"
+          },
+          {
+            "preset": "evacuation_capacity",
+            "q50": {
+              "derivation": "written by the pipeline, and reproduced exactly by replaying risk.compare_presets on the scenario's risk table",
+              "selector": "scenario=surge_5_0m; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+              "unit": "people",
+              "value": 11287
+            },
+            "q80": {
+              "derivation": "risk.compare_presets replayed on this risk table with vulnerable_quantile=0.8 by src/experiments/report.py, after the default-quantile replay reproduced every written trade-off row exactly; the pipeline itself never wrote this number",
+              "selector": "scenario=surge_5_0m; preset=evacuation_capacity; risk.compare_presets(vulnerable_quantile=0.8)",
+              "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/risk_surge_5_0m_svi_equal.csv",
+              "unit": "people",
+              "value": 4969
+            },
+            "scenario": "surge_5_0m"
+          }
+        ]
+      }
     }
   },
   "transfer": {

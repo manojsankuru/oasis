@@ -1,0 +1,69 @@
+area,scenario,from_preset,to_preset,change,GEOID,population
+"Charleston County, South Carolina",surge_1_5m,svi_equal,svi_themes,enters,45019000100,2267
+"Charleston County, South Carolina",surge_1_5m,svi_equal,svi_themes,leaves,45019002004,870
+"Charleston County, South Carolina",surge_1_5m,svi_themes,evacuation_capacity,enters,45019002004,870
+"Charleston County, South Carolina",surge_1_5m,svi_themes,evacuation_capacity,leaves,45019000100,2267
+"Charleston County, South Carolina",surge_3_0m,svi_equal,svi_themes,enters,45019001100,3143
+"Charleston County, South Carolina",surge_3_0m,svi_equal,svi_themes,leaves,45019002105,2308
+"Charleston County, South Carolina",surge_3_0m,svi_equal,evacuation_capacity,enters,45019004617,10984
+"Charleston County, South Carolina",surge_3_0m,svi_equal,evacuation_capacity,leaves,45019004620,4368
+"Charleston County, South Carolina",surge_3_0m,svi_themes,evacuation_capacity,enters,45019002105,2308
+"Charleston County, South Carolina",surge_3_0m,svi_themes,evacuation_capacity,enters,45019004617,10984
+"Charleston County, South Carolina",surge_3_0m,svi_themes,evacuation_capacity,leaves,45019004620,4368
+"Charleston County, South Carolina",surge_3_0m,svi_themes,evacuation_capacity,leaves,45019001100,3143
+"Charleston County, South Carolina",surge_5_0m,svi_equal,svi_themes,enters,45019000700,2879
+"Charleston County, South Carolina",surge_5_0m,svi_equal,svi_themes,enters,45019005602,6960
+"Charleston County, South Carolina",surge_5_0m,svi_equal,svi_themes,enters,45019002008,4116
+"Charleston County, South Carolina",surge_5_0m,svi_equal,svi_themes,leaves,45019002613,5903
+"Charleston County, South Carolina",surge_5_0m,svi_equal,svi_themes,leaves,45019002300,1613
+"Charleston County, South Carolina",surge_5_0m,svi_equal,svi_themes,leaves,45019002006,5041
+"Charleston County, South Carolina",surge_5_0m,svi_equal,evacuation_capacity,enters,45019004617,10984
+"Charleston County, South Carolina",surge_5_0m,svi_equal,evacuation_capacity,enters,45019002008,4116
+"Charleston County, South Carolina",surge_5_0m,svi_equal,evacuation_capacity,enters,45019004902,2472
+"Charleston County, South Carolina",surge_5_0m,svi_equal,evacuation_capacity,leaves,45019000400,3495
+"Charleston County, South Carolina",surge_5_0m,svi_equal,evacuation_capacity,leaves,45019005300,4275
+"Charleston County, South Carolina",surge_5_0m,svi_equal,evacuation_capacity,leaves,45019001100,3143
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,enters,45019004617,10984
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,enters,45019002613,5903
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,enters,45019002006,5041
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,enters,45019002300,1613
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,enters,45019004902,2472
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,leaves,45019000400,3495
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,leaves,45019005300,4275
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,leaves,45019001100,3143
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,leaves,45019000700,2879
+"Charleston County, South Carolina",surge_5_0m,svi_themes,evacuation_capacity,leaves,45019005602,6960
+"Chatham County, Georgia",surge_1_5m,svi_equal,svi_themes,enters,13051010815,3528
+"Chatham County, Georgia",surge_1_5m,svi_equal,svi_themes,enters,13051010503,2195
+"Chatham County, Georgia",surge_1_5m,svi_equal,svi_themes,leaves,13051004212,5595
+"Chatham County, Georgia",surge_1_5m,svi_equal,svi_themes,leaves,13051011007,2559
+"Chatham County, Georgia",surge_1_5m,svi_equal,evacuation_capacity,enters,13051011111,1785
+"Chatham County, Georgia",surge_1_5m,svi_equal,evacuation_capacity,enters,13051011104,4533
+"Chatham County, Georgia",surge_1_5m,svi_equal,evacuation_capacity,leaves,13051004212,5595
+"Chatham County, Georgia",surge_1_5m,svi_equal,evacuation_capacity,leaves,13051011007,2559
+"Chatham County, Georgia",surge_1_5m,svi_themes,evacuation_capacity,enters,13051011111,1785
+"Chatham County, Georgia",surge_1_5m,svi_themes,evacuation_capacity,enters,13051011104,4533
+"Chatham County, Georgia",surge_1_5m,svi_themes,evacuation_capacity,leaves,13051010815,3528
+"Chatham County, Georgia",surge_1_5m,svi_themes,evacuation_capacity,leaves,13051010503,2195
+"Chatham County, Georgia",surge_3_0m,svi_equal,svi_themes,enters,13051010815,3528
+"Chatham County, Georgia",surge_3_0m,svi_equal,svi_themes,enters,13051011113,3861
+"Chatham County, Georgia",surge_3_0m,svi_equal,svi_themes,leaves,13051011007,2559
+"Chatham County, Georgia",surge_3_0m,svi_equal,svi_themes,leaves,13051004212,5595
+"Chatham County, Georgia",surge_3_0m,svi_equal,evacuation_capacity,enters,13051011104,4533
+"Chatham County, Georgia",surge_3_0m,svi_equal,evacuation_capacity,enters,13051011113,3861
+"Chatham County, Georgia",surge_3_0m,svi_equal,evacuation_capacity,leaves,13051010901,4162
+"Chatham County, Georgia",surge_3_0m,svi_equal,evacuation_capacity,leaves,13051004212,5595
+"Chatham County, Georgia",surge_3_0m,svi_themes,evacuation_capacity,enters,13051011104,4533
+"Chatham County, Georgia",surge_3_0m,svi_themes,evacuation_capacity,enters,13051011007,2559
+"Chatham County, Georgia",surge_3_0m,svi_themes,evacuation_capacity,leaves,13051010815,3528
+"Chatham County, Georgia",surge_3_0m,svi_themes,evacuation_capacity,leaves,13051010901,4162
+"Chatham County, Georgia",surge_5_0m,svi_equal,svi_themes,enters,13051011112,2907
+"Chatham County, Georgia",surge_5_0m,svi_equal,svi_themes,enters,13051000601,4658
+"Chatham County, Georgia",surge_5_0m,svi_equal,svi_themes,leaves,13051004209,4251
+"Chatham County, Georgia",surge_5_0m,svi_equal,svi_themes,leaves,13051011007,2559
+"Chatham County, Georgia",surge_5_0m,svi_equal,evacuation_capacity,enters,13051011112,2907
+"Chatham County, Georgia",surge_5_0m,svi_equal,evacuation_capacity,enters,13051011108,2604
+"Chatham County, Georgia",surge_5_0m,svi_equal,evacuation_capacity,leaves,13051004209,4251
+"Chatham County, Georgia",surge_5_0m,svi_equal,evacuation_capacity,leaves,13051011007,2559
+"Chatham County, Georgia",surge_5_0m,svi_themes,evacuation_capacity,enters,13051011108,2604
+"Chatham County, Georgia",surge_5_0m,svi_themes,evacuation_capacity,leaves,13051000601,4658
