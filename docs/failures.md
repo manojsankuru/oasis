@@ -2115,3 +2115,11 @@ zero-change first-attempt success.
 **Why.** "Believed only if every request refused" held within one counted attempt, not across the retrieval, and `CountLedger.known` was overwritten by a later count without comparing the two. The refusal re-asks also had no wait, so a short burst of transient 400s could read as a standing refusal.
 **Did the agent recover?** Yes, before commit. A refusal is believed only when every count reply in the retrieval was a refusal, a count that changes between attempts raises `FeatureCountMismatch` naming both, and the re-asks wait with the retry backoff. Both orderings have checks in `faults --check`.
 **Kept as a paper failure case?** Not decided. It is the third recurrence of the 2026-10-25 count-check entry.
+
+## 2026-10-26 — a regenerated figure differed in bytes from the committed copy
+
+**What happened.** Running `python -m src.figures` in the Linux container while adding the overlap heat map rewrote `paper/figs/risk_surface.pdf`, and `git status` showed it modified. Nothing that feeds that figure had changed: the same snapshot, the same `outputs/risk_surge_3_0m_svi_equal.csv` and the same depth raster. `figures --check` passes "repeated generation is byte-deterministic" here, because it compares two runs on one machine.
+**Where.** `src/figures.py`, `generate`; `paper/figs/risk_surface.pdf`, last committed in `05deff0`.
+**Why.** Not determined. The container runs matplotlib 3.11.1, the version `requirements-lock.txt` pins, so a library version change is not the cause. The committed copy was made on a different machine.
+**Did the agent recover?** Partly. The committed `risk_surface.pdf` was restored with `git checkout`, so only figures whose content changed are committed. The byte-determinism check still holds within one machine only.
+**Kept as a paper failure case?** Not decided.
