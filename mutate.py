@@ -35,6 +35,7 @@ if not PYTHON.exists():
 
 MODULE_IMPORTS: dict[str, str] = {
     "transfer": "experiments.transfer",
+    "report": "experiments.report",
 }
 
 CHECKED_BY: dict[str, str] = {
@@ -1246,6 +1247,77 @@ TRANSFER_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+REPORT_MUTATIONS: list[tuple[str, str, str]] = [
+    (
+        "the replay no longer compares the written vulnerable count",
+        "                    same = same and (\n"
+        "                        row.vulnerable_population_in_priority\n",
+        "                    same = same or (\n"
+        "                        row.vulnerable_population_in_priority\n",
+    ),
+    (
+        "the replay no longer compares the mean inundation",
+        "                    and math.isclose(\n"
+        "                        row.mean_inundation_m,\n",
+        "                    or math.isclose(\n"
+        "                        row.mean_inundation_m,\n",
+    ),
+    (
+        "the stricter count is replayed at the default quantile",
+        "                    frame, scenario=scenario, units=frame, vulnerable_quantile=quantile\n",
+        "                    frame, scenario=scenario, units=frame\n",
+    ),
+    (
+        "entering and leaving are swapped",
+        "                entering = [geoid for geoid in chosen[second] if geoid not in chosen[first]]\n",
+        "                entering = [geoid for geoid in chosen[first] if geoid not in chosen[second]]\n",
+    ),
+    (
+        "the Jaccard index divides by one set rather than the union",
+        "            round(len(by_pair[left] & by_pair[right]) / len(by_pair[left] | by_pair[right]), 6)\n",
+        "            round(len(by_pair[left] & by_pair[right]) / len(by_pair[left]), 6)\n",
+    ),
+    (
+        "the lowest overlap between presets is taken across scenarios",
+        "        if i != j and runs[i][0] == runs[j][0]\n"
+        "    ]\n"
+        "    across = [\n",
+        "        if i != j and runs[i][1] == runs[j][1]\n"
+        "    ]\n"
+        "    across = [\n",
+    ),
+    (
+        "the priority-changes table is never written",
+        "        os.replace(staged, table)\n",
+        "        pass\n",
+    ),
+]
+
+
+FIGURES_MUTATIONS: list[tuple[str, str, str]] = [
+    (
+        "an asymmetric overlap matrix is drawn",
+        '            _require(bool(np.array_equal(matrix, matrix.T)), f"{county} {title} matrix is not symmetric")\n',
+        "",
+    ),
+    (
+        "overlap runs are not compared with the configuration",
+        '        _require(runs == expected, f"{county} overlap runs do not cover every configured scenario and preset")\n',
+        "",
+    ),
+    (
+        "an overlap matrix is drawn without comparing it to the trade-off table",
+        "        _overlap_agrees(matrix, tradeoff, label=label)\n",
+        "        pass\n",
+    ),
+    (
+        "the overlap figure is not drawn",
+        "    _overlap_figure(paths[2], inputs.overlap)\n",
+        "",
+    ),
+]
+
+
 TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "align": ALIGN_MUTATIONS,
     "hazard": HAZARD_MUTATIONS,
@@ -1259,6 +1331,8 @@ TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "faults": FAULTS_MUTATIONS,
     "acquire": ACQUIRE_MUTATIONS,
     "transfer": TRANSFER_MUTATIONS,
+    "report": REPORT_MUTATIONS,
+    "figures": FIGURES_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
 
