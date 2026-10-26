@@ -137,6 +137,19 @@ published, and `ScenarioRow.vulnerable_population_in_priority` is only readable
 beside the number that produced it."""
 
 
+def vulnerable_label(quantile: float = DEFAULT_VULNERABLE_QUANTILE) -> str:
+    """What `vulnerable_population_in_priority` counts at `quantile`, in plain words.
+
+    The count is everyone living in a selected tract whose vulnerability is at or
+    above that point of the county's own distribution. At the median, half the
+    scored tracts qualify by construction, so "vulnerable population" would claim
+    more than the number does. Every label a person reads comes from here, so the
+    word "median" cannot outlive a change to the default.
+    """
+    point = "median" if quantile == 0.5 else f"{quantile:g} quantile of"
+    return f"population in tracts at or above the county {point} vulnerability"
+
+
 @dataclass(slots=True)
 class ResilienceEvidence:
     """What the facility count counted, and what it could not."""
@@ -842,7 +855,8 @@ def format_tradeoff(rows: list[ScenarioRow]) -> str:
     """The trade-off table, including who loses under each weighting."""
     lines = [
         "TRADE-OFF -- the same county under three weightings, and who each one drops",
-        f"  {'preset':<22} {'scenario':<12} {'pop':>9} {'vuln pop':>9} {'mean m':>7}  displaced",
+        f"  {'preset':<22} {'scenario':<12} {'pop':>9} {'>= cut':>9} {'mean m':>7}  displaced",
+        f"  pop is everyone in the priority tracts. >= cut is the {vulnerable_label()}",
     ]
     for row in rows:
         lines.append(
