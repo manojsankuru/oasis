@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-01T19:21:24",
+  "generated": "2026-10-26T01:32:30",
   "rates": [
     0.25,
     0.5
@@ -14,12 +14,13 @@
     "runs": 20,
     "completed": 20,
     "correct": 20,
+    "completed_but_wrong": 0,
     "recovery_rate": 1.0,
     "recovery_rate_given_faulted": null,
     "runs_with_an_injected_fault": 0,
     "injected_faults": 0,
     "not_applicable": 0,
-    "attempts": 40,
+    "attempts": 60,
     "mean_extra_calls": 0.0,
     "features_seen": [
       10
@@ -35,13 +36,14 @@
       "runs": 20,
       "completed": 20,
       "correct": 20,
+      "completed_but_wrong": 0,
       "recovery_rate": 1.0,
       "recovery_rate_given_faulted": 1.0,
-      "runs_with_an_injected_fault": 8,
-      "injected_faults": 12,
+      "runs_with_an_injected_fault": 10,
+      "injected_faults": 20,
       "not_applicable": 0,
-      "attempts": 52,
-      "mean_extra_calls": 0.6,
+      "attempts": 80,
+      "mean_extra_calls": 1.0,
       "features_seen": [
         10
       ],
@@ -53,15 +55,16 @@
       "kind": "timeout",
       "rate": 0.5,
       "runs": 20,
-      "completed": 16,
-      "correct": 16,
-      "recovery_rate": 0.8,
-      "recovery_rate_given_faulted": 0.714,
-      "runs_with_an_injected_fault": 14,
-      "injected_faults": 27,
+      "completed": 13,
+      "correct": 13,
+      "completed_but_wrong": 0,
+      "recovery_rate": 0.65,
+      "recovery_rate_given_faulted": 0.588,
+      "runs_with_an_injected_fault": 17,
+      "injected_faults": 47,
       "not_applicable": 0,
-      "attempts": 60,
-      "mean_extra_calls": 1.0,
+      "attempts": 93,
+      "mean_extra_calls": 1.65,
       "features_seen": [
         0,
         10
@@ -78,13 +81,14 @@
       "runs": 20,
       "completed": 20,
       "correct": 20,
+      "completed_but_wrong": 0,
       "recovery_rate": 1.0,
       "recovery_rate_given_faulted": 1.0,
-      "runs_with_an_injected_fault": 8,
-      "injected_faults": 12,
+      "runs_with_an_injected_fault": 10,
+      "injected_faults": 20,
       "not_applicable": 0,
-      "attempts": 52,
-      "mean_extra_calls": 0.6,
+      "attempts": 80,
+      "mean_extra_calls": 1.0,
       "features_seen": [
         10
       ],
@@ -96,15 +100,16 @@
       "kind": "server_error",
       "rate": 0.5,
       "runs": 20,
-      "completed": 16,
-      "correct": 16,
-      "recovery_rate": 0.8,
-      "recovery_rate_given_faulted": 0.714,
-      "runs_with_an_injected_fault": 14,
-      "injected_faults": 27,
+      "completed": 13,
+      "correct": 13,
+      "completed_but_wrong": 0,
+      "recovery_rate": 0.65,
+      "recovery_rate_given_faulted": 0.588,
+      "runs_with_an_injected_fault": 17,
+      "injected_faults": 47,
       "not_applicable": 0,
-      "attempts": 60,
-      "mean_extra_calls": 1.0,
+      "attempts": 93,
+      "mean_extra_calls": 1.65,
       "features_seen": [
         0,
         10
@@ -119,57 +124,64 @@
       "kind": "empty",
       "rate": 0.25,
       "runs": 20,
-      "completed": 20,
+      "completed": 17,
       "correct": 17,
+      "completed_but_wrong": 0,
       "recovery_rate": 0.85,
-      "recovery_rate_given_faulted": 0.0,
-      "runs_with_an_injected_fault": 3,
-      "injected_faults": 3,
+      "recovery_rate_given_faulted": 0.5,
+      "runs_with_an_injected_fault": 6,
+      "injected_faults": 16,
       "not_applicable": 6,
-      "attempts": 40,
-      "mean_extra_calls": 0.0,
+      "attempts": 84,
+      "mean_extra_calls": 1.2,
       "features_seen": [
         0,
         10
       ],
       "every_call_had_a_timeout": true,
-      "failure_kinds": []
+      "failure_kinds": [
+        "FeatureCountMismatch"
+      ]
     },
     {
       "source": "fixture",
       "kind": "empty",
       "rate": 0.5,
       "runs": 20,
-      "completed": 20,
-      "correct": 14,
-      "recovery_rate": 0.7,
-      "recovery_rate_given_faulted": 0.0,
-      "runs_with_an_injected_fault": 6,
-      "injected_faults": 6,
+      "completed": 12,
+      "correct": 12,
+      "completed_but_wrong": 0,
+      "recovery_rate": 0.6,
+      "recovery_rate_given_faulted": 0.333,
+      "runs_with_an_injected_fault": 12,
+      "injected_faults": 40,
       "not_applicable": 12,
-      "attempts": 40,
-      "mean_extra_calls": 0.0,
+      "attempts": 106,
+      "mean_extra_calls": 2.3,
       "features_seen": [
         0,
         10
       ],
       "every_call_had_a_timeout": true,
-      "failure_kinds": []
+      "failure_kinds": [
+        "FeatureCountMismatch"
+      ]
     },
     {
       "source": "fixture",
       "kind": "wrong_crs",
       "rate": 0.25,
       "runs": 20,
-      "completed": 17,
-      "correct": 17,
-      "recovery_rate": 0.85,
-      "recovery_rate_given_faulted": 0.0,
+      "completed": 18,
+      "correct": 18,
+      "completed_but_wrong": 0,
+      "recovery_rate": 0.9,
+      "recovery_rate_given_faulted": 0.333,
       "runs_with_an_injected_fault": 3,
-      "injected_faults": 3,
-      "not_applicable": 6,
-      "attempts": 40,
-      "mean_extra_calls": 0.0,
+      "injected_faults": 5,
+      "not_applicable": 10,
+      "attempts": 66,
+      "mean_extra_calls": 0.3,
       "features_seen": [
         0,
         10
@@ -186,13 +198,14 @@
       "runs": 20,
       "completed": 14,
       "correct": 14,
+      "completed_but_wrong": 0,
       "recovery_rate": 0.7,
-      "recovery_rate_given_faulted": 0.0,
-      "runs_with_an_injected_fault": 6,
-      "injected_faults": 6,
-      "not_applicable": 12,
-      "attempts": 40,
-      "mean_extra_calls": 0.0,
+      "recovery_rate_given_faulted": 0.333,
+      "runs_with_an_injected_fault": 9,
+      "injected_faults": 15,
+      "not_applicable": 24,
+      "attempts": 78,
+      "mean_extra_calls": 0.9,
       "features_seen": [
         0,
         10
@@ -208,16 +221,16 @@
       "rate": 0.25,
       "runs": 20,
       "completed": 20,
-      "correct": 17,
-      "recovery_rate": 0.85,
-      "recovery_rate_given_faulted": 0.0,
+      "correct": 20,
+      "completed_but_wrong": 0,
+      "recovery_rate": 1.0,
+      "recovery_rate_given_faulted": 1.0,
       "runs_with_an_injected_fault": 3,
-      "injected_faults": 3,
-      "not_applicable": 6,
-      "attempts": 40,
-      "mean_extra_calls": 0.0,
+      "injected_faults": 5,
+      "not_applicable": 11,
+      "attempts": 70,
+      "mean_extra_calls": 0.5,
       "features_seen": [
-        5,
         10
       ],
       "every_call_had_a_timeout": true,
@@ -228,21 +241,24 @@
       "kind": "truncated",
       "rate": 0.5,
       "runs": 20,
-      "completed": 20,
-      "correct": 14,
-      "recovery_rate": 0.7,
-      "recovery_rate_given_faulted": 0.0,
-      "runs_with_an_injected_fault": 6,
-      "injected_faults": 6,
-      "not_applicable": 12,
-      "attempts": 40,
-      "mean_extra_calls": 0.0,
+      "completed": 17,
+      "correct": 17,
+      "completed_but_wrong": 0,
+      "recovery_rate": 0.85,
+      "recovery_rate_given_faulted": 0.667,
+      "runs_with_an_injected_fault": 9,
+      "injected_faults": 18,
+      "not_applicable": 27,
+      "attempts": 90,
+      "mean_extra_calls": 1.5,
       "features_seen": [
-        5,
+        0,
         10
       ],
       "every_call_had_a_timeout": true,
-      "failure_kinds": []
+      "failure_kinds": [
+        "FeatureCountMismatch"
+      ]
     }
   ],
   "events": [
@@ -382,7 +398,7 @@
       "kind": "timeout",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 2
     },
     {
       "kind": "timeout",
@@ -412,6 +428,48 @@
       "kind": "timeout",
       "dataset": "fixture",
       "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 1
     },
     {
@@ -436,67 +494,7 @@
       "kind": "timeout",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
+      "extra_turns": 2
     },
     {
       "kind": "timeout",
@@ -514,24 +512,6 @@
       "kind": "timeout",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
       "extra_turns": 3
     },
     {
@@ -543,56 +523,56 @@
     {
       "kind": "timeout",
       "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "timeout",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
+      "extra_turns": 2
     },
     {
       "kind": "timeout",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 1
+      "extra_turns": 0
     },
     {
       "kind": "timeout",
       "dataset": "fixture",
       "recovered": true,
       "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 5
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
     },
     {
       "kind": "timeout",
@@ -604,6 +584,42 @@
       "kind": "timeout",
       "dataset": "fixture",
       "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "timeout",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 0
     },
     {
@@ -622,7 +638,7 @@
       "kind": "server_error",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 2
     },
     {
       "kind": "server_error",
@@ -652,6 +668,48 @@
       "kind": "server_error",
       "dataset": "fixture",
       "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 1
     },
     {
@@ -676,67 +734,7 @@
       "kind": "server_error",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
+      "extra_turns": 2
     },
     {
       "kind": "server_error",
@@ -754,24 +752,6 @@
       "kind": "server_error",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
       "extra_turns": 3
     },
     {
@@ -783,56 +763,56 @@
     {
       "kind": "server_error",
       "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
-    },
-    {
-      "kind": "server_error",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 1
+      "extra_turns": 2
     },
     {
       "kind": "server_error",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 1
+      "extra_turns": 0
     },
     {
       "kind": "server_error",
       "dataset": "fixture",
       "recovered": true,
       "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 5
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
     },
     {
       "kind": "server_error",
@@ -844,6 +824,48 @@
       "kind": "server_error",
       "dataset": "fixture",
       "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 1
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "server_error",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 0
     },
     {
@@ -856,7 +878,19 @@
       "kind": "empty",
       "dataset": "fixture",
       "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
     },
     {
       "kind": "empty",
@@ -874,91 +908,19 @@
       "kind": "empty",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "empty",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "empty",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "empty",
@@ -994,43 +956,7 @@
       "kind": "empty",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "empty",
@@ -1060,13 +986,7 @@
       "kind": "empty",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "empty",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "empty",
@@ -1078,7 +998,103 @@
       "kind": "empty",
       "dataset": "fixture",
       "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 4
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "empty",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 4
     },
     {
       "kind": "empty",
@@ -1102,49 +1118,7 @@
       "kind": "wrong_crs",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 2
     },
     {
       "kind": "wrong_crs",
@@ -1180,6 +1154,24 @@
       "kind": "wrong_crs",
       "dataset": "fixture",
       "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 0
     },
     {
@@ -1193,6 +1185,102 @@
       "dataset": "fixture",
       "recovered": true,
       "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
+    },
+    {
+      "kind": "wrong_crs",
+      "dataset": "fixture",
+      "recovered": false,
+      "extra_turns": 2
     },
     {
       "kind": "wrong_crs",
@@ -1234,25 +1322,7 @@
       "kind": "wrong_crs",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
+      "extra_turns": 2
     },
     {
       "kind": "wrong_crs",
@@ -1264,61 +1334,7 @@
       "kind": "wrong_crs",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "wrong_crs",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 2
     },
     {
       "kind": "wrong_crs",
@@ -1342,7 +1358,139 @@
       "kind": "truncated",
       "dataset": "fixture",
       "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 0
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 2
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
+      "extra_turns": 4
     },
     {
       "kind": "truncated",
@@ -1354,7 +1502,7 @@
       "kind": "truncated",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "truncated",
@@ -1366,13 +1514,13 @@
       "kind": "truncated",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "truncated",
       "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
+      "recovered": true,
+      "extra_turns": 4
     },
     {
       "kind": "truncated",
@@ -1384,132 +1532,6 @@
       "kind": "truncated",
       "dataset": "fixture",
       "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": false,
       "extra_turns": 0
     },
     {
@@ -1540,25 +1562,19 @@
       "kind": "truncated",
       "dataset": "fixture",
       "recovered": false,
+      "extra_turns": 4
+    },
+    {
+      "kind": "truncated",
+      "dataset": "fixture",
+      "recovered": true,
       "extra_turns": 0
     },
     {
       "kind": "truncated",
       "dataset": "fixture",
       "recovered": false,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
-    },
-    {
-      "kind": "truncated",
-      "dataset": "fixture",
-      "recovered": true,
-      "extra_turns": 0
+      "extra_turns": 4
     },
     {
       "kind": "truncated",
