@@ -10,9 +10,23 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .risk import vulnerable_label
+
 WIDTH = 68
 MAX_LIST_ITEMS = 8
 MAX_TEXT = 400
+
+FIELD_LABELS: dict[str, str] = {
+    "population_in_priority": "population in priority tracts",
+    "vulnerable_population_in_priority": vulnerable_label(),
+    "displaced_count": "tracts it drops that another weighting picks",
+}
+"""How a field reads on screen. The logged key stays as the contract names it."""
+ROW_FIELDS: tuple[str, ...] = (
+    "population_in_priority",
+    "vulnerable_population_in_priority",
+    "displaced_count",
+)
 
 
 def _fmt(value: Any) -> str:
@@ -50,11 +64,24 @@ def mask_line(report: dict[str, Any]) -> str | None:
     )
 
 
+def _label(key: str) -> str:
+    return FIELD_LABELS.get(key, key)
+
+
+def _render_row(row: dict[str, Any], indent: int) -> str:
+    """One weighting's row of a comparison, on one line, with readable labels."""
+    pad = "  " * indent
+    parts = [f"{_label(key)} {_fmt(row[key])}" for key in ROW_FIELDS if key in row]
+    return f"{pad}{row['preset']}: {', '.join(parts)}"
+
+
 def _render_list(key: str, items: list[Any], indent: int) -> list[str]:
     pad = "  " * indent
     if not items:
         return [f"{pad}{key}: (none)"]
     if all(isinstance(item, dict) for item in items):
+        if all("preset" in item for item in items):
+            return [f"{pad}{key}:", *(_render_row(item, indent + 1) for item in items)]
         return [f"{pad}{key}: {len(items)} rows"]
     shown = ", ".join(_fmt(item) for item in items[:MAX_LIST_ITEMS])
     extra = len(items) - MAX_LIST_ITEMS
@@ -74,7 +101,7 @@ def render(value: Any, indent: int = 0) -> list[str]:
         elif isinstance(item, list):
             lines.extend(_render_list(key, item, indent))
         else:
-            lines.append(f"{pad}{key}: {_fmt(item)}")
+            lines.append(f"{pad}{_label(key)}: {_fmt(item)}")
     return lines
 
 
