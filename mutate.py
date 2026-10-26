@@ -37,6 +37,26 @@ MODULE_IMPORTS: dict[str, str] = {
     "transfer": "experiments.transfer",
 }
 
+CHECKED_BY: dict[str, str] = {
+    "acquire": "faults",
+}
+"""A module whose own `--check` cannot be the one mutations are judged by.
+
+`acquire --check` is live by design: every check in it is a real request to a
+public service, and a mutation sweep that sent hundreds of them would be the
+abuse `experiments/faults.py` exists to avoid. `acquire`'s failure handling --
+the retry, the count check, the CRS re-request, the extent checks -- is checked
+offline by `faults --check` against a loopback service, so that is the suite
+that has to notice an acquire mutation. Every other module is judged by its own.
+"""
+
+CHECK_TIMEOUT_S = 1800
+"""How long one `--check` may run under a mutation before it counts as failing.
+
+A mutation that removes a retry bound does not fail a check, it hangs one: the
+call it bounded now retries forever. Without this the sweep would hang with it
+and never report the mutation as caught."""
+
 
 def import_of(module: str) -> str:
     """Resolve a mutation target name to its import path below ``src``."""
@@ -1021,6 +1041,101 @@ CRITIC_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+ACQUIRE_MUTATIONS: list[tuple[str, str, str]] = [
+    # -- every page against the service's own count --------------------------
+    ("a page that disagrees with the count is returned anyway",
+     "    if received != expected:\n",
+     "    if False:\n"),
+    ("a count mismatch is never asked again",
+     "    retry=retry_if_exception_type(FeatureCountMismatch),\n",
+     "    retry=retry_if_exception_type(CRSMismatch),\n"),
+    ("an unusable count reply lets that attempt's pages through unchecked",
+     '    if expected is None:\n        ledger.outcomes.append("unusable")\n',
+     '    if expected is None:\n        return payload, pages, None, note\n        ledger.outcomes.append("unusable")\n'),
+    ("an explicit refusal to count is treated as a bad reply, so no layer comes back",
+     "        if exc.code is not None and 400 <= exc.code < 500 and exc.code not in _RETRYABLE_STATUS:\n",
+     "        if False:\n"),
+    ("a 429 count reply is taken as a refusal to count instead of a busy service",
+     "        if exc.code is not None and 400 <= exc.code < 500 and exc.code not in _RETRYABLE_STATUS:\n",
+     "        if exc.code is not None and 400 <= exc.code < 500:\n"),
+    ("one refusal is believed without asking the count again",
+     "    for asked in range(1, config.MAX_RETRIES + 1):\n",
+     "    for asked in range(1, 2):\n"),
+    ("a count the service already gave is not used to check a later attempt",
+     "        if ledger.known is not None:\n            # The service counted earlier",
+     "        if False:\n            # The service counted earlier"),
+    ("the re-request forgets the count the first attempt gave",
+     "            base, layer_id, params, timeout_s=timeout_s, oid_field=oid_field, ledger=ledger\n        )\n        count_attempts.append(attempts)\n",
+     "            base, layer_id, params, timeout_s=timeout_s, oid_field=oid_field, ledger=CountLedger()\n        )\n        count_attempts.append(attempts)\n"),
+    ("the count request drops the query's filter and counts the whole layer",
+     'COUNT_FILTER_PARAMS: tuple[str, ...] = ("where", "geometry", "geometryType", "inSR", "spatialRel")\n',
+     "COUNT_FILTER_PARAMS: tuple[str, ...] = ()\n"),
+    ("a feature the parser drops is returned one short",
+     "    if counted is not None and len(gdf) != counted:\n",
+     "    if False:\n"),
+    # -- the reference the response declares ---------------------------------
+    ("a mislabelled response is refused without the one re-request",
+     "    except CRSMismatch:\n        # One re-request",
+     "    except CRSMismatch:\n        raise\n        # One re-request"),
+    ("coordinates are never held to the declared reference's range",
+     "    crs_notes.append(_assert_plausible_extent(gdf, declared_crs, query_url))\n",
+     "    crs_notes.append('range not checked')\n"),
+    ("the range check never compares the west edge",
+     "        minx < xmin - slack_x\n",
+     "        False\n"),
+    ("the range check never compares the east edge",
+     "        or maxx > xmax + slack_x\n",
+     "        or False\n"),
+    ("the range check never compares the south edge",
+     "        or miny < ymin - slack_y\n",
+     "        or False\n"),
+    ("the range check never compares the north edge",
+     "        or maxy > ymax + slack_y\n",
+     "        or False\n"),
+    ("a layer with no geometry is reported as inside the range",
+     "    if not all(math.isfinite(value) for value in (minx, miny, maxx, maxy)):\n",
+     "    if False:\n"),
+    ("a reference crossing the antimeridian refuses every one of its own coordinates",
+     "    if usable.west > usable.east and reference.is_geographic:\n",
+     "    if False:\n"),
+    ("a projected reference crossing the antimeridian loses its range check",
+     "    if usable.west > usable.east and reference.is_geographic:\n",
+     "    if usable.west > usable.east:\n"),
+    ("any longitude passes under a reference whose area of use crosses 180",
+     "        value >= usable.west - slack_x or value <= usable.east + slack_x\n",
+     "        True\n"),
+    ("refusals after a reply that was not one are believed",
+     '        elif all(outcome == "refused" for outcome in ledger.outcomes):\n',
+     "        elif True:\n"),
+    ("a count that changes between attempts is adopted",
+     "    if ledger.known is not None and expected != ledger.known:\n",
+     "    if False:\n"),
+    # -- every layer after tracts reaches the tracts --------------------------
+    ("every extent meets every other",
+     "    return bool(box(*mine.total_bounds).intersects(box(*theirs.total_bounds)))\n",
+     "    return True\n"),
+    ("extents are compared in whatever CRS each arrived in",
+     "    mine = aligner.to_working_crs(frame)\n",
+     "    mine = frame\n"),
+    ("a layer that lands elsewhere is accepted",
+     "    if not meets_extent(frame, tracts, align.Alignment(registry)):\n",
+     "    if False:\n"),
+    ("no tract layer reads as a passed extent check",
+     '        return f"{dataset}: no tract layer is registered yet, so its extent was not compared"\n',
+     '        return f"{dataset}: its extent meets the tract layer\'s"\n'),
+    ("a refused raster is left on disk for the old record to read",
+     "        # compared is as unsafe to leave for the old record as one that was refused.\n        path.unlink(missing_ok=True)\n",
+     "        # compared is as unsafe to leave for the old record as one that was refused.\n"),
+    ("a raster that could not be compared is left on disk",
+     "    except Exception:\n        # Any failure here, not only a refusal",
+     "    except CRSMismatch:\n        # Any failure here, not only a refusal"),
+    # -- what an error message may carry -------------------------------------
+    ("a transport error keeps its query string, and with it the encoded extent",
+     '    return QUERY_STRING.sub("?<query withheld>", text)\n',
+     "    return text\n"),
+]
+
+
 FAULTS_MUTATIONS: list[tuple[str, str, str]] = [
     ('the injector is armed at import, when nobody asked for it',
      '_ACTIVE: FaultPlan | None = None\n',
@@ -1076,6 +1191,26 @@ FAULTS_MUTATIONS: list[tuple[str, str, str]] = [
     ('the choke-point scan looks for a pattern acquire does not contain',
      '    call_sites = len(re.findall(r"_session\\(\\)\\.request\\(", source))\n',
      '    call_sites = len(re.findall(r"_no_such_call_site\\(", source))\n'),
+
+    # -- the standing faults the count, CRS and extent checks are tested on --
+    ('the fixture tells the truth about its count when told to disagree',
+     '            elif settings.count_reported is not None:\n',
+     '            elif False:\n'),
+    ('the fixture counts when told it cannot',
+     '            if scripted == REFUSE or (scripted is None and settings.refuse_count):\n',
+     '            if scripted == REFUSE:\n'),
+    ('the fixture serves degrees when told to serve metres under a degree label',
+     '                SAMPLE_FEATURE_COUNT, out_sr, offset, page, metres=settings.metres\n',
+     '                SAMPLE_FEATURE_COUNT, out_sr, offset, page, metres=False\n'),
+    ('empty no longer reaches a count reply, so the bad count is never injected',
+     '    if isinstance(payload, dict) and COUNT_KEY in payload and FEATURE_KEY not in payload:\n',
+     '    if False:\n'),
+    ('truncated halves a count reply too, so a second wrong number can agree by chance',
+     '        if kind != "empty":\n            raise FaultNotApplicable(f"{kind} has nothing to corrupt in a count reply")\n',
+     ''),
+    ('the fixture answers a scripted refusal with a real count',
+     '            if scripted == REFUSE or (scripted is None and settings.refuse_count):\n',
+     '            if scripted is None and settings.refuse_count:\n'),
 ]
 
 
@@ -1122,6 +1257,7 @@ TARGETS: dict[str, list[tuple[str, str, str]]] = {
     "sandbox": SANDBOX_MUTATIONS,
     "critic": CRITIC_MUTATIONS,
     "faults": FAULTS_MUTATIONS,
+    "acquire": ACQUIRE_MUTATIONS,
     "transfer": TRANSFER_MUTATIONS,
 }
 """Which module each mutation edits, and therefore which `--check` runs.
@@ -1133,12 +1269,17 @@ disappearing into a healthy-looking total."""
 
 
 def run_check(module: str) -> tuple[int, list[str]]:
-    proc = subprocess.run(
-        [str(PYTHON), "-m", f"src.{import_of(module)}", "--check"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
+    checker = import_of(CHECKED_BY.get(module, module))
+    try:
+        proc = subprocess.run(
+            [str(PYTHON), "-m", f"src.{checker}", "--check"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=CHECK_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return 1, [f"(timed out after {CHECK_TIMEOUT_S} s: the check hung)"]
     failing = [
         line.strip()
         for line in proc.stdout.splitlines()
@@ -1205,7 +1346,7 @@ def main() -> int:
         relative_source = source_of(module).relative_to(ROOT).as_posix()
         print(
             f"-- {relative_source}, checked by "
-            f"`python -m src.{import_of(module)} --check`"
+            f"`python -m src.{import_of(CHECKED_BY.get(module, module))} --check`"
         )
         for label, code, failing in results:
             caught = code == 1 and bool(failing)
