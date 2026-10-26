@@ -50,7 +50,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 from . import verify, vulnerability
 from .contracts import TOOL_NAMES, VULNERABILITY_INDICATORS
 from .hazard import HAZARD_SCENARIOS
-from .risk import COMPONENT_RATIONALE
+from .risk import COMPONENT_RATIONALE, vulnerable_label
 from .vulnerability import DEFAULT_PRESET, INDICATOR_RATIONALE, WEIGHT_PRESETS
 
 SCALAR_TYPES: frozenset[str] = frozenset({"string", "number", "integer", "boolean"})
@@ -286,6 +286,16 @@ RiskScenarioArgs = create_model(
     preset=(str, Field(default=UNSET_NAME, description=_PRESET_HELP)),
     top_n=(int, Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)),
     preference=(str, Field(default=UNSET_NAME, description=_PREFERENCE_HELP)),
+    export_map=(
+        bool,
+        Field(
+            default=False,
+            description=(
+                "Also write the ranked tracts as a GeoPackage and a PNG map under "
+                "outputs/maps/. Only the two file paths come back, never a shape."
+            ),
+        ),
+    ),
     **_weight_fields(RISK_WEIGHT_KEYS, _risk_weight_help),
 )
 
@@ -439,8 +449,9 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "compare_scenarios": (
         "Run every named weighting against one scenario and report the trade-off: "
-        "who each weighting prioritises, how many residents and how many vulnerable "
-        "residents that covers, and WHICH UNITS EACH WEIGHTING DROPS that another "
+        "who each weighting prioritises, how many residents that covers, the "
+        f"{vulnerable_label()} among them, and WHICH "
+        "UNITS EACH WEIGHTING DROPS that another "
         "would have prioritised. Use this whenever the answer depends on a value "
         "judgement, which is whenever it is a priority ordering. With weight_* "
         "arguments and preference set, the person's weighting is added and compared "
