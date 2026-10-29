@@ -208,6 +208,20 @@ TRADEOFF_LANGUAGE = re.compile(
     r"another\s+weighting|a\s+different\s+weighting|trade[- ]?offs?)\b",
     re.IGNORECASE,
 )
+TRACT_NAME = re.compile(r"\btracts?\s+(?:number\s+|no\.?\s*|#\s*)?\d", re.IGNORECASE)
+
+
+def names_units(answer: str) -> bool:
+    return bool(LONG_DIGITS.search(answer)) or bool(TRACT_NAME.search(answer))
+
+
+RANKING_TOOLS: frozenset[str] = frozenset(
+    {"hazard_exposure", "vulnerability_index", "risk_scenario", "compare_scenarios", "ask_user_preferences"}
+)
+
+
+def ranked_in_run(calls: list[dict[str, Any]]) -> bool:
+    return any(call.get("tool") in RANKING_TOOLS for call in calls)
 
 
 # ---------------------------------------------------------------------------
@@ -816,7 +830,7 @@ class Critic:
         on the answer actually ordering something, so an answer to a counting
         question is never asked for a weighting it had no reason to choose.
         """
-        if not ORDERING_LANGUAGE.search(answer):
+        if not ORDERING_LANGUAGE.search(answer) or not (names_units(answer) or ranked_in_run(calls)):
             return []
         findings: list[CriticFinding] = []
         if not WEIGHTING_LANGUAGE.search(answer):
@@ -1838,12 +1852,88 @@ def _guard_checks() -> list[tuple[str, bool]]:
     ]
 
 
+PROVENANCE_RANKINGS = (
+    "*   **Indicator Derivation**: Percentage-based indicators for vulnerability "
+    "(e.g., `pct_age_65_plus`, `pct_disability`) were calculated from the ACS count "
+    "estimates. For one of the 99 tracts, these indicators are undefined because the "
+    "population universe was zero. This tract will be excluded from any rankings "
+    "that use these indicators."
+)
+
+PROVENANCE_RANKING = (
+    "*   **Derived Indicators**: The five vulnerability indicators, such as "
+    "`pct_age_65_plus`, were derived from the ACS tables. For 1 of the 99 tracts, its "
+    "population universe for these indicators was zero, so it could not be scored "
+    "and is not included in any vulnerability ranking."
+)
+
+RANKED_EXCERPT = (
+    "The `svi_equal` weighting, from the CDC/ATSDR Social Vulnerability Index, "
+    "prioritises these ten census tracts: `99001004609`, `99001004616`, "
+    "`99001002300`, `99001002009`, `99001002008`, `99001005002`, `99001002503`, "
+    "`99001004620`, `99001004902`, and `99001002105`. This choice covers 43,651 "
+    "residents, of whom 21,509 are considered vulnerable."
+)
+
+ORDERING_PHRASE = "orders communities by priority"
+
+
+AGGREGATE_EXCERPT = (
+    "The `svi_equal` weighting, from the CDC/ATSDR Social Vulnerability Index, "
+    "prioritises ten census tracts. This choice covers 43,651 residents, of whom "
+    "21,509 are considered vulnerable."
+)
+
+
+def _gate_checks() -> list[tuple[str, bool]]:
+    def ordering(text: str, calls: list[dict[str, Any]] | None = None) -> list[CriticFinding]:
+        return [item for item in Critic().check(text, calls or [], 1).findings
+                if ORDERING_PHRASE in item.detail]
+
+    def call_to(tool: str) -> list[dict[str, Any]]:
+        return [{"tool": tool, "arguments": {}, "result": {"note": "fixture"}}]
+
+    refusal = ordering(REFUSAL_ANSWER)
+    rankings = ordering(PROVENANCE_RANKINGS)
+    ranking = ordering(PROVENANCE_RANKING)
+    ranked = ordering(RANKED_EXCERPT)
+    named = ordering("Census Tract 46.09 ranks first and Census Tract 20.04 second.")
+    aggregate = ordering(AGGREGATE_EXCERPT, call_to("compare_scenarios"))
+    unranked = ordering(AGGREGATE_EXCERPT)
+    after_data = ordering(PROVENANCE_RANKINGS, call_to("describe_alignment"))
+    print(f"  ordering findings: refusal {len(refusal)}, provenance {len(rankings)} and "
+          f"{len(ranking)}, ranked GEOIDs {len(ranked)}, tracts by number {len(named)}")
+    print(f"  no units after compare_scenarios {len(aggregate)}, with no call {len(unranked)}, "
+          f"provenance after describe_alignment {len(after_data)}")
+    return [
+        ("an ordering that names no unit still fires once a ranking tool ran "
+         "(run 20261022_175854 excerpt without its GEOIDs)",
+         len(aggregate) == 1 and "does not say who loses" in aggregate[0].detail),
+        ("the same ordering with no ranking call is treated like the refusal", unranked == []),
+        ("a provenance note written after only data tools is not asked for a weighting",
+         after_data == []),
+        ("every ranking tool the gate trusts is a model-visible tool",
+         RANKING_TOOLS <= set(contracts.TOOL_NAMES)),
+        ("a refusal that mentions the highest-risk tracts is not asked for a weighting "
+         "(run 20260831_142354)", refusal == []),
+        ("a provenance note about rankings is not asked for a weighting "
+         "(runs 20261023_120753 and 20261023_123437)", rankings == [] and ranking == []),
+        ("an excerpt of run 20261022_175854 that names GEOIDs, cut before its "
+         "who-loses sentence, still fires",
+         len(ranked) == 1 and "does not say who loses" in ranked[0].detail),
+        ("an ordering that names tracts by number still fires", len(named) == 2),
+    ]
+
+
 def _ordering_checks() -> list[tuple[str, bool]]:
     """The trade-off rule: what a priority ordering owes beyond its numbers."""
     calls = [structured_call({"ranking": [{"score": 0.5}]})]
-    bare = Critic().check("The highest-risk units score 0.5.", calls, 1)
+    bare = Critic().check(
+        "The highest-risk units, tracts 99001000100 and 99001000200, score 0.5.", calls, 1
+    )
     complete = Critic().check(
-        "Under the equal weighting the highest-risk units score 0.5. A different "
+        "Under the equal weighting the highest-risk units, tracts 99001000100 and "
+        "99001000200, score 0.5. A different "
         "weighting would have prioritised other units, which this one drops.",
         calls,
         1,
@@ -1955,7 +2045,8 @@ def _loop_checks() -> list[tuple[str, bool]]:
     # count flat and the fixture would have tested nothing.
     worse = scripted_run(
         [stubborn,
-         "The highest-risk communities are ranked first; the total is 31337 residents."],
+         "The highest-risk communities are ranked first, led by tract 99001000100; "
+         "the total is 31337 residents."],
         bound,
     )
 
@@ -2048,6 +2139,8 @@ def _self_check() -> int:
     checks += _invariant_checks()
     print()
     checks += _ordering_checks()
+    print()
+    checks += _gate_checks()
     print()
     checks += _guard_checks()
     print()
