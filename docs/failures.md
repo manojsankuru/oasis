@@ -2115,3 +2115,19 @@ zero-change first-attempt success.
 **Why.** "Believed only if every request refused" held within one counted attempt, not across the retrieval, and `CountLedger.known` was overwritten by a later count without comparing the two. The refusal re-asks also had no wait, so a short burst of transient 400s could read as a standing refusal.
 **Did the agent recover?** Yes, before commit. A refusal is believed only when every count reply in the retrieval was a refusal, a count that changes between attempts raises `FeatureCountMismatch` naming both, and the re-asks wait with the retry backoff. Both orderings have checks in `faults --check`.
 **Kept as a paper failure case?** Not decided. It is the third recurrence of the 2026-10-25 count-check entry.
+
+## 2026-10-28 — the critic read "top-10" as the number -10
+
+**What happened.** In the live Session 3 run `logs/run_20261028_211102.jsonl` (`google/gemini-2.5-pro`, scripted reply "older residents and households without a car matter most"), the first draft ended "...which communities are included and excluded from a top-10 priority list." The critic failed it on that phrase alone: "the answer reports -10 and no logged tool result produced a number that rounds to it. The scan read 2 logged tool result(s)." 11 of the other 12 checked numbers traced. The revised draft dropped the phrase and passed.
+**Where.** `src/critic.py`, `NUMBER`, which accepts an optional leading `-` after any character that is not a digit or a dot.
+**Why.** The hyphen in "top-10" is read as a minus sign, so the claim becomes -10, which no tool result holds.
+**Did the agent recover?** Yes, after one revision turn (4 model calls in total).
+**Kept as a paper failure case?** Not decided.
+
+## 2026-10-28 — a final answer named a tool the run never called
+
+**What happened.** The same run's final answer, which passed the critic, says "This ranking was produced by the `risk_scenario` tool, which re-weighted its vulnerability index...". The run called only `ask_user_preferences` and `compare_scenarios`, and the ranking came from the `compare_scenarios` row for the `user` weighting. Every number in the answer traced, so nothing flagged the attribution.
+**Where.** The model's final answer. `src/critic.py` checks numbers and ordering language, not which tool an answer credits.
+**Why.** Not determined. `compare_scenarios` and `risk_scenario` both take the new `weight_*` arguments, and the answer credits the one that was not called.
+**Did the agent recover?** No. The misattribution is in the final answer.
+**Kept as a paper failure case?** Not decided.
