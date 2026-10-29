@@ -1220,12 +1220,73 @@ def vulnerability_index(
     }
 
 
+MAP_DIRECTORY: Path = config.OUTPUTS_DIR / "maps"
+
+
+def _export_map(
+    frame: pd.DataFrame, scenario: HazardScenario, weighting: WeightPreset, top_n: int
+) -> dict[str, str]:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib import pyplot
+
+    units = analysis().units
+    shapes = units[[Col.GEOID, units.geometry.name]].copy()
+    shapes[Col.GEOID] = shapes[Col.GEOID].astype("string")
+    ranked = pipeline.reported(frame).copy()
+    ranked[Col.GEOID] = ranked[Col.GEOID].astype("string")
+    layer = shapes.merge(ranked, on=Col.GEOID, how="left", validate="one_to_one")
+    stem = Path(pipeline.table_name(scenario, weighting)).stem
+    MAP_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    package = MAP_DIRECTORY / f"{stem}.gpkg"
+    picture = MAP_DIRECTORY / f"{stem}.png"
+    partial_package = MAP_DIRECTORY / f"{stem}.partial.gpkg"
+    partial_picture = MAP_DIRECTORY / f"{stem}.partial.png"
+    figure, axis = pyplot.subplots(figsize=(6.0, 6.0))
+    try:
+        partial_package.unlink(missing_ok=True)
+        layer.to_file(partial_package, layer=stem, driver="GPKG")
+        layer.plot(ax=axis, color="#d9d9d9", edgecolor="white", linewidth=0.2)
+        layer.dropna(subset=[Col.RISK_SCORE]).plot(
+            ax=axis,
+            column=Col.RISK_SCORE,
+            cmap="Reds",
+            edgecolor="white",
+            linewidth=0.2,
+            legend=True,
+            legend_kwds={"label": "risk score, county-relative", "shrink": 0.6},
+        )
+        priority = layer.dropna(subset=[Col.PRIORITY_RANK])
+        priority[priority[Col.PRIORITY_RANK] <= top_n].plot(
+            ax=axis, facecolor="none", edgecolor="black", linewidth=0.8
+        )
+        axis.set_title(f"{scenario.name} under {weighting.name}", fontsize=9)
+        axis.set_axis_off()
+        figure.text(
+            0.01,
+            0.01,
+            f"Black outline: the top {top_n} priority tracts. Grey: not scored. "
+            "Includes data derived from OpenStreetMap (ODbL).",
+            fontsize=6,
+        )
+        figure.savefig(partial_picture, dpi=150, bbox_inches="tight")
+        os.replace(partial_package, package)
+        os.replace(partial_picture, picture)
+    finally:
+        pyplot.close(figure)
+        partial_package.unlink(missing_ok=True)
+        partial_picture.unlink(missing_ok=True)
+    return {"geopackage": pipeline.shown_path(package), "png": pipeline.shown_path(picture)}
+
+
 @tool
 def risk_scenario(
     scenario: str = "",
     preset: str = "",
     top_n: int = schemas.DEFAULT_TOP_N,
     preference: str = "",
+    export_map: bool = False,
     **weights: Any,
 ) -> ToolResult:
     """Hazard, exposure, vulnerability and resilience combined into a priority order.
@@ -1304,6 +1365,14 @@ def risk_scenario(
     }
     if user is not None:
         result.update(user_fields(user, chosen_preset, weights, trace))
+    if export_map:
+        try:
+            result["map_files"] = _export_map(frame, chosen_scenario, weighting, top_n)
+        except (OSError, RuntimeError, ValueError) as exc:
+            return {
+                "error": "map export failed",
+                "detail": f"{type(exc).__name__} while writing under {pipeline.shown_path(MAP_DIRECTORY)}",
+            }
     return result
 
 
@@ -1382,6 +1451,7 @@ def compare_scenarios(
             "comparison prioritises and this one does not -- the people whose "
             "priority depends on a value judgement rather than on the data"
         ),
+        "vulnerable_population_in_priority_means": f"{schemas.vulnerable_population_label()} in the priority set",
         "note": (
             "both halves of each weighting vary here: the index is recomputed per "
             "weighting from the indicator weights, then re-ranked under the "
@@ -2202,6 +2272,16 @@ def _agreement_checks() -> list[tuple[str, bool]]:
              for name in tool_rows
          )
          and len(tool_rows) > 1),
+        ("the trade-off rows' population in tracts at or above the median is the pipeline's",
+         all(
+             tool_rows[name]["vulnerable_population_in_priority"]
+             == pipeline_rows[name].vulnerable_population_in_priority
+             for name in tool_rows
+         )
+         and len(tool_rows) > 1),
+        ("the comparison says in words what that population counts",
+         compared.get("vulnerable_population_in_priority_means")
+         == f"{schemas.vulnerable_population_label()} in the priority set"),
         ("the comparison covered every weighting the project defines",
          compared["weightings_compared"] == len(WEIGHT_PRESETS)),
     ]
@@ -2550,6 +2630,86 @@ def _shaping_checks() -> list[tuple[str, bool]]:
         ("a missing value is reported as missing, never as a zero",
          missing == [None, None, None]),
         ("a real value survives shaping unchanged", real == [3, "x", True, 1.5]),
+    ]
+
+
+def _map_checks() -> list[tuple[str, bool]]:
+    global MAP_DIRECTORY
+    import inspect
+
+    import geopandas
+
+    scenario = DEFAULT_SCENARIO
+    other = next(item for item in WEIGHT_PRESETS if item.name != DEFAULT_PRESET.name)
+    kept = MAP_DIRECTORY
+    with tempfile.TemporaryDirectory(prefix="tools-map-check-", ignore_cleanup_errors=True) as temporary:
+        MAP_DIRECTORY = Path(temporary)
+        try:
+            plain = risk_scenario(scenario=scenario.name, preset=other.name)
+            after_plain = sorted(item.name for item in MAP_DIRECTORY.iterdir())
+            refused = risk_scenario(scenario="not_a_scenario", export_map=True)
+            after_refused = sorted(item.name for item in MAP_DIRECTORY.iterdir())
+            mapped = risk_scenario(scenario=scenario.name, preset=other.name, export_map=True)
+            written = sorted(item.name for item in MAP_DIRECTORY.iterdir())
+            packages = sorted(MAP_DIRECTORY.glob("*.gpkg"))
+            pictures = sorted(MAP_DIRECTORY.glob("*.png"))
+            layer = geopandas.read_file(packages[0]) if packages else None
+            signature = pictures[0].read_bytes()[:8] if pictures else b""
+            shown = (
+                pipeline.shown_path(packages[0]) if packages else "",
+                pipeline.shown_path(pictures[0]) if pictures else "",
+            )
+            blocker = Path(temporary) / "not_a_folder"
+            blocker.write_text("a file where the map folder should be", encoding="utf-8")
+            MAP_DIRECTORY = blocker / "maps"
+            failed = risk_scenario(scenario=scenario.name, preset=other.name, export_map=True)
+        finally:
+            MAP_DIRECTORY = kept
+    files = mapped.get("map_files", {})
+    units = analysis().units
+    ranked = [row[Col.GEOID] for row in mapped.get("ranking", [])]
+    from_file = (
+        layer.dropna(subset=[Col.PRIORITY_RANK])
+        .sort_values(Col.PRIORITY_RANK)[Col.GEOID]
+        .astype(str)
+        .head(len(ranked))
+        .tolist()
+        if layer is not None
+        else []
+    )
+    default_top = [row[Col.GEOID] for row in risk_scenario(scenario=scenario.name)["ranking"]]
+    advertised = set(schemas.RiskScenarioArgs.model_fields) - set(
+        schemas.weight_arguments(schemas.RISK_WEIGHT_KEYS)
+    )
+    print(f"  {other.name} map: {files}; files written {written}")
+    print(f"  the file's top {len(from_file)} is the ranking asked for: {from_file == ranked}; "
+          f"it differs from the default weighting's: {ranked != default_top}")
+    return [
+        ("a ranking with export_map unset writes nothing and names no map",
+         after_plain == [] and "map_files" not in plain),
+        ("a refused call writes no map", "error" in refused and after_refused == []),
+        ("a map request writes one GeoPackage and one PNG",
+         len(packages) == 1 and len(pictures) == 1 and len(written) == 2
+         and signature == b"\x89PNG\r\n\x1a\n"),
+        ("the result adds only the two file paths, as strings",
+         set(mapped) - set(plain) == {"map_files"}
+         and set(files) == {"geopackage", "png"}
+         and all(isinstance(value, str) for value in files.values())
+         and files.get("geopackage", "").endswith(".gpkg")
+         and files.get("png", "").endswith(".png")
+         and (files.get("geopackage"), files.get("png")) == shown),
+        ("a map that cannot be written is a refusal that names no machine path",
+         failed.get("error") == "map export failed"
+         and "map_files" not in failed
+         and ":\\" not in str(failed.get("detail", ""))
+         and not str(failed.get("detail", "")).startswith("/")),
+        ("the GeoPackage holds every tract once",
+         layer is not None and len(layer) == len(units)
+         and set(layer[Col.GEOID].astype(str)) == set(units[Col.GEOID].astype(str))),
+        ("the map ranks the weighting asked for, not the pipeline's default",
+         from_file == ranked and len(ranked) > 0 and ranked != default_top),
+        ("every argument risk_scenario advertises besides the weights is one it takes",
+         advertised <= set(inspect.signature(risk_scenario).parameters) and "export_map" in advertised),
     ]
 
 
@@ -3444,6 +3604,8 @@ def _run_checks() -> int:
     checks += _pending_checks(results)
     print()
     checks += _log_checks()
+    print()
+    checks += _map_checks()
     print()
     checks += _cache_checks()
     print()
