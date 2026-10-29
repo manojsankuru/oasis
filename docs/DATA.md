@@ -126,7 +126,7 @@ scanning `fields` for `esriFieldTypeOID` and finds `OBJECTID`.
 > `resultOffset` returns page one forever with `exceededTransferLimit` stuck
 > true.
 
-> **Count check, UNVERIFIED (added 25 Oct 2026).** Before paging,
+> **Count check (added 25 Oct 2026). Agreeing path VERIFIED live 26 Oct 2026, fault paths fixture-only.** Before paging,
 > `fetch_arcgis_vector` sends the same filter (`where` plus any envelope) with
 > `returnCountOnly=true` and compares the `count` it answers with the paged
 > total. A mismatch, a count that changes between attempts, or a count reply
@@ -150,10 +150,11 @@ scanning `fields` for `esriFieldTypeOID` and finds `OBJECTID`.
 > reference is re-requested. The parser-loss guard (counted features against
 > parsed ones) is exercised only by a stub of the parser, because no fixture
 > page makes the ESRIJSON driver drop a feature.
-> Every one of these paths ran against the loopback fixture in `src/faults.py`
-> only. The extent checks have no live check at all, and
-> `python -m src.acquire --check`, which asserts the count against this service,
-> has not been run since the change.
+> The fault paths above ran against the loopback fixture in `src/faults.py`
+> only, and the extent checks have no live check at all. The agreeing path is
+> measured live: on 26 Oct 2026 `python -m src.acquire --check` passed 95 of 95
+> checks against TIGERweb. `returnCountOnly` answered 99 for Charleston County
+> and 85,529 for the whole layer, and the 99 paged features matched that count.
 
 > **Error bodies.** A bad `where` returns **HTTP 200** with
 > `{"error":{"code":400,...}}` and no `features` key. Measured. `_get_json`
