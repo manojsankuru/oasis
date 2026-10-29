@@ -19,6 +19,9 @@ responds to the program committee reviews.
   git-ignored. Reviewer text never goes to the public repo.
 - Every session ends with the `invariant-reviewer` subagent on the diff, then
   `/gate <module>`, then a proposed commit message and a wait for approval.
+- Before the first commit in a session, set `git config user.name` and
+  `user.email` to the author of `phase1-submitted`. After each commit, check
+  `git log -1 --format='%an <%ae>'`. Never commit with Claude as author.
 - `/failure` the moment something breaks, with the real error text.
 - `src/contracts.py` stays frozen.
 - The model-visible tool count stays at 11.
