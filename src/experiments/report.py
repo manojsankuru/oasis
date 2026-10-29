@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import io
+import itertools
 import json
 import math
 import os
@@ -29,9 +31,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, TypeAlias
 
+import pandas as pd
 import rasterio
 
-from .. import agent, config, contracts, hazard, risk, sandbox, verify, vulnerability
+from .. import agent, config, contracts, hazard, risk, sandbox, schemas, verify, vulnerability
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -75,6 +78,17 @@ TRADEOFF_COLUMNS = (
     "mean_inundation_m",
     "top_geoids",
     "displaced_geoids",
+)
+SENSITIVITY_VULNERABLE_QUANTILE = 0.8
+PRIORITY_CHANGES_RELATIVE = Path("outputs/paper/priority_changes.csv")
+PRIORITY_CHANGE_COLUMNS = (
+    "area",
+    "scenario",
+    "from_preset",
+    "to_preset",
+    "change",
+    contracts.Col.GEOID,
+    contracts.Col.POPULATION,
 )
 REQUIRED_DATASETS = (
     "acs",
@@ -129,6 +143,7 @@ MODULE_SOURCES: dict[str, str] = {
     "risk": "src/risk.py",
     "agent": "src/agent.py",
     "sandbox": "src/sandbox.py",
+    "report": "src/experiments/report.py",
 }
 
 ALIGNMENT_REPORT_LABELS: dict[str, str] = {
@@ -1117,7 +1132,13 @@ def _compare_transfer_rows(
             raise EvidenceError("transfer displaced GEOIDs disagree with canonical report")
 
 
-def _tradeoff_payload(rows: list[dict[str, Any]], source: str) -> list[dict[str, JsonValue]]:
+def _tradeoff_payload(
+    rows: list[dict[str, Any]],
+    source: str,
+    sensitivity: dict[tuple[str, str], int],
+    risk_sources: dict[str, str],
+    module_source: dict[str, str],
+) -> list[dict[str, JsonValue]]:
     """Turn validated trade-off rows into individually traceable records."""
     payload: list[dict[str, JsonValue]] = []
     for row in rows:
@@ -1150,8 +1171,46 @@ def _tradeoff_payload(rows: list[dict[str, Any]], source: str) -> list[dict[str,
                     "people",
                     source,
                     f"row where {selector}; column=vulnerable_population_in_priority",
-                    "pipeline-produced population sum for selected units above its stated vulnerability quantile",
+                    f"pipeline-produced {schemas.vulnerable_population_label()} in the priority set: whole-tract "
+                    "population of the selected units whose index is at or above that median, "
+                    "taken over this preset's own index across scored tracts",
                 ),
+                "vulnerable_population_by_quantile": [
+                    {
+                        "quantile": _metric(
+                            risk.DEFAULT_VULNERABLE_QUANTILE,
+                            "quantile",
+                            module_source["risk"],
+                            "DEFAULT_VULNERABLE_QUANTILE",
+                            "the cut the pipeline used for vulnerable_population_in_priority",
+                        ),
+                        "population": _metric(
+                            int(row["vulnerable_population_in_priority"]),
+                            "people",
+                            source,
+                            f"row where {selector}; column=vulnerable_population_in_priority",
+                            f"the {schemas.vulnerable_population_label()} in the priority set",
+                        ),
+                    },
+                    {
+                        "quantile": _metric(
+                            SENSITIVITY_VULNERABLE_QUANTILE,
+                            "quantile",
+                            module_source["report"],
+                            "SENSITIVITY_VULNERABLE_QUANTILE",
+                            "the stricter cut reported beside the default",
+                        ),
+                        "population": _metric(
+                            sensitivity[(str(row["scenario"]), str(row["preset"]))],
+                            "people",
+                            risk_sources[str(row["scenario"])],
+                            f"{selector}; risk.Risk().compare_presets with units from the same "
+                            f"table and vulnerable_quantile={SENSITIVITY_VULNERABLE_QUANTILE}",
+                            f"the {schemas.vulnerable_population_label(SENSITIVITY_VULNERABLE_QUANTILE)} in the priority set, "
+                            "recomputed from this scenario's risk table over the same priority set",
+                        ),
+                    },
+                ],
                 "mean_inundation_m": _metric(
                     float(row["mean_inundation_m"]),
                     "metres",
@@ -1183,6 +1242,243 @@ def _tradeoff_payload(rows: list[dict[str, Any]], source: str) -> list[dict[str,
             }
         )
     return payload
+
+
+def _risk_frame(path: Path) -> pd.DataFrame:
+    frame = pd.read_csv(path, dtype={contracts.Col.GEOID: "string"}, float_precision="round_trip")
+    for column in frame.columns:
+        if column != contracts.Col.GEOID:
+            try:
+                frame[column] = pd.to_numeric(frame[column])
+            except (TypeError, ValueError) as exc:
+                raise EvidenceError(f"non-numeric risk column {column} in {path.name}") from exc
+    return frame
+
+
+def _recomputed_tradeoffs(
+    frames: dict[str, pd.DataFrame], quantile: float
+) -> dict[tuple[str, str], contracts.ScenarioRow]:
+    engine = risk.Risk()
+    recomputed: dict[tuple[str, str], contracts.ScenarioRow] = {}
+    for scenario in hazard.HAZARD_SCENARIOS:
+        frame = frames[scenario.name]
+        for row in engine.compare_presets(
+            frame,
+            scenario=scenario,
+            units=frame,
+            presets=vulnerability.WEIGHT_PRESETS,
+            vulnerable_quantile=quantile,
+        ):
+            recomputed[(row.scenario, row.preset)] = row
+    return recomputed
+
+
+def _require_reproduction(
+    committed: list[dict[str, Any]],
+    recomputed: dict[tuple[str, str], contracts.ScenarioRow],
+    unscored: set[str],
+    frames: dict[str, pd.DataFrame],
+    label: str,
+) -> None:
+    for row in committed:
+        again = recomputed.get((row["scenario"], row["preset"]))
+        if (
+            again is None
+            or list(again.top_geoids) != row["top_geoids"]
+            or list(again.displaced_geoids) != row["displaced_geoids"]
+            or int(again.population_in_priority) != row["population_in_priority"]
+            or int(again.vulnerable_population_in_priority) != row["vulnerable_population_in_priority"]
+            or not math.isclose(
+                float(again.mean_inundation_m), row["mean_inundation_m"], rel_tol=0, abs_tol=1e-12
+            )
+        ):
+            raise EvidenceError(f"recomputed {label} trade-off disagrees with committed table")
+    engine = risk.Risk()
+    for frame in frames.values():
+        index, _ = engine.index.index(frame, preset=vulnerability.DEFAULT_PRESET)
+        missing = set(frame.loc[index.isna().to_numpy(), contracts.Col.GEOID].astype(str))
+        if missing != unscored:
+            raise EvidenceError(f"recomputed {label} unscored tracts disagree with committed table")
+
+
+def _sensitivity_values(
+    committed: list[dict[str, Any]],
+    recomputed: dict[tuple[str, str], contracts.ScenarioRow],
+    label: str,
+) -> dict[tuple[str, str], int]:
+    values: dict[tuple[str, str], int] = {}
+    for row in committed:
+        again = recomputed[(row["scenario"], row["preset"])]
+        if list(again.top_geoids) != row["top_geoids"]:
+            raise EvidenceError(f"{label} priority set moved with the vulnerability quantile")
+        values[(row["scenario"], row["preset"])] = int(again.vulnerable_population_in_priority)
+    return values
+
+
+def _tract_population(frames: dict[str, pd.DataFrame], label: str) -> dict[str, int]:
+    maps = [
+        dict(zip(frame[contracts.Col.GEOID].astype(str), frame[contracts.Col.POPULATION].astype("int64")))
+        for frame in frames.values()
+    ]
+    if any(item != maps[0] for item in maps):
+        raise EvidenceError(f"{label} tract populations disagree across scenario tables")
+    return {geoid: int(value) for geoid, value in maps[0].items()}
+
+
+def _priority_changes(
+    rows: list[dict[str, Any]],
+    population: dict[str, int],
+    area: str,
+    scenarios: tuple[str, ...],
+    presets: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    by_pair = {(row["scenario"], row["preset"]): row for row in rows}
+    changes: list[dict[str, Any]] = []
+    for scenario in scenarios:
+        rebuilt: dict[str, set[str]] = {preset: set() for preset in presets}
+        for before, after in itertools.combinations(presets, 2):
+            first, second = by_pair[(scenario, before)], by_pair[(scenario, after)]
+            enters = sorted(set(first["displaced_geoids"]) & set(second["top_geoids"]))
+            leaves = sorted(set(second["displaced_geoids"]) & set(first["top_geoids"]))
+            rebuilt[before] |= set(enters)
+            rebuilt[after] |= set(leaves)
+            gained = sum(population[geoid] for geoid in enters)
+            lost = sum(population[geoid] for geoid in leaves)
+            if gained - lost != second["population_in_priority"] - first["population_in_priority"]:
+                raise EvidenceError(f"{area} priority changes do not add up to the population difference")
+            for change, geoids in (("enters", enters), ("leaves", leaves)):
+                for geoid in geoids:
+                    changes.append(
+                        {
+                            "area": area,
+                            "scenario": scenario,
+                            "from_preset": before,
+                            "to_preset": after,
+                            "change": change,
+                            contracts.Col.GEOID: geoid,
+                            contracts.Col.POPULATION: population[geoid],
+                        }
+                    )
+        for preset in presets:
+            if rebuilt[preset] != set(by_pair[(scenario, preset)]["displaced_geoids"]):
+                raise EvidenceError(f"{area} pairwise changes do not rebuild the displaced tracts")
+    return changes
+
+
+def _priority_changes_bytes(changes: list[dict[str, Any]]) -> bytes:
+    handle = io.StringIO()
+    writer = csv.DictWriter(handle, fieldnames=PRIORITY_CHANGE_COLUMNS, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(changes)
+    return handle.getvalue().encode("utf-8")
+
+
+def _priority_change_payload(
+    changes: list[dict[str, Any]],
+    area: str,
+    scenarios: tuple[str, ...],
+    presets: tuple[str, ...],
+    tradeoff_source: str,
+    risk_sources: dict[str, str],
+) -> dict[str, JsonValue]:
+    pairs: list[JsonValue] = []
+    totals = {"enters": [0, 0], "leaves": [0, 0]}
+    for scenario in scenarios:
+        for before, after in itertools.combinations(presets, 2):
+            selector = f"scenario={scenario}; from_preset={before}; to_preset={after}"
+            moved = [
+                item
+                for item in changes
+                if (item["area"], item["scenario"], item["from_preset"], item["to_preset"])
+                == (area, scenario, before, after)
+            ]
+            record: dict[str, JsonValue] = {
+                "scenario": _metric(scenario, "scenario name", tradeoff_source, selector, "scenario of the preset pair"),
+                "from_preset": _metric(before, "preset name", tradeoff_source, selector, "first preset of the unordered pair"),
+                "to_preset": _metric(after, "preset name", tradeoff_source, selector, "second preset of the unordered pair"),
+            }
+            for change, word, side in (
+                ("enters", "entering", "in to_preset's top ten and not from_preset's"),
+                ("leaves", "leaving", "in from_preset's top ten and not to_preset's"),
+            ):
+                group = [item for item in moved if item["change"] == change]
+                people = sum(int(item[contracts.Col.POPULATION]) for item in group)
+                totals[change][0] += len(group)
+                totals[change][1] += people
+                record[f"{word}_tracts"] = _metric(
+                    len(group),
+                    "tracts",
+                    tradeoff_source,
+                    f"{selector}; displaced_geoids against top_geoids",
+                    f"tracts {side}",
+                )
+                record[f"{word}_population"] = _metric(
+                    people,
+                    "people",
+                    risk_sources[scenario],
+                    f"{selector}; column={contracts.Col.POPULATION} of the {word} GEOIDs",
+                    f"whole-tract population summed over the tracts {side}",
+                )
+            pairs.append(record)
+    first_table = risk_sources[scenarios[0]]
+    every = "every unordered preset pair in every scenario"
+    return {
+        "pairs": pairs,
+        "entering_tracts": _metric(totals["enters"][0], "tracts", tradeoff_source, every, "sum of entering_tracts over the pairs"),
+        "leaving_tracts": _metric(totals["leaves"][0], "tracts", tradeoff_source, every, "sum of leaving_tracts over the pairs"),
+        "entering_population": _metric(
+            totals["enters"][1], "people", first_table, every,
+            "sum of entering_population over the pairs; tract population is identical across the scenario tables",
+        ),
+        "leaving_population": _metric(
+            totals["leaves"][1], "people", first_table, every,
+            "sum of leaving_population over the pairs; tract population is identical across the scenario tables",
+        ),
+    }
+
+
+def _overlap_payload(
+    rows: list[dict[str, Any]],
+    scenarios: tuple[str, ...],
+    presets: tuple[str, ...],
+    source: str,
+) -> dict[str, JsonValue]:
+    tops = {(row["scenario"], row["preset"]): set(row["top_geoids"]) for row in rows}
+    runs = [(scenario, preset) for scenario in scenarios for preset in presets]
+    shared = [[len(tops[first] & tops[second]) for second in runs] for first in runs]
+    jaccard = [
+        [len(tops[first] & tops[second]) / len(tops[first] | tops[second]) for second in runs]
+        for first in runs
+    ]
+    size = len(runs)
+    if any(jaccard[i][j] != jaccard[j][i] or not 0.0 <= jaccard[i][j] <= 1.0 for i in range(size) for j in range(size)) or any(
+        jaccard[i][i] != 1.0 for i in range(size)
+    ):
+        raise EvidenceError("priority overlap matrix is not a symmetric similarity")
+    selector = "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS"
+    return {
+        "runs": _metric([list(run) for run in runs], "scenario and preset", source, selector, "row and column order of shared_tracts and jaccard"),
+        "shared_tracts": _metric(shared, "tracts", source, selector, "count of top-ten tracts two runs have in common"),
+        "jaccard": _metric(jaccard, "ratio", source, selector, "shared tracts divided by the tracts in either top ten"),
+    }
+
+
+def _changes_file_payload(data: bytes, row_count: int, source: str) -> dict[str, JsonValue]:
+    selector = PRIORITY_CHANGES_RELATIVE.as_posix()
+    return {
+        "path": _metric(selector, "repository path", source, selector, "written beside numbers.json by the same build"),
+        "sha256": _metric(hashlib.sha256(data).hexdigest(), "sha256", source, selector, "digest of the LF-terminated UTF-8 bytes written"),
+        "bytes": _metric(len(data), "bytes", source, selector, "size of the bytes written"),
+        "row_count": _metric(
+            row_count,
+            "rows",
+            source,
+            selector,
+            "one row per tract that enters or leaves a top ten between two presets, over both counties: "
+            "the entering_tracts and leaving_tracts totals of tradeoffs.primary.priority_changes and "
+            "tradeoffs.transfer.priority_changes, each recorded against its own county's trade-off table",
+        ),
+    }
 
 
 def _robustness_payload(values: dict[str, Any], source: str) -> dict[str, JsonValue]:
@@ -1340,7 +1636,7 @@ def _paper_catalog(report: dict[str, JsonValue]) -> dict[str, Metric]:
     return catalog
 
 
-def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonValue]:
+def _assemble(root: Path, generated_at: str | None = None) -> tuple[dict[str, JsonValue], bytes]:
     """Aggregate and validate all authoritative evidence beneath ``root``."""
     repository = Path(root).resolve()
     sources: dict[str, JsonValue] = {}
@@ -1453,6 +1749,25 @@ def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonV
     primary_tradeoffs = _tradeoff_table(
         paper_tradeoff_path, config.STUDY_AREA, scenarios, presets
     )
+    primary_frames = {
+        scenario: _risk_frame(
+            repository / "outputs" / f"risk_{scenario}_{vulnerability.DEFAULT_PRESET.name}.csv"
+        )
+        for scenario in scenarios
+    }
+    _require_reproduction(
+        primary_tradeoffs,
+        _recomputed_tradeoffs(primary_frames, risk.DEFAULT_VULNERABLE_QUANTILE),
+        set(next(iter(unscored_geoids))),
+        primary_frames,
+        "primary",
+    )
+    primary_sensitivity = _sensitivity_values(
+        primary_tradeoffs,
+        _recomputed_tradeoffs(primary_frames, SENSITIVITY_VULNERABLE_QUANTILE),
+        "primary",
+    )
+    primary_tract_population = _tract_population(primary_frames, "primary")
 
     transfer_report_path = repository / TRANSFER_REPORT_RELATIVE
     transfer_report_source = _source(
@@ -1496,6 +1811,30 @@ def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonV
         transfer_tradeoff_path, config.TRANSFER_AREA, scenarios, presets
     )
     _compare_transfer_rows(transfer_tradeoffs, transfer_pipeline.get("scenario_rows"))
+    transfer_frames = {
+        scenario: _risk_frame(
+            transfer_directory / f"risk_{scenario}_{vulnerability.DEFAULT_PRESET.name}.csv"
+        )
+        for scenario in scenarios
+    }
+    _require_reproduction(
+        transfer_tradeoffs,
+        _recomputed_tradeoffs(transfer_frames, risk.DEFAULT_VULNERABLE_QUANTILE),
+        set(transfer_risk[scenarios[0]]["unscored_geoids"]),
+        transfer_frames,
+        "transfer",
+    )
+    transfer_sensitivity = _sensitivity_values(
+        transfer_tradeoffs,
+        _recomputed_tradeoffs(transfer_frames, SENSITIVITY_VULNERABLE_QUANTILE),
+        "transfer",
+    )
+    transfer_tract_population = _tract_population(transfer_frames, "transfer")
+    changes = [
+        *_priority_changes(primary_tradeoffs, primary_tract_population, "primary", scenarios, presets),
+        *_priority_changes(transfer_tradeoffs, transfer_tract_population, "transfer", scenarios, presets),
+    ]
+    changes_bytes = _priority_changes_bytes(changes)
     transfer_pipeline_report_path = transfer_directory / "pipeline_report.txt"
     _source(
         sources,
@@ -1769,7 +2108,17 @@ def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonV
                     "all data rows",
                     "validated scenario-by-preset Cartesian product; copy is byte-identical to outputs/tradeoff.csv",
                 ),
-                "rows": _tradeoff_payload(primary_tradeoffs, paper_tradeoff_source),
+                "rows": _tradeoff_payload(
+                    primary_tradeoffs,
+                    paper_tradeoff_source,
+                    primary_sensitivity,
+                    primary_risk_sources,
+                    module_source,
+                ),
+                "priority_changes": _priority_change_payload(
+                    changes, "primary", scenarios, presets, paper_tradeoff_source, primary_risk_sources
+                ),
+                "overlap": _overlap_payload(primary_tradeoffs, scenarios, presets, paper_tradeoff_source),
             },
             "transfer": {
                 "row_count": _metric(
@@ -1779,8 +2128,19 @@ def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonV
                     "all data rows",
                     "validated scenario-by-preset Cartesian product and matched to canonical scenario_rows",
                 ),
-                "rows": _tradeoff_payload(transfer_tradeoffs, transfer_tradeoff_source),
+                "rows": _tradeoff_payload(
+                    transfer_tradeoffs,
+                    transfer_tradeoff_source,
+                    transfer_sensitivity,
+                    transfer_risk_sources,
+                    module_source,
+                ),
+                "priority_changes": _priority_change_payload(
+                    changes, "transfer", scenarios, presets, transfer_tradeoff_source, transfer_risk_sources
+                ),
+                "overlap": _overlap_payload(transfer_tradeoffs, scenarios, presets, transfer_tradeoff_source),
             },
+            "priority_changes_file": _changes_file_payload(changes_bytes, len(changes), paper_tradeoff_source),
         },
         "robustness": robustness_payload,
         "configuration": {
@@ -1888,6 +2248,21 @@ def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonV
                 module_source["risk"],
                 "DEFAULT_PRIORITY_UNITS",
                 "source default used by the risk and trade-off priority sets",
+            ),
+            "vulnerable_quantile": _metric(
+                risk.DEFAULT_VULNERABLE_QUANTILE,
+                "quantile",
+                module_source["risk"],
+                "DEFAULT_VULNERABLE_QUANTILE",
+                "a priority tract counts toward vulnerable_population_in_priority when its index is "
+                "at or above this quantile of its preset's own index over scored tracts",
+            ),
+            "sensitivity_vulnerable_quantile": _metric(
+                SENSITIVITY_VULNERABLE_QUANTILE,
+                "quantile",
+                module_source["report"],
+                "SENSITIVITY_VULNERABLE_QUANTILE",
+                "the stricter cut reported beside the default for every trade-off row",
             ),
             "configured_county_count": _metric(
                 len((config.STUDY_AREA, config.TRANSFER_AREA)),
@@ -2083,7 +2458,11 @@ def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonV
         "all_paper_todos_resolved": len(prose_todos) == 0 and len(placeholders) == 0,
     }
     _validate_payload(report, repository, paper_path)
-    return report
+    return report, changes_bytes
+
+
+def build_report(root: Path, generated_at: str | None = None) -> dict[str, JsonValue]:
+    return _assemble(root, generated_at)[0]
 
 
 def _walk_payload(value: JsonValue, path: str = "$", key: str = "") -> None:
@@ -2204,11 +2583,15 @@ def _validate_payload(payload: dict[str, JsonValue], root: Path, paper_path: Pat
 
 def _atomic_write(destination: Path, payload: dict[str, JsonValue]) -> Path:
     """Write stable UTF-8 strict JSON and atomically replace the destination."""
-    target = Path(destination)
-    target.parent.mkdir(parents=True, exist_ok=True)
     encoded = (
         json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False, allow_nan=False) + "\n"
     ).encode("utf-8")
+    return _atomic_bytes(destination, encoded)
+
+
+def _atomic_bytes(destination: Path, encoded: bytes) -> Path:
+    target = Path(destination)
+    target.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -2237,8 +2620,12 @@ def generate(
     """Build, validate, and write the production numbers artifact."""
     repository = Path(root).resolve()
     target = Path(destination) if destination is not None else repository / OUTPUT_RELATIVE
-    payload = build_report(repository, generated_at=generated_at)
+    payload, changes = _assemble(repository, generated_at=generated_at)
     _validate_payload(payload, repository, repository / PAPER_RELATIVE)
+    written = _atomic_bytes(target.parent / PRIORITY_CHANGES_RELATIVE.name, changes)
+    recorded = payload["tradeoffs"]["priority_changes_file"]["sha256"]["value"]
+    if hashlib.sha256(written.read_bytes()).hexdigest() != recorded:
+        raise EvidenceError("priority changes file does not match its recorded fingerprint")
     return _atomic_write(target, payload)
 
 
@@ -2378,10 +2765,10 @@ def _fixture_risk_rows(
             {
                 contracts.Col.GEOID: geoid,
                 contracts.Col.POPULATION: population,
-                contracts.Col.PCT_POVERTY: 10 + index / 10,
+                contracts.Col.PCT_POVERTY: 30 - index if is_scored else "",
                 contracts.Col.PCT_AGE_65_PLUS: 12 + index / 10,
                 contracts.Col.PCT_DISABILITY: 8 + index / 10,
-                contracts.Col.PCT_NO_VEHICLE: 6 + index / 10,
+                contracts.Col.PCT_NO_VEHICLE: 20 - index,
                 contracts.Col.PCT_LIMITED_ENGLISH: 4 + index / 10,
                 contracts.Col.INUNDATED_FRACTION: fraction,
                 contracts.Col.INUNDATION_MEAN_M: scenario_index + index / 100,
@@ -2396,34 +2783,24 @@ def _fixture_risk_rows(
     return rows
 
 
-def _fixture_tradeoffs(
-    area: config.StudyArea,
-    scenarios: tuple[str, ...],
-    presets: tuple[str, ...],
-) -> list[dict[str, Any]]:
-    """Create three discrete, overlapping priority sets per scenario."""
-    geoids = _fixture_geoids(area, 12)
-    starts = tuple(range(len(presets)))
+def _fixture_tradeoffs(paths: dict[str, Path]) -> list[dict[str, Any]]:
+    """Trade-off rows computed by the shipped comparison from the fixture's own risk tables."""
+    engine = risk.Risk()
     rows: list[dict[str, Any]] = []
-    for scenario_index, scenario in enumerate(scenarios, start=1):
-        selected = {
-            preset: geoids[start : start + risk.DEFAULT_PRIORITY_UNITS]
-            for preset, start in zip(presets, starts)
-        }
-        union = set().union(*(set(items) for items in selected.values()))
-        for preset_index, preset in enumerate(presets, start=1):
-            top = selected[preset]
+    for scenario in hazard.HAZARD_SCENARIOS:
+        frame = _risk_frame(paths[scenario.name])
+        for row in engine.compare_presets(
+            frame, scenario=scenario, units=frame, presets=vulnerability.WEIGHT_PRESETS
+        ):
             rows.append(
                 {
-                    "preset": preset,
-                    "scenario": scenario,
-                    "population_in_priority": sum(1000 + geoids.index(item) + 1 for item in top),
-                    "vulnerable_population_in_priority": sum(
-                        1000 + geoids.index(item) + 1 for item in top[preset_index:]
-                    ),
-                    "mean_inundation_m": scenario_index + preset_index / 10,
-                    "top_geoids": " ".join(top),
-                    "displaced_geoids": " ".join(sorted(union - set(top))),
+                    "preset": row.preset,
+                    "scenario": row.scenario,
+                    "population_in_priority": int(row.population_in_priority),
+                    "vulnerable_population_in_priority": int(row.vulnerable_population_in_priority),
+                    "mean_inundation_m": float(row.mean_inundation_m),
+                    "top_geoids": " ".join(row.top_geoids),
+                    "displaced_geoids": " ".join(row.displaced_geoids),
                 }
             )
     return rows
@@ -2596,7 +2973,12 @@ def _write_fixture(root: Path) -> None:
             RISK_COLUMNS,
             rows,
         )
-    primary_tradeoffs = _fixture_tradeoffs(config.STUDY_AREA, scenarios, presets)
+    primary_tradeoffs = _fixture_tradeoffs(
+        {
+            scenario: root / "outputs" / f"risk_{scenario}_{vulnerability.DEFAULT_PRESET.name}.csv"
+            for scenario in scenarios
+        }
+    )
     primary_tradeoff_path = root / PRIMARY_TRADEOFF_RELATIVE
     paper_tradeoff_path = root / PAPER_TRADEOFF_RELATIVE
     _write_fixture_csv(primary_tradeoff_path, TRADEOFF_COLUMNS, primary_tradeoffs)
@@ -2630,7 +3012,12 @@ def _write_fixture(root: Path) -> None:
             RISK_COLUMNS,
             rows,
         )
-    transfer_tradeoffs = _fixture_tradeoffs(config.TRANSFER_AREA, scenarios, presets)
+    transfer_tradeoffs = _fixture_tradeoffs(
+        {
+            scenario: transfer_directory / f"risk_{scenario}_{vulnerability.DEFAULT_PRESET.name}.csv"
+            for scenario in scenarios
+        }
+    )
     _write_fixture_csv(
         transfer_directory / "tradeoff.csv", TRADEOFF_COLUMNS, transfer_tradeoffs
     )
@@ -2889,6 +3276,38 @@ def _tradeoff_row_mutation(root: Path) -> None:
     _edit_fixture_json(report_path, update)
 
 
+def _primary_tradeoff_edit(root: Path, edit: Callable[[dict[str, str]], None]) -> None:
+    source = root / PRIMARY_TRADEOFF_RELATIVE
+    with source.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    edit(rows[0])
+    _write_fixture_csv(source, TRADEOFF_COLUMNS, rows)
+    shutil.copyfile(source, root / PAPER_TRADEOFF_RELATIVE)
+
+    def update(payload: dict[str, Any]) -> None:
+        copy = payload["primary_tradeoff"]
+        copy["source_sha256"] = _sha256(source)
+        copy["destination_sha256"] = _sha256(root / PAPER_TRADEOFF_RELATIVE)
+        copy["byte_count"] = source.stat().st_size
+
+    _edit_fixture_json(root / TRANSFER_REPORT_RELATIVE, update)
+
+
+def _recomputed_tradeoff_mutation(root: Path) -> None:
+    def edit(row: dict[str, str]) -> None:
+        row["vulnerable_population_in_priority"] = str(int(row["vulnerable_population_in_priority"]) + 1)
+
+    _primary_tradeoff_edit(root, edit)
+
+
+def _reordered_tradeoff_mutation(root: Path) -> None:
+    def edit(row: dict[str, str]) -> None:
+        first, second, *rest = row["top_geoids"].split()
+        row["top_geoids"] = " ".join([second, first, *rest])
+
+    _primary_tradeoff_edit(root, edit)
+
+
 def _mismatched_tradeoff_mutation(root: Path) -> None:
     """Change only the paper copy of the primary trade-off table."""
     path = root / PAPER_TRADEOFF_RELATIVE
@@ -3010,6 +3429,34 @@ def _self_check() -> int:
             ("production generation never called the pipeline or network", generated.is_file()),
             ("production generation did not mutate a source artifact", before == after),
             ("the generated JSON is strict and round-trips", parsed == good),
+            ("both vulnerability quantiles are stated in the configuration",
+             good["configuration"]["vulnerable_quantile"]["value"] == risk.DEFAULT_VULNERABLE_QUANTILE
+             and good["configuration"]["sensitivity_vulnerable_quantile"]["value"] == SENSITIVITY_VULNERABLE_QUANTILE),
+            ("every trade-off row carries its vulnerable population at both quantiles",
+             all(
+                 [item["quantile"]["value"] for item in row["vulnerable_population_by_quantile"]]
+                 == [risk.DEFAULT_VULNERABLE_QUANTILE, SENSITIVITY_VULNERABLE_QUANTILE]
+                 for area in ("primary", "transfer")
+                 for row in good["tradeoffs"][area]["rows"]
+             )),
+            ("the priority changes land beside the generated numbers, never inside the fixture",
+             (generated.parent / PRIORITY_CHANGES_RELATIVE.name).is_file()
+             and not (base / PRIORITY_CHANGES_RELATIVE).exists()),
+            ("the priority changes file matches its recorded fingerprint",
+             hashlib.sha256((generated.parent / PRIORITY_CHANGES_RELATIVE.name).read_bytes()).hexdigest()
+             == good["tradeoffs"]["priority_changes_file"]["sha256"]["value"]),
+            ("the fixture's presets disagree, so the priority changes are not empty",
+             good["tradeoffs"]["priority_changes_file"]["row_count"]["value"] > 0),
+            ("each overlap matrix covers every scenario and preset with a unit diagonal",
+             all(
+                 len(good["tradeoffs"][area]["overlap"]["runs"]["value"])
+                 == len(hazard.HAZARD_SCENARIOS) * len(vulnerability.WEIGHT_PRESETS)
+                 and all(
+                     row[index] == 1.0
+                     for index, row in enumerate(good["tradeoffs"][area]["overlap"]["jaccard"]["value"])
+                 )
+                 for area in ("primary", "transfer")
+             )),
             ("the generated artifact stays outside the production path during check", generated != base / OUTPUT_RELATIVE),
             ("the generated artifact contains only portable registered source paths", all("\\" not in key and not Path(key).is_absolute() for key in good["sources"])),
             ("fixture and live robustness rows remain separately labeled", set(good["robustness"]["rows_by_source"]) == {"fixture", "live"}),
@@ -3183,6 +3630,26 @@ def _self_check() -> int:
                             ),
                         ),
                         "missing preset",
+                    ),
+                ),
+                (
+                    "a committed trade-off row the shipped comparison cannot reproduce is refused",
+                    _fixture_failure(
+                        base,
+                        cases,
+                        "recomputed-tradeoff",
+                        _recomputed_tradeoff_mutation,
+                        "recomputed primary trade-off disagrees",
+                    ),
+                ),
+                (
+                    "a committed priority order the shipped comparison does not produce is refused",
+                    _fixture_failure(
+                        base,
+                        cases,
+                        "reordered-tradeoff",
+                        _reordered_tradeoff_mutation,
+                        "recomputed primary trade-off disagrees",
                     ),
                 ),
                 (
@@ -3367,6 +3834,7 @@ def main() -> int:
     missing = _sequence(payload.get("missing_evidence"), "numbers.missing_evidence")
     todos = _sequence(payload.get("remaining_paper_todos"), "numbers.remaining_paper_todos")
     print(f"wrote {_portable(destination, config.PROJECT_ROOT)}")
+    print(f"wrote {_portable(destination.parent / PRIORITY_CHANGES_RELATIVE.name, config.PROJECT_ROOT)}")
     print(f"  {len(paper_keys)} quantitative paper placeholder(s) mapped")
     print(f"  {len(missing)} missing-evidence item(s), {len(todos)} prose TODO line(s)")
     return 0
