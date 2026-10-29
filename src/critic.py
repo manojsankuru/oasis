@@ -132,7 +132,7 @@ MASKS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("a list marker", LIST_MARKER),
 )
 
-NUMBER = re.compile(r"(?<![\d.])-?\d[\d,]*(?:\.\d+)?(?!\d)(?!\.\d)")
+NUMBER = re.compile(r"(?<![\d.])(?:(?:(?<![^\W\d_])|(?<=\d[eE]))-)?\d[\d,]*(?:\.\d+)?(?!\d)(?!\.\d)")
 """One number, with digit boundaries on both sides.
 
 `48192` yields one number and never `192`, `8192` or `4819`. That guarantee comes
@@ -1474,6 +1474,45 @@ def _claim_checks() -> list[tuple[str, bool]]:
     ]
 
 
+TOP_TEN_SENTENCE = (
+    "Each of the named weightings comes from a specific source (the CDC/ATSDR's "
+    "Social Vulnerability Index or the authors of this tool), and changing the "
+    "weights to reflect your stated preference has a direct effect on which "
+    "communities are included and excluded from a top-10 priority list."
+)
+
+
+def _hyphen_checks() -> list[tuple[str, bool]]:
+    read = [item.value for item in claims(TOP_TEN_SENTENCE)]
+    report = Critic().check(
+        TOP_TEN_SENTENCE, agent_shape([structured_call({"priority_units": 10})]), 1
+    )
+    signed = [item.value for item in claims("a change of -0.3 against (-2) last year")]
+    exponent = [item.value for item in claims("p = 3.2e-05")]
+    words = [item.value for item in claims("along I-26, a TOP-10 list")]
+    accented = [item.value for item in claims("the café-10 list")]
+    underscored = [item.value for item in claims("a change of _-0.3_")]
+    scanned = numbers_in_text("delta=-1.5, [-4, -5]")
+    print(f"  the 28 Oct live sentence with top-10 yields {read}; signed numbers yield {signed}")
+    print(f"  an exponent yields {exponent}; I-26 and TOP-10 yield {words}; café-10 yields "
+          f"{accented}; _-0.3_ yields {underscored}; a tool string yields {scanned}")
+    return [
+        ("a hyphen after a word is not a minus sign (run 20261028_211102, top-10)",
+         read == [10.0]),
+        ("that sentence's 10 traces to a priority list of ten",
+         report.numbers_checked == 1 and report.numbers_traceable == 1
+         and not any(item.kind == "untraceable_number" for item in report.findings)),
+        ("a minus after a space or a bracket is still a minus", signed == [-0.3, -2.0]),
+        ("an exponent keeps its minus", exponent == [3.2, -5.0]),
+        ("a hyphen after an upper-case word is not a minus sign either", words == [26.0, 10.0]),
+        ("a hyphen after an accented letter is not a minus sign", accented == [10.0]),
+        ("a minus after an underscore is still a minus", underscored == [-0.3]),
+        ("tool results keep their signs after = and [", scanned == [-1.5, -4.0, -5.0]),
+        ("tool results read a hyphenated word the same way answers do",
+         numbers_in_text(TOP_TEN_SENTENCE) == [10.0]),
+    ]
+
+
 def _boundary_checks() -> list[tuple[str, bool]]:
     """The guard that stops a text blob tracing anything: whole-number boundaries."""
     pool, _ = candidates([stdout_call(SUBSTRING_STDOUT)])
@@ -1995,6 +2034,8 @@ def _self_check() -> int:
     checks = _claim_checks()
     print()
     checks += _mask_checks()
+    print()
+    checks += _hyphen_checks()
     print()
     checks += _boundary_checks()
     print()
