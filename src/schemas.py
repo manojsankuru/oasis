@@ -50,7 +50,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 from . import verify, vulnerability
 from .contracts import TOOL_NAMES, VULNERABILITY_INDICATORS
 from .hazard import HAZARD_SCENARIOS
-from .risk import COMPONENT_RATIONALE
+from .risk import COMPONENT_RATIONALE, DEFAULT_VULNERABLE_QUANTILE
 from .vulnerability import DEFAULT_PRESET, INDICATOR_RATIONALE, WEIGHT_PRESETS
 
 SCALAR_TYPES: frozenset[str] = frozenset({"string", "number", "integer", "boolean"})
@@ -135,6 +135,14 @@ PRESET_NAMES: tuple[str, ...] = tuple(item.name for item in WEIGHT_PRESETS)
 
 def _named(values: Iterable[str]) -> str:
     return ", ".join(values)
+
+
+def vulnerable_population_label(quantile: float = DEFAULT_VULNERABLE_QUANTILE) -> str:
+    if quantile == 0.5:
+        return "population in tracts at or above the county median vulnerability"
+    percent = round(quantile * 100)
+    suffix = "th" if 10 <= percent % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(percent % 10, "th")
+    return f"population in tracts at or above the county {percent}{suffix} percentile vulnerability"
 
 
 _SCENARIO_HELP = (
@@ -274,6 +282,13 @@ class HazardExposureArgs(BaseModel):
     top_n: int = Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)
 
 
+_EXPORT_MAP_HELP = (
+    "Set true to also save this ranking as a map: a GeoPackage and a PNG of the ranked "
+    "tracts under outputs/maps, replacing any earlier map of the same scenario and "
+    "weighting. The result then gives the two file paths and never the geometry."
+)
+
+
 RiskScenarioArgs = create_model(
     "RiskScenarioArgs",
     __config__=_EXTRAS_REACH_THE_TOOL,
@@ -286,6 +301,7 @@ RiskScenarioArgs = create_model(
     preset=(str, Field(default=UNSET_NAME, description=_PRESET_HELP)),
     top_n=(int, Field(default=DEFAULT_TOP_N, ge=1, le=MAX_TOP_N, description=_TOP_N_HELP)),
     preference=(str, Field(default=UNSET_NAME, description=_PREFERENCE_HELP)),
+    export_map=(bool, Field(default=False, description=_EXPORT_MAP_HELP)),
     **_weight_fields(RISK_WEIGHT_KEYS, _risk_weight_help),
 )
 
@@ -435,12 +451,15 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "county-relative: it says which units here are worst, never whether here is bad. "
         "To follow a person's own words, set the weight_* arguments their words name "
         "and pass their sentence as preference: the ranking is then made under a "
-        f"weighting named '{USER_WEIGHTING}', and the result reports the weights used."
+        f"weighting named '{USER_WEIGHTING}', and the result reports the weights used. "
+        "Set export_map to also save the ranking as a map, a GeoPackage and a PNG under "
+        "outputs/maps, and get back only their file paths."
     ),
     "compare_scenarios": (
         "Run every named weighting against one scenario and report the trade-off: "
-        "who each weighting prioritises, how many residents and how many vulnerable "
-        "residents that covers, and WHICH UNITS EACH WEIGHTING DROPS that another "
+        "who each weighting prioritises, how many residents that covers, the "
+        f"{vulnerable_population_label()} among them, and WHICH UNITS EACH "
+        "WEIGHTING DROPS that another "
         "would have prioritised. Use this whenever the answer depends on a value "
         "judgement, which is whenever it is a priority ordering. With weight_* "
         "arguments and preference set, the person's weighting is added and compared "
@@ -923,6 +942,36 @@ def _derivation_checks() -> list[tuple[str, bool]]:
     ]
 
 
+def _label_checks() -> list[tuple[str, bool]]:
+    text = serialised(TOOL_SPECS)
+    fields = RiskScenarioArgs.model_fields
+    properties = {
+        spec["function"]["name"]: spec["function"]["parameters"].get("properties", {})
+        for spec in TOOL_SPECS
+    }
+    export = properties.get("risk_scenario", {}).get("export_map", {})
+    carriers = sorted(name for name, found in properties.items() if "export_map" in found)
+    print(f"  the default label: {vulnerable_population_label()!r}")
+    print(f"  at 0.8:            {vulnerable_population_label(0.8)!r}")
+    print(f"  export_map on the wire: type {export.get('type')}, default {export.get('default')}, "
+          f"carried by {carriers}")
+    return [
+        ("the trade-off population is labelled in the plan's words at the default quantile",
+         vulnerable_population_label()
+         == "population in tracts at or above the county median vulnerability"),
+        ("another quantile is named as its percentile, not as the median",
+         vulnerable_population_label(0.8)
+         == "population in tracts at or above the county 80th percentile vulnerability"),
+        ("the specs say what the trade-off population counts", vulnerable_population_label() in text),
+        ("no spec calls that population vulnerable residents", "vulnerable residents" not in text),
+        ("risk_scenario takes export_map as a plain boolean that is off unless asked",
+         "export_map" in fields and fields["export_map"].annotation is bool
+         and fields["export_map"].default is False
+         and export.get("type") == "boolean" and export.get("default") is False),
+        ("only risk_scenario takes export_map", carriers == ["risk_scenario"]),
+    ]
+
+
 def _self_check() -> int:
     print("SCHEMAS -- flat scalar argument models, no $ref anywhere\n")
     checks = _surface_checks()
@@ -938,6 +987,8 @@ def _self_check() -> int:
     checks += _pending_checks()
     print()
     checks += _derivation_checks()
+    print()
+    checks += _label_checks()
     print()
     checks += verify.discipline_checks(sys.modules[__name__])
     return verify.report(checks)
