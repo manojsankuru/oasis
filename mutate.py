@@ -608,6 +608,18 @@ SCHEMAS_MUTATIONS: list[tuple[str, str, str]] = [
     ("a weight's description drops the sentence the model maps words onto",
      'f"Weight on {name}, one of the {half}: {WEIGHT_RATIONALE[name]}. Relative, "',
      'f"Weight on {name}, one of the {half}. Relative, "'),
+    ("the trade-off description calls the median population vulnerable residents again",
+     '        f"{vulnerable_population_label()} among them, and WHICH UNITS EACH "',
+     '        "vulnerable residents among them, and WHICH UNITS EACH "'),
+    ("every quantile is labelled the median",
+     "    if quantile == 0.5:",
+     "    if True:"),
+    ("a ranking writes map files unless the model says not to",
+     "    export_map=(bool, Field(default=False, description=_EXPORT_MAP_HELP)),",
+     "    export_map=(bool, Field(default=True, description=_EXPORT_MAP_HELP)),"),
+    ("the label says above where the rule is at or above",
+     '        return "population in tracts at or above the county median vulnerability"',
+     '        return "population in tracts above the county median vulnerability"'),
 ]
 
 
@@ -780,6 +792,24 @@ TOOLS_MUTATIONS: list[tuple[str, str, str]] = [
     ("the scripted-reply cursor is never reset between questions",
      "    CALLS.clear()\n    _SCRIPT_POSITION = 0",
      "    CALLS.clear()"),
+    ("the comparison stops saying in words what its median population counts",
+     '        "vulnerable_population_in_priority_means": f"{schemas.vulnerable_population_label()} in the priority set",\n',
+     ""),
+    ("a map request is ignored, so no file is written",
+     "    if export_map:\n",
+     "    if False:\n"),
+    ("every ranking writes a map, asked for or not",
+     "    if export_map:\n",
+     "    if True:\n"),
+    ("the map is drawn from the pipeline's default table rather than the ranking asked for",
+     "    ranked = pipeline.reported(frame).copy()\n",
+     "    ranked = pipeline.reported(analysis().result.tables[scenario.name].frame).copy()\n"),
+    ("the map paths come back as machine paths rather than project paths",
+     '    return {"geopackage": pipeline.shown_path(package), "png": pipeline.shown_path(picture)}\n',
+     '    return {"geopackage": str(package), "png": str(picture)}\n'),
+    ("a failed map write hands the model the machine's own path",
+     '                "detail": f"{type(exc).__name__} while writing under {pipeline.shown_path(MAP_DIRECTORY)}",\n',
+     '                "detail": str(exc),\n'),
 ]
 
 
