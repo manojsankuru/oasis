@@ -411,4 +411,4 @@ Known limitations include:
 
 ### License
 
-This project is released under the MIT License. See `LICENSE`.
+This project is released under the MIT License. See `LICENSE`. The files derived from OpenStreetMap, listed in `docs/DATA.md`, are available under the ODbL, not under the MIT License that covers this repository's code.

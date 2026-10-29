@@ -527,6 +527,9 @@ the facilities each tract can reach:
 - `paper/figs/risk_surface.pdf` and `paper/figs/tradeoff.pdf`, which are drawn
   from those tables
 
+The files listed above are derived from OpenStreetMap and are available under
+the ODbL, not under the MIT License that covers this repository's code.
+
 **U.S. Census Bureau and USGS.** The TIGERweb tract and block-group boundaries
 and the ACS estimates come from the U.S. Census Bureau. The 3DEP elevation
 raster, `data/snapshot/3depelevation.tif`, comes from the U.S. Geological
