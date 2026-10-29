@@ -203,9 +203,17 @@ ORDERING_LANGUAGE = re.compile(
 WEIGHTING_LANGUAGE = re.compile(
     r"\b(?:weight\w*|weighting|preset|equal\w*|value\s+judg\w*)\b", re.IGNORECASE
 )
+UNIT_WORD = r"(?<![\w'\u2019-])(?:communit(?:y|ies)|tracts?|units?|neighbou?rhoods?)(?![\w'\u2019-])"
+LEFT_OUT = r"(?:left|leaves)[^\S\n]+out"
+WITHIN_THREE_WORDS = r"[^\S\n]+(?:\w[\w'\u2019-]*[^\S\n]+){0,2}"
+LEFT_OUT_UNITS = (
+    LEFT_OUT + WITHIN_THREE_WORDS + UNIT_WORD + "|" + UNIT_WORD + WITHIN_THREE_WORDS + LEFT_OUT
+)
+WOULD_NOT_PRIORITISE = r"would\s+not\s+(?:\w+\s+){0,2}prioriti[sz]\w*"
 TRADEOFF_LANGUAGE = re.compile(
     r"\b(?:loses?|losing|who\s+loses|drop\w*|displac\w*|not\s+prioriti\w*|"
-    r"another\s+weighting|a\s+different\s+weighting|trade[- ]?offs?)\b",
+    r"another\s+weighting|a\s+different\s+weighting|trade[- ]?offs?"
+    "|" + WOULD_NOT_PRIORITISE + "|" + LEFT_OUT_UNITS + r")\b",
     re.IGNORECASE,
 )
 TRACT_NAME = re.compile(r"\btracts?\s+(?:number\s+|no\.?\s*|#\s*)?\d", re.IGNORECASE)
@@ -1885,6 +1893,63 @@ AGGREGATE_EXCERPT = (
 )
 
 
+WHO_LOSES_EXCERPTS: tuple[tuple[str, str], ...] = (
+    ("20261022_175854",
+     RANKED_EXCERPT + " However, it leaves out two communities that other weightings would "
+     "have prioritised: `99001001100` and `99001004617`."),
+    ("20261023_113611",
+     "*   The `evacuation_capacity` weighting would have prioritised census tract "
+     "**99001004617**, which is not in the top ten under the `svi_equal` weighting.\n"
+     "\n"
+     "This means that the choice of the `svi_equal` weighting leaves out communities that "
+     "would have been prioritised under other rationales."),
+    ("20260904_121105",
+     "Here are the top 10 communities for three different weightings, and who each one "
+     "leaves out:\n"
+     "\n"
+     "### Evacuation Capacity\n"
+     "\n"
+     "This weighting prioritises areas with high population density and limited "
+     "transportation options.\n"
+     "\n"
+     "*   **Priority Communities (GEOIDs):** 99001004616, 99001004609, 99001002008, "
+     "99001002009, 99001004902, 99001002300, 99001005002, 99001002105, 99001002503, "
+     "99001004617\n"
+     "*   **Population covered:** 50,267\n"
+     "*   **Vulnerable population covered:** 25,670\n"
+     "*   **Mean inundation:** 1.99m\n"
+     "*   **Communities left out:** 99001001100, 99001004620"),
+    ("20260904_123657",
+     "This choice of weighting, which gives equal importance to each of the five "
+     "vulnerability indicators, leaves out two census tracts that other weightings would "
+     "have prioritised:\n"
+     "\n"
+     "*   **99001001100**, which would have been prioritised if vulnerability were weighted "
+     "by theme (the `svi_themes` preset)."),
+    ("20260904_125627",
+     "This weighting would not have prioritised tracts `99001002105` and `99001004617`, "
+     "which the `svi_equal` weighting would have."),
+)
+
+NOT_WHO_LOSES: tuple[tuple[str, str], ...] = (
+    ("it says only that a data layer was left out", " The analysis left out the NFHL layer."),
+    ("a heading a paragraph earlier ends in a unit word",
+     "\n\n### Priority tracts\n\nThe analysis left out the NFHL layer."),
+    ("the unit word after left out is part of a hyphenated word",
+     " The analysis left out the tract-level NFHL layer."),
+    ("the unit word before left out is part of a hyphenated word",
+     " The census-tract layer was left out."),
+    ("a lone dash stands between left out and a unit word",
+     " The NFHL layer was left out - tracts are ranked on surge depth alone."),
+    ("the unit word is more than three words after left out",
+     " The analysis left out the NFHL layer for these tracts."),
+    ("would not is more than two words before prioritise",
+     " Without the NFHL layer the analysis would not have been able to prioritise these tracts."),
+)
+
+OTHER_UNIT_WORDS: tuple[str, ...] = ("units", "neighbourhoods")
+
+
 def _gate_checks() -> list[tuple[str, bool]]:
     def ordering(text: str, calls: list[dict[str, Any]] | None = None) -> list[CriticFinding]:
         return [item for item in Critic().check(text, calls or [], 1).findings
@@ -1922,6 +1987,45 @@ def _gate_checks() -> list[tuple[str, bool]]:
          "who-loses sentence, still fires",
          len(ranked) == 1 and "does not say who loses" in ranked[0].detail),
         ("an ordering that names tracts by number still fires", len(named) == 2),
+    ]
+
+
+def _tradeoff_checks() -> list[tuple[str, bool]]:
+    def who_loses(text: str) -> list[CriticFinding]:
+        return [item for item in Critic().check(text, [], 1).findings
+                if "does not say who loses" in item.detail]
+
+    named = [(run, who_loses(text)) for run, text in WHO_LOSES_EXCERPTS]
+    real = dict(WHO_LOSES_EXCERPTS)["20261022_175854"]
+    other_words = [(word, who_loses(real.replace("two communities", f"two {word}")))
+                   for word in OTHER_UNIT_WORDS]
+    hidden = [(case, who_loses(RANKED_EXCERPT + tail)) for case, tail in NOT_WHO_LOSES]
+    unranked = [who_loses(text) for text in (REFUSAL_ANSWER, PROVENANCE_RANKINGS, PROVENANCE_RANKING)]
+    print("  who-loses findings on drafts that said who loses: "
+          + ", ".join(f"{run} {len(found)}" for run, found in named))
+    print("  on the 175854 sentence with another unit word: "
+          + ", ".join(f"{word} {len(found)}" for word, found in other_words))
+    print("  on ranked answers whose new words do not say who loses: "
+          + ", ".join(str(len(found)) for _, found in hidden)
+          + f"; on answers that rank nothing {[len(found) for found in unranked]}")
+    checks = [
+        (f"run {run} names who loses in other words and is no longer asked who loses", found == [])
+        for run, found in named
+    ]
+    checks += [
+        (f"the run 20261022_175854 sentence with {word} for communities counts too (constructed)",
+         found == [])
+        for word, found in other_words
+    ]
+    checks += [
+        (f"a ranked answer is still asked who loses when {case} "
+         "(run 20261022_175854 excerpt plus a constructed sentence)", len(found) == 1)
+        for case, found in hidden
+    ]
+    return checks + [
+        ("an answer that ranks nothing is never asked who loses when no ranking tool ran "
+         "(runs 20260831_142354, 20261023_120753 and 20261023_123437)",
+         all(found == [] for found in unranked)),
     ]
 
 
@@ -2141,6 +2245,8 @@ def _self_check() -> int:
     checks += _ordering_checks()
     print()
     checks += _gate_checks()
+    print()
+    checks += _tradeoff_checks()
     print()
     checks += _guard_checks()
     print()
