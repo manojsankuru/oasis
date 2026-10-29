@@ -32,17 +32,18 @@ template "ACM Conference Proceedings Primary Article").
 
 ## Figures
 
-Generate the two data figures from the repository root with
-`python -m src.figures`. `architecture.pdf` was made by hand and has no source
+Generate the three data figures from the repository root with
+`python -m src.figures`, after `python -m src.experiments.report`. `architecture.pdf` was made by hand and has no source
 in this repository, so `src.figures` never writes it. The production
-`paper/figs/` directory holds exactly these three PDFs, and `main.tex` includes
-them directly:
+`paper/figs/` directory holds these four PDFs. `main.tex` includes the first
+three directly. `priority_overlap.pdf` is generated but not placed in the paper:
 
 | File | Section | Evidence shown |
 | --- | --- | --- |
 | `architecture.pdf` | system design | double-column view of both bounded feedback cycles and data/model boundaries |
 | `risk_surface.pdf` | spatial risk | single-column 3 m raster-to-tract hazard, vulnerability, and priority view |
 | `tradeoff.pdf` | trade-offs | single-column county-separated discrete priority-set view |
+| `priority_overlap.pdf` | not placed | Jaccard overlap of the top-ten tract sets across the nine scenario and preset runs, per county |
 
 `architecture.pdf` is deliberately double-column. The risk and trade-off
 figures use standard single-column placement as required by the manuscript

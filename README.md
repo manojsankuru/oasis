@@ -123,6 +123,8 @@ This writes three scenario risk tables, a nine-row weighting trade-off table, an
 outputs/
 ```
 
+In the trade-off table, `vulnerable_population_in_priority` is the population in tracts at or above the county median vulnerability in the priority set, with the median taken over each weighting's own index across scored tracts.
+
 The deterministic pipeline includes:
 
 1. tract and block-group acquisition;
@@ -321,31 +323,32 @@ To reproduce the figure PDFs byte for byte, install the exact versions in `requi
 & $ProjectPython -m pip install -r requirements-lock.txt
 ```
 
-Under that lock on Windows both data figures match the committed PDFs byte for byte. On Linux `tradeoff.pdf` matches byte for byte, and `risk_surface.pdf` draws identical content, but four of its compressed image streams differ because the system zlib differs (1.3.2 on the Linux test, 1.3.1 on Windows).
+Under that lock on Windows the three data figures match the committed PDFs byte for byte. On Linux `risk_surface.pdf` draws identical content, but four of its compressed image streams differ because the system zlib differs (1.3.2 on the Linux test, 1.3.1 on Windows). The current `tradeoff.pdf` and `priority_overlap.pdf` have not been checked on Linux.
 
-Generate the two data figures. `paper/figs/architecture.pdf` was made by hand and is not regenerated:
-
-```powershell
-& $ProjectPython -m src.figures
-```
-
-Generate the source-fingerprinted quantitative evidence:
+Generate the source-fingerprinted quantitative evidence first, because the overlap figure reads `outputs/paper/numbers.json`:
 
 ```powershell
 & $ProjectPython -m src.experiments.report
 ```
 
+Then generate the three data figures. `paper/figs/architecture.pdf` was made by hand and is not regenerated:
+
+```powershell
+& $ProjectPython -m src.figures
+```
+
 Verify both:
 
 ```powershell
-& $ProjectPython -m src.figures --check
 & $ProjectPython -m src.experiments.report --check
+& $ProjectPython -m src.figures --check
 ```
 
 Expected figures:
 
 ```text
 paper/figs/architecture.pdf
+paper/figs/priority_overlap.pdf
 paper/figs/risk_surface.pdf
 paper/figs/tradeoff.pdf
 ```
@@ -354,6 +357,7 @@ Expected metric record:
 
 ```text
 outputs/paper/numbers.json
+outputs/paper/priority_changes.csv
 ```
 
 Build the paper from `paper/`:
