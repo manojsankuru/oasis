@@ -88,16 +88,17 @@ Same length as what it replaces, so every offset in the answer still points at
 the same character and a finding can quote the text around a number."""
 
 URL_SPAN = re.compile(r"https?://\S+")
-CODE_SPAN = re.compile(r"`(?P<name>[^`\n]*[A-Za-z][^`\n]*)`|`[^`\n]*`")
-"""A backtick span that contains a letter holds names -- a tool, a layer, a
-scenario, a preset. Real answers write `surge_1_5m` and `tracts_joined` that way.
-Only the names inside it that mix letters and digits are masked, including codes
-joined by `:`, `=`, `/`, `-` or `.` such as `EPSG:5070` and `4fc8bd7`. A
-free-standing number in the same span, such as the weights in
-`pct_age_65_plus: 0.384615`, is a claim, and so is a number with a short unit
-such as `1.5m`.
+CODE_SPAN = re.compile(r"`[^`\n]*`")
+"""A backtick span. Real answers write names that way -- a tool, a layer, a
+scenario, a preset, such as `surge_1_5m` and `tracts_joined`. Every span pairs in
+order, a span with no letter included, so the prose between two backticked GEOIDs
+is never read as a span. Only the names inside a span are masked, meaning tokens
+that carry a digit alongside a letter or an underscore, including codes joined by
+`:`, `=`, `/`, `-` or `.` such as `EPSG:5070` and `4fc8bd7`. A free-standing number in the same span, such as the
+weights in `pct_age_65_plus: 0.384615`, is a claim, and so is a number with a
+short unit such as `1.5m`.
 
-**The letter is the whole rule.** An earlier version masked every backtick span,
+**Only names are masked.** An earlier version masked every backtick span,
 on the assumption that a span in backticks is always a name. Nothing checked the
 assumption, and a model that writes a fabricated figure as `48200` -- the same
 model already backticks numeric-looking tokens throughout its real answers -- had
@@ -330,10 +331,6 @@ LABEL_MASKS: frozenset[str] = frozenset(
 )
 
 
-def hides(found: re.Match[str]) -> bool:
-    return "name" not in found.re.groupindex or found.group("name") is not None
-
-
 SPAN_NAME = re.compile(r"[\w.:=/-]*[A-Za-z_][\w.:=/-]*")
 QUANTITY_WITH_UNIT = re.compile(r"-?\d[\d,]*(?:\.\d+)?[A-Za-z%]{1,2}")
 
@@ -353,7 +350,7 @@ def mask_spans(answer: str) -> tuple[str, list[tuple[str, int, int]]]:
     text = answer
     spans: list[tuple[str, int, int]] = []
     for label, rule in MASKS:
-        hidden = [found for found in rule.finditer(text) if hides(found)]
+        hidden = list(rule.finditer(text))
         for found in hidden:
             for start, end in hidden_parts(rule, found):
                 spans.append((label, start, end))
@@ -1492,6 +1489,11 @@ def _claim_checks() -> list[tuple[str, bool]]:
     # prove two rules; each of these two now has text only it can reach.
     named = [item.value for item in claims("scored under `svi_equal` and s_1_5m, 477 units")]
     print(f"  a bare name and a backticked one together yield {named}")
+    paired_text = "`99001000100` within a 2-mile buffer of `surge_3_0m`"
+    paired = [found.group(0) for found in CODE_SPAN.finditer(paired_text)]
+    paired_labels = sorted({label for label, _, _ in mask_spans(paired_text)[1]})
+    paired_claims = [item.value for item in claims(paired_text)]
+    print(f"  spans in {paired_text}: {paired}, masked as {paired_labels}, claims {paired_claims}")
 
     percent = claims("poverty is 23.4% of households")
     listed = [item.value for item in claims("the fractions are 0.5,0.75,0.9 in order")]
@@ -1510,6 +1512,10 @@ def _claim_checks() -> list[tuple[str, bool]]:
         ("a name carrying a number is not a claim", 1.5 not in values and 5.0 not in values),
         ("a bare name carrying a number is masked by the token rule, not by backticks",
          named == [477.0]),
+        ("backtick spans pair in order, a GEOID span included, so the prose after one keeps its number",
+         paired == ["`99001000100`", "`surge_3_0m`"] and paired_claims == [2.0]),
+        ("and the name after it is still a backticked name",
+         paired_labels == sorted({"a name in backticks", "an identifier of ten digits or more"})),
         ("a dataset vintage is not a claim", 2019.0 not in values and 2023.0 not in values),
         ("a URL is not a claim", 1234.0 not in values),
         ("the real quantities in it are claims",
