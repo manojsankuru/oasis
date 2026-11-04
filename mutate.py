@@ -39,6 +39,7 @@ MODULE_IMPORTS: dict[str, str] = {
 
 CHECKED_BY: dict[str, str] = {
     "acquire": "faults",
+    "agent": "tools",
 }
 """A module whose own `--check` cannot be the one mutations are judged by.
 
@@ -620,6 +621,9 @@ SCHEMAS_MUTATIONS: list[tuple[str, str, str]] = [
     ("the label says above where the rule is at or above",
      '        return "population in tracts at or above the county median vulnerability"',
      '        return "population in tracts above the county median vulnerability"'),
+    ("the scenario help promises the deepest scenario for an empty name again",
+     '    f"{_named(SCENARIO_NAMES)}. Leave empty for {SCENARIO_NAMES[0]}, the shallowest. "',
+     '    f"{_named(SCENARIO_NAMES)}. Leave empty for the deepest one that is not the only one. "'),
 ]
 
 
@@ -810,6 +814,12 @@ TOOLS_MUTATIONS: list[tuple[str, str, str]] = [
     ("a failed map write hands the model the machine's own path",
      '                "detail": f"{type(exc).__name__} while writing under {pipeline.shown_path(MAP_DIRECTORY)}",\n',
      '                "detail": str(exc),\n'),
+    ("an empty scenario name gets the deepest scenario while the help still says the shallowest",
+     'DEFAULT_SCENARIO: HazardScenario = HAZARD_SCENARIOS[0]',
+     'DEFAULT_SCENARIO: HazardScenario = HAZARD_SCENARIOS[-1]'),
+    ("the re-scoring note says again that risk_scenario made the call",
+     '            "ask_user_preferences re-scored these units under the weighting named above. "\n',
+     '            "these units were re-scored through the same call risk_scenario makes. "\n'),
 ]
 
 
@@ -1137,6 +1147,18 @@ CRITIC_MUTATIONS: list[tuple[str, str, str]] = [
     ("a report grows without bound, so a finding crowds the turns that are left",
      "        if len(findings) <= MAX_FINDINGS:",
      "        if True:"),
+    ("a backtick span is masked whole again, so the weights inside it are never checked",
+     '    if rule is not CODE_SPAN:',
+     '    if True:'),
+    ("any word matching a tool name counts as a credit, so a weight named vulnerability_index is flagged",
+     r'    name: re.compile(rf"`{name}`|\b{name}\s+tool\b") for name in contracts.TOOL_NAMES',
+     r'    name: re.compile(rf"\b{name}\b") for name in contracts.TOOL_NAMES'),
+    ("a code joined to a name in backticks leaks its digits as a claim again",
+     r'SPAN_NAME = re.compile(r"[\w.:=/-]*[A-Za-z_][\w.:=/-]*")',
+     r'SPAN_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")'),
+    ("a number with a unit in backticks is masked as though it were a name",
+     '        and not QUANTITY_WITH_UNIT.fullmatch(token.group(0))',
+     '        and True'),
 ]
 
 
@@ -1345,7 +1367,15 @@ TRANSFER_MUTATIONS: list[tuple[str, str, str]] = [
 ]
 
 
+AGENT_MUTATIONS: list[tuple[str, str, str]] = [
+    ("the rules stop telling the model to name only the tools it called",
+     "  Name only the tools you called in this run.\"\"\"",
+     "  \"\"\""),
+]
+
+
 TARGETS: dict[str, list[tuple[str, str, str]]] = {
+    "agent": AGENT_MUTATIONS,
     "align": ALIGN_MUTATIONS,
     "hazard": HAZARD_MUTATIONS,
     "vulnerability": VULNERABILITY_MUTATIONS,
