@@ -37,6 +37,11 @@ data/snapshot/*
 !data/snapshot/manifest.json
 !data/snapshot/tracts.geojson
 !data/snapshot/3depelevation.tif
+!data/snapshot/acs.parquet
+!data/snapshot/acs_block_groups.parquet
+!data/snapshot/block_groups.geojson
+!data/snapshot/facilities.geojson
+!data/snapshot/flood_zones.geojson
 !data/.gitkeep
 
 # mutation harness backup, written and removed by mutate.py
