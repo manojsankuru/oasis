@@ -23,17 +23,25 @@ responds to the program committee reviews.
   `user.email` to the author of `phase1-submitted`. After each commit, check
   `git log -1 --format='%an <%ae>'`. Never commit with Claude as author.
 - `/failure` the moment something breaks, with the real error text.
+- The critic's ordering-gate wording (`ORDERING_LANGUAGE`, `WEIGHTING_LANGUAGE`,
+  `TRADEOFF_LANGUAGE`) has been frozen since `c7df797`. From the commit that
+  declares the Session 7 cohort questions until the cohort finishes, nothing in
+  `src/critic.py`, the RULES text in `src/agent.py` or the notes the tools return
+  changes. Log a misfire with `/failure` and change nothing.
 - `src/contracts.py` stays frozen.
 - The model-visible tool count stays at 11.
 - Every number in the paper comes from `outputs/paper/numbers.json`.
-- Nine committed data files are committed once and never overwritten in place:
+- Fourteen committed data files are committed once and never overwritten in place:
   `data/snapshot/3depelevation.tif`, `data/snapshot/manifest.json`,
-  `data/snapshot/tracts.geojson`, `data/derived/surge_3_0m_depth.tif`,
+  `data/snapshot/tracts.geojson`, `data/snapshot/block_groups.geojson`,
+  `data/snapshot/acs.parquet`, `data/snapshot/acs_block_groups.parquet`,
+  `data/snapshot/facilities.geojson`, `data/snapshot/flood_zones.geojson`,
+  `data/derived/surge_3_0m_depth.tif`,
   `outputs/tradeoff.csv`, `outputs/pipeline_report.txt` and the three
   `outputs/risk_surge_*_svi_equal.csv` tables. A live acquisition, the
   `acquire_dataset` tool, any analysis build (including `critic --check`) and
   `hazard --check` or a hazard mutation sweep can rewrite them. Before any commit,
-  and after any sweep, `git status` must show all nine unmodified. Restore any
+  and after any sweep, `git status` must show all fourteen unmodified. Restore any
   that changed with `git checkout -- <file>`, and never stage them while a sweep
   is running.
 
