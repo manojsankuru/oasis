@@ -2155,3 +2155,11 @@ zero-change first-attempt success.
 **Why.** Not determined. Nothing checks the order of an answer's parts.
 **Did the agent recover?** No. The order is in the final answer. The weights it states are correct.
 **Kept as a paper failure case?** Not decided.
+
+## 2026-11-04 — the unchanged transfer failed on New Hanover County, NC
+
+**What happened.** For optional item B, `src/config.py` `TRANSFER_AREA` was set to New Hanover County, North Carolina (37, 129) in a scratch clone at `717926e`, with no code change. `python -m src.experiments.transfer --check` passed 42 of 42. `python -m src.experiments.transfer` then failed while acquiring OSM facilities: "ServiceError: https://overpass-api.de/api/interpreter: 1 of 71 returned features fall outside the requested bbox (-78.02992200018996, 33.786800000001406, -77.67527599957793, 34.38935900017112); the south,west,north,east conversion is wrong and the layer describes somewhere else". The config paths were restored and the primary snapshot was unchanged. The first attempt's structured report was overwritten when the runner went on to Galveston County, TX, so a second attempt was run at 16:04 UTC. It failed with the same error, and its report is `outputs/paper/transfer_reports/37129.json` (run `20261104T160445491859Z-25f2d947`). Galveston County, TX (48, 167) completed on its first attempt (`outputs/paper/transfer_reports/48167.json`).
+**Where.** `src/acquire.py`, the Overpass facilities retrieval and its returned-extent check.
+**Why.** Not determined. The check reads any returned feature outside the requested bbox as a swapped coordinate order. One feature of 71 fell outside, and which feature, or why, was not inspected.
+**Did the agent recover?** No. The transfer stopped with a structured failure report. Nothing was changed, as the plan for item B requires.
+**Kept as a paper failure case?** Not decided.
