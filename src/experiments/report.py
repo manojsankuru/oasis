@@ -201,6 +201,12 @@ EXPECTED_PAPER_KEYS = (
     "robustness.rate_count",
     "robustness.fault_kind_count",
     "limitations.county_count",
+    "results.sensitivity_quantile",
+    "results.sensitivity_surge_height_m",
+    "results.median_leader_population",
+    "results.p80_leader_population",
+    "results.primary_within_scenario_jaccard_min",
+    "results.primary_within_scenario_jaccard_max",
 )
 
 
@@ -1456,11 +1462,80 @@ def _overlap_payload(
     ):
         raise EvidenceError("priority overlap matrix is not a symmetric similarity")
     selector = "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS"
+    within = [jaccard[i][j] for i in range(size) for j in range(i + 1, size) if runs[i][0] == runs[j][0]]
     return {
+        "within_scenario_jaccard_min": _metric(
+            min(within), "ratio", source, selector,
+            "smallest Jaccard overlap between two presets' top tens in the same scenario",
+        ),
+        "within_scenario_jaccard_max": _metric(
+            max(within), "ratio", source, selector,
+            "largest Jaccard overlap between two presets' top tens in the same scenario",
+        ),
         "runs": _metric([list(run) for run in runs], "scenario and preset", source, selector, "row and column order of shared_tracts and jaccard"),
         "shared_tracts": _metric(shared, "tracts", source, selector, "count of top-ten tracts two runs have in common"),
         "jaccard": _metric(jaccard, "ratio", source, selector, "shared tracts divided by the tracts in either top ten"),
     }
+
+
+def _sensitivity_leaders(
+    rows: list[dict[str, Any]],
+    sensitivity: dict[tuple[str, str], int],
+    source: str,
+    risk_sources: dict[str, str],
+) -> dict[str, JsonValue]:
+    middle = hazard.HAZARD_SCENARIOS[len(hazard.HAZARD_SCENARIOS) // 2]
+    scenario = middle.name
+    group = [row for row in rows if row["scenario"] == scenario]
+    at_median = sorted((int(row["vulnerable_population_in_priority"]) for row in group), reverse=True)
+    at_strict = sorted((sensitivity[(scenario, row["preset"])] for row in group), reverse=True)
+    median = max(group, key=lambda row: int(row["vulnerable_population_in_priority"]))
+    strict = max(group, key=lambda row: sensitivity[(scenario, row["preset"])])
+    selector = f"scenario={scenario}; the middle configured scenario"
+    return {
+        "scenario": _metric(scenario, "scenario name", source, selector, "middle entry of HAZARD_SCENARIOS"),
+        "surge_height_m": _metric(
+            float(middle.surge_height_m), "metres", source, selector, "surge height of the middle configured scenario"
+        ),
+        "median_leader": _metric(
+            str(median["preset"]), "preset name", source, selector,
+            "preset whose vulnerable_population_in_priority is largest at the default quantile",
+        ),
+        "median_leader_population": _metric(
+            int(median["vulnerable_population_in_priority"]), "people", source,
+            f"{selector}; preset={median['preset']}; column=vulnerable_population_in_priority",
+            f"the largest {schemas.vulnerable_population_label()} in the priority set among the presets",
+        ),
+        "p80_leader": _metric(
+            str(strict["preset"]), "preset name", risk_sources[scenario], selector,
+            "preset whose vulnerable population is largest at the sensitivity quantile",
+        ),
+        "median_runner_up_population": _metric(
+            at_median[1] if len(at_median) > 1 else 0, "people", source, selector,
+            "second largest vulnerable_population_in_priority among the presets at the default quantile",
+        ),
+        "p80_runner_up_population": _metric(
+            at_strict[1] if len(at_strict) > 1 else 0, "people", risk_sources[scenario], selector,
+            "second largest vulnerable population among the presets at the sensitivity quantile",
+        ),
+        "p80_leader_population": _metric(
+            sensitivity[(scenario, strict["preset"])], "people", risk_sources[scenario],
+            f"{selector}; preset={strict['preset']}; vulnerable_quantile={SENSITIVITY_VULNERABLE_QUANTILE}",
+            f"the largest {schemas.vulnerable_population_label(SENSITIVITY_VULNERABLE_QUANTILE)} "
+            "in the priority set among the presets",
+        ),
+    }
+
+
+def _require_paper_claims(payload: dict[str, JsonValue]) -> None:
+    leaders = payload["tradeoffs"]["primary"]["sensitivity_leaders"]
+    value = {key: item["value"] for key, item in leaders.items()}
+    if value["median_leader_population"] <= value["median_runner_up_population"]:
+        raise EvidenceError("presets tie at the default quantile, so the paper's leader at the median no longer holds")
+    if value["p80_leader_population"] <= value["p80_runner_up_population"]:
+        raise EvidenceError("presets tie at the sensitivity quantile, so the paper's leader at that cut no longer holds")
+    if value["median_leader"] == value["p80_leader"]:
+        raise EvidenceError("the same preset leads at both quantiles, so the paper sentence on the cut no longer holds")
 
 
 def _changes_file_payload(data: bytes, row_count: int, source: str) -> dict[str, JsonValue]:
@@ -1593,6 +1668,11 @@ def _paper_catalog(report: dict[str, JsonValue]) -> dict[str, Metric]:
     primary_alignment = _mapping(alignment["primary"], "report.alignment.primary")
     transfer_section = _mapping(report["transfer"], "report.transfer")
     robustness = _mapping(report["robustness"], "report.robustness")
+    primary_tradeoffs = _mapping(
+        _mapping(report["tradeoffs"], "report.tradeoffs")["primary"], "report.tradeoffs.primary"
+    )
+    leaders = _mapping(primary_tradeoffs["sensitivity_leaders"], "report.tradeoffs.primary.sensitivity_leaders")
+    overlap = _mapping(primary_tradeoffs["overlap"], "report.tradeoffs.primary.overlap")
     mappings: dict[str, Any] = {
         "abstract.primary_tract_count": primary["tract_count"],
         "abstract.scenario_count": configuration["scenario_count"],
@@ -1626,6 +1706,12 @@ def _paper_catalog(report: dict[str, JsonValue]) -> dict[str, Metric]:
         "robustness.rate_count": robustness["rate_count"],
         "robustness.fault_kind_count": robustness["fault_kind_count"],
         "limitations.county_count": configuration["configured_county_count"],
+        "results.sensitivity_quantile": configuration["sensitivity_vulnerable_quantile"],
+        "results.sensitivity_surge_height_m": leaders["surge_height_m"],
+        "results.median_leader_population": leaders["median_leader_population"],
+        "results.p80_leader_population": leaders["p80_leader_population"],
+        "results.primary_within_scenario_jaccard_min": overlap["within_scenario_jaccard_min"],
+        "results.primary_within_scenario_jaccard_max": overlap["within_scenario_jaccard_max"],
     }
     catalog: dict[str, Metric] = {}
     for key, raw in mappings.items():
@@ -2119,6 +2205,9 @@ def _assemble(root: Path, generated_at: str | None = None) -> tuple[dict[str, Js
                     changes, "primary", scenarios, presets, paper_tradeoff_source, primary_risk_sources
                 ),
                 "overlap": _overlap_payload(primary_tradeoffs, scenarios, presets, paper_tradeoff_source),
+                "sensitivity_leaders": _sensitivity_leaders(
+                    primary_tradeoffs, primary_sensitivity, paper_tradeoff_source, primary_risk_sources
+                ),
             },
             "transfer": {
                 "row_count": _metric(
@@ -2616,12 +2705,15 @@ def generate(
     root: Path = config.PROJECT_ROOT,
     destination: Path | None = None,
     generated_at: str | None = None,
+    paper_claims: bool = False,
 ) -> Path:
     """Build, validate, and write the production numbers artifact."""
     repository = Path(root).resolve()
     target = Path(destination) if destination is not None else repository / OUTPUT_RELATIVE
     payload, changes = _assemble(repository, generated_at=generated_at)
     _validate_payload(payload, repository, repository / PAPER_RELATIVE)
+    if paper_claims:
+        _require_paper_claims(payload)
     written = _atomic_bytes(target.parent / PRIORITY_CHANGES_RELATIVE.name, changes)
     recorded = payload["tradeoffs"]["priority_changes_file"]["sha256"]["value"]
     if hashlib.sha256(written.read_bytes()).hexdigest() != recorded:
@@ -3372,6 +3464,26 @@ def _hash_change_refusal(base: Path, cases: Path, delete: bool) -> bool:
     )
 
 
+def _claims_case(payload: dict[str, Any], *, same_leader: bool = False, tie: bool = False) -> dict[str, Any]:
+    case = json.loads(json.dumps(payload))
+    leaders = case["tradeoffs"]["primary"]["sensitivity_leaders"]
+    leaders["median_leader"]["value"] = "first"
+    leaders["p80_leader"]["value"] = "first" if same_leader else "second"
+    leaders["median_leader_population"]["value"] = 200
+    leaders["median_runner_up_population"]["value"] = 200 if tie else 100
+    leaders["p80_leader_population"]["value"] = 50
+    leaders["p80_runner_up_population"]["value"] = 40
+    return case
+
+
+def _claims_accepted(payload: dict[str, Any]) -> bool:
+    try:
+        _require_paper_claims(payload)
+    except EvidenceError:
+        return False
+    return True
+
+
 def _self_check() -> int:
     """Run realistic offline positive and negative report gates."""
     from unittest.mock import patch
@@ -3424,11 +3536,17 @@ def _self_check() -> int:
             ("a complete realistic offline fixture builds", bool(good)),
             ("the schema is stable and versioned", good.get("schema_version") == SCHEMA_VERSION),
             ("all agreed semantic paper keys are mapped", set(good["paper_keys"]) == set(EXPECTED_PAPER_KEYS)),
-            ("the paper key catalogue contains exactly the agreed 28 mappings", len(EXPECTED_PAPER_KEYS) == 28),
+            ("the paper key catalogue contains exactly the agreed 34 mappings", len(EXPECTED_PAPER_KEYS) == 34),
             ("fixed evidence and timestamp produce deterministic JSON", encoded == repeated),
             ("production generation never called the pipeline or network", generated.is_file()),
             ("production generation did not mutate a source artifact", before == after),
             ("the generated JSON is strict and round-trips", parsed == good),
+            ("the paper's sentence on the cut is refused when one preset leads at both quantiles",
+             verify.refuses(lambda: _require_paper_claims(_claims_case(good, same_leader=True)), EvidenceError, "same preset")),
+            ("the paper's sentence on the cut is refused when presets tie at a quantile",
+             verify.refuses(lambda: _require_paper_claims(_claims_case(good, tie=True)), EvidenceError, "tie")),
+            ("the paper's sentence on the cut is accepted when two different presets lead untied",
+             _claims_accepted(_claims_case(good))),
             ("both vulnerability quantiles are stated in the configuration",
              good["configuration"]["vulnerable_quantile"]["value"] == risk.DEFAULT_VULNERABLE_QUANTILE
              and good["configuration"]["sensitivity_vulnerable_quantile"]["value"] == SENSITIVITY_VULNERABLE_QUANTILE),
@@ -3828,7 +3946,7 @@ def _self_check() -> int:
 
 def main() -> int:
     """Write the production report and print a compact evidence summary."""
-    destination = generate()
+    destination = generate(paper_claims=True)
     payload = _load_json(destination)
     paper_keys = _mapping(payload.get("paper_keys"), "numbers.paper_keys")
     missing = _sequence(payload.get("missing_evidence"), "numbers.missing_evidence")
