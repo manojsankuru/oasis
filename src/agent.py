@@ -84,7 +84,8 @@ RULES = """How to work:
 - The risk score is county-relative: it says which units here are worst, never
   whether here is bad in absolute terms. Say so when you quote it.
 - Keep the final answer short. Name the tools you used, quote the exact numbers
-  they returned, and state the scenario and weighting the answer is conditional on."""
+  they returned, and state the scenario and weighting the answer is conditional on.
+  Name only the tools you called in this run."""
 
 
 def tool_inventory(pending: tuple[str, ...] = ()) -> str:
