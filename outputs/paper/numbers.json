@@ -299,7 +299,7 @@
       }
     }
   },
-  "generated_at": "2026-10-29T23:26:36.348050+00:00",
+  "generated_at": "2026-11-04T19:23:51.523965+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -550,6 +550,20 @@
       "unit": "model-visible tools",
       "value": 11
     },
+    "results.median_leader_population": {
+      "derivation": "the largest population in tracts at or above the county median vulnerability in the priority set among the presets",
+      "selector": "scenario=surge_3_0m; the middle configured scenario; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+      "source": "outputs/paper/tradeoff.csv",
+      "unit": "people",
+      "value": 25670
+    },
+    "results.p80_leader_population": {
+      "derivation": "the largest population in tracts at or above the county 80th percentile vulnerability in the priority set among the presets",
+      "selector": "scenario=surge_3_0m; the middle configured scenario; preset=svi_themes; vulnerable_quantile=0.8",
+      "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+      "unit": "people",
+      "value": 5873
+    },
     "results.primary_population": {
       "derivation": "sum of the validated tract population column; repeated scenario tables agree",
       "selector": "column=population; aggregation=sum; all rows",
@@ -570,6 +584,34 @@
       "source": "data/snapshot/manifest.json",
       "unit": "tracts",
       "value": 99
+    },
+    "results.primary_within_scenario_jaccard_max": {
+      "derivation": "largest Jaccard overlap between two presets' top tens in the same scenario",
+      "selector": "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS",
+      "source": "outputs/paper/tradeoff.csv",
+      "unit": "ratio",
+      "value": 1.0
+    },
+    "results.primary_within_scenario_jaccard_min": {
+      "derivation": "smallest Jaccard overlap between two presets' top tens in the same scenario",
+      "selector": "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS",
+      "source": "outputs/paper/tradeoff.csv",
+      "unit": "ratio",
+      "value": 0.3333333333333333
+    },
+    "results.sensitivity_quantile": {
+      "derivation": "the stricter cut reported beside the default for every trade-off row",
+      "selector": "SENSITIVITY_VULNERABLE_QUANTILE",
+      "source": "src/experiments/report.py",
+      "unit": "quantile",
+      "value": 0.8
+    },
+    "results.sensitivity_surge_height_m": {
+      "derivation": "surge height of the middle configured scenario",
+      "selector": "scenario=surge_3_0m; the middle configured scenario",
+      "source": "outputs/paper/tradeoff.csv",
+      "unit": "metres",
+      "value": 3.0
     },
     "results.transfer_facility_count": {
       "derivation": "registered facility feature count",
@@ -2073,14 +2115,14 @@
       "sha256": "7868bf2ea73c8a400dc3f8faa97761e06f5de06c9caade391b0471adc1d692a2"
     },
     "paper/main.tex": {
-      "bytes": 17008,
+      "bytes": 18209,
       "role": "paper placeholder source",
-      "sha256": "2783ce6229086533220af7ec6aea64ee64c3b95625b0ca412114bbc6ed95a9b6"
+      "sha256": "5221cf4b952c93f1ade74d8982a4516fac76b5423b53ada74d27e0b90447557d"
     },
     "src/agent.py": {
-      "bytes": 16446,
+      "bytes": 16492,
       "role": "configuration constant source: agent",
-      "sha256": "eec4224bcf4edbdcab8459f03804cb26f823f2576361797273c9331c007f765e"
+      "sha256": "946ce9f5e1133cc641a10d52e3e9b40a103dee8dda1ec547f1771748aaa11955"
     },
     "src/config.py": {
       "bytes": 6050,
@@ -2093,9 +2135,9 @@
       "sha256": "d2c9cb41cb764e95198d35de1781a3092b197ac182a62c70d2ecc305cd7e7e2e"
     },
     "src/experiments/report.py": {
-      "bytes": 164040,
+      "bytes": 170812,
       "role": "configuration constant source: report",
-      "sha256": "bc104db2d67da3650e8b689548cc3a68aeadddaf5d468a55eb3b5e81420f5dc2"
+      "sha256": "b96a1103974c235ed1979dfdf2895ccb4d43498d9467cf36b14365b719570e91"
     },
     "src/hazard.py": {
       "bytes": 66600,
@@ -2505,6 +2547,20 @@
               10
             ]
           ]
+        },
+        "within_scenario_jaccard_max": {
+          "derivation": "largest Jaccard overlap between two presets' top tens in the same scenario",
+          "selector": "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "ratio",
+          "value": 1.0
+        },
+        "within_scenario_jaccard_min": {
+          "derivation": "smallest Jaccard overlap between two presets' top tens in the same scenario",
+          "selector": "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "ratio",
+          "value": 0.3333333333333333
         }
       },
       "priority_changes": {
@@ -3966,7 +4022,65 @@
             "value": 32757
           }
         }
-      ]
+      ],
+      "sensitivity_leaders": {
+        "median_leader": {
+          "derivation": "preset whose vulnerable_population_in_priority is largest at the default quantile",
+          "selector": "scenario=surge_3_0m; the middle configured scenario",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "preset name",
+          "value": "evacuation_capacity"
+        },
+        "median_leader_population": {
+          "derivation": "the largest population in tracts at or above the county median vulnerability in the priority set among the presets",
+          "selector": "scenario=surge_3_0m; the middle configured scenario; preset=evacuation_capacity; column=vulnerable_population_in_priority",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "people",
+          "value": 25670
+        },
+        "median_runner_up_population": {
+          "derivation": "second largest vulnerable_population_in_priority among the presets at the default quantile",
+          "selector": "scenario=surge_3_0m; the middle configured scenario",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "people",
+          "value": 24652
+        },
+        "p80_leader": {
+          "derivation": "preset whose vulnerable population is largest at the sensitivity quantile",
+          "selector": "scenario=surge_3_0m; the middle configured scenario",
+          "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+          "unit": "preset name",
+          "value": "svi_themes"
+        },
+        "p80_leader_population": {
+          "derivation": "the largest population in tracts at or above the county 80th percentile vulnerability in the priority set among the presets",
+          "selector": "scenario=surge_3_0m; the middle configured scenario; preset=svi_themes; vulnerable_quantile=0.8",
+          "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+          "unit": "people",
+          "value": 5873
+        },
+        "p80_runner_up_population": {
+          "derivation": "second largest vulnerable population among the presets at the sensitivity quantile",
+          "selector": "scenario=surge_3_0m; the middle configured scenario",
+          "source": "outputs/risk_surge_3_0m_svi_equal.csv",
+          "unit": "people",
+          "value": 4343
+        },
+        "scenario": {
+          "derivation": "middle entry of HAZARD_SCENARIOS",
+          "selector": "scenario=surge_3_0m; the middle configured scenario",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "scenario name",
+          "value": "surge_3_0m"
+        },
+        "surge_height_m": {
+          "derivation": "surge height of the middle configured scenario",
+          "selector": "scenario=surge_3_0m; the middle configured scenario",
+          "source": "outputs/paper/tradeoff.csv",
+          "unit": "metres",
+          "value": 3.0
+        }
+      }
     },
     "priority_changes_file": {
       "bytes": {
@@ -4257,6 +4371,20 @@
               10
             ]
           ]
+        },
+        "within_scenario_jaccard_max": {
+          "derivation": "largest Jaccard overlap between two presets' top tens in the same scenario",
+          "selector": "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+          "unit": "ratio",
+          "value": 0.8181818181818182
+        },
+        "within_scenario_jaccard_min": {
+          "derivation": "smallest Jaccard overlap between two presets' top tens in the same scenario",
+          "selector": "top_geoids of every scenario/preset row, scenario-major over HAZARD_SCENARIOS x WEIGHT_PRESETS",
+          "source": "outputs/paper/transfer/20260901T231445085774Z-4c1011c1/tradeoff.csv",
+          "unit": "ratio",
+          "value": 0.6666666666666666
         }
       },
       "priority_changes": {
@@ -5865,14 +5993,14 @@
       "selector": "all semantic \\\\TD{key} occurrences",
       "source": "paper/main.tex",
       "unit": "mapped placeholders",
-      "value": 28
+      "value": 34
     },
     "quantitative_placeholder_count": {
       "derivation": "count after rejecting generic and duplicate placeholders",
       "selector": "all semantic \\\\TD{key} occurrences",
       "source": "paper/main.tex",
       "unit": "placeholders",
-      "value": 28
+      "value": 34
     },
     "remaining_prose_todo_count": {
       "derivation": "counted separately from quantitative placeholders so mapping cannot imply the paper is complete",
