@@ -2081,6 +2081,24 @@ def _surface_checks(results: dict[str, ToolResult]) -> list[tuple[str, bool]]:
         for spec in specs
         if schemas.PENDING_SUFFIX in spec["function"]["description"]
     }
+    probe = sorted(BACKING_MODULES)[0]
+    original = BACKING_MODULES[probe]
+    BACKING_MODULES[probe] = "a_module_nobody_wrote"
+    try:
+        injected = pending_tools()
+        injected_marked = {
+            spec["function"]["name"]
+            for spec in tool_specs()
+            if schemas.PENDING_SUFFIX in spec["function"]["description"]
+        }
+        try:
+            injected_refusal = _backing(probe)
+        except ImportError as raised:
+            injected_refusal = {"error": type(raised).__name__}
+    finally:
+        BACKING_MODULES[probe] = original
+    print(f"  with {probe}'s module missing: pending {list(injected)}, "
+          f"refusal {injected_refusal.get('error') if isinstance(injected_refusal, dict) else None}")
     return [
         ("the advertised surface and the executable one agree", not faults),
         ("every frozen tool name is executable", set(TOOL_FUNCTIONS) == set(TOOL_NAMES)),
@@ -2094,6 +2112,15 @@ def _surface_checks(results: dict[str, ToolResult]) -> list[tuple[str, bool]]:
          set(pending) == {
              name for name, module in BACKING_MODULES.items() if not module_present(module)
          }),
+        ("a tool whose module goes missing is reported as pending, and no other tool joins it",
+         set(injected) == set(pending) | {probe}),
+        ("the specs then mark that tool as pending", injected_marked == set(pending) | {probe}),
+        ("that tool then refuses, naming its missing module and saying it was advertised as pending",
+         isinstance(injected_refusal, dict)
+         and injected_refusal.get("error") == "tool_unavailable"
+         and injected_refusal.get("backing_module") == "src/a_module_nobody_wrote.py"
+         and injected_refusal.get("advertised_as_pending") is True),
+        ("the probe reads the real checkout again once the module is put back", pending_tools() == pending),
         ("the specs the agent sends mark exactly the pending tools", marked == set(pending)),
         ("every implemented tool is a callable the loop can reach",
          all(callable(TOOL_FUNCTIONS[name]) for name in TOOL_NAMES)),
