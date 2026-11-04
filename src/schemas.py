@@ -147,8 +147,8 @@ def vulnerable_population_label(quantile: float = DEFAULT_VULNERABLE_QUANTILE) -
 
 _SCENARIO_HELP = (
     f"Name of a surge scenario. The ones this study area carries are "
-    f"{_named(SCENARIO_NAMES)}. Leave empty for the deepest one that is not the "
-    "only one, or call hazard_exposure with an empty name to see the list."
+    f"{_named(SCENARIO_NAMES)}. Leave empty for {SCENARIO_NAMES[0]}, the shallowest. "
+    "An unknown name is refused with the list."
 )
 
 _PRESET_HELP = (
@@ -969,6 +969,9 @@ def _label_checks() -> list[tuple[str, bool]]:
          and fields["export_map"].default is False
          and export.get("type") == "boolean" and export.get("default") is False),
         ("only risk_scenario takes export_map", carriers == ["risk_scenario"]),
+        ("the scenario help names the first scenario as the empty default, and it is the shallowest",
+         f"Leave empty for {SCENARIO_NAMES[0]}, the shallowest" in _SCENARIO_HELP
+         and HAZARD_SCENARIOS[0].surge_height_m == min(item.surge_height_m for item in HAZARD_SCENARIOS)),
     ]
 
 
