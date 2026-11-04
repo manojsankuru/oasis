@@ -509,26 +509,29 @@ the Overpass API. Map data © OpenStreetMap contributors, available under the
 Open Database License (ODbL) as stated at
 https://www.openstreetmap.org/copyright. The manifest records the licence as
 "ODbL" without a version.
-The raw layer, `data/snapshot/facilities.geojson`, is not committed. These
-committed files are derived from it, because the resilience component counts
-the facilities each tract can reach:
+The raw layer, `data/snapshot/facilities.geojson`, is committed so that a fresh
+clone can run `critic --check` and `tools --check`. These committed files are
+derived from it, because the resilience component counts the facilities each
+tract can reach:
 
 - `outputs/risk_surge_*_svi_equal.csv` and
   `outputs/paper/transfer/*/risk_surge_*_svi_equal.csv`, through the
   `resilience_index` column
-- `outputs/tradeoff.csv`, `outputs/paper/tradeoff.csv` and
-  `outputs/paper/transfer/*/tradeoff.csv`, whose priority sets are ranked with
-  that column
+- `outputs/tradeoff.csv`, `outputs/paper/tradeoff.csv`,
+  `outputs/paper/transfer/*/tradeoff.csv` and `outputs/paper/priority_changes.csv`,
+  whose priority sets are ranked with that column
 - `outputs/pipeline_report.txt` and `outputs/paper/transfer/*/pipeline_report.txt`,
   which report facility counts
 - `data/snapshot/manifest.json`, `outputs/paper/transfer_report.json`,
-  `outputs/paper/numbers.json` and `outputs/paper/transfer_attempts/*.json`,
-  which record facility counts, hashes and provenance
-- `paper/figs/risk_surface.pdf` and `paper/figs/tradeoff.pdf`, which are drawn
-  from those tables
+  `outputs/paper/numbers.json`, `outputs/paper/transfer_attempts/*.json` and
+  `outputs/paper/transfer_reports/*.json`, which record facility counts, hashes
+  and provenance
+- `paper/figs/risk_surface.pdf`, `paper/figs/tradeoff.pdf` and
+  `paper/figs/priority_overlap.pdf`, which are drawn from those tables
 
-The files listed above are derived from OpenStreetMap and are available under
-the ODbL, not under the MIT License that covers this repository's code.
+`data/snapshot/facilities.geojson` and the files listed above are derived from
+OpenStreetMap and are available under the ODbL, not under the MIT License that
+covers this repository's code.
 
 **U.S. Census Bureau and USGS.** The TIGERweb tract and block-group boundaries
 and the ACS estimates come from the U.S. Census Bureau. The 3DEP elevation
