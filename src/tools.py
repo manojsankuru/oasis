@@ -1651,8 +1651,8 @@ def answer_note(elicited: bool | str, channel: str, stated: str, used: bool) -> 
         if stated:
             return "a person at a terminal answered this in their own words." + words
         return (
-            "a person at a terminal answered this and the county was re-scored under "
-            "what they chose"
+            "a person at a terminal answered this, and ask_user_preferences re-scored the "
+            "county under what they chose. Call risk_scenario with this preset for the full table."
         )
     if elicited == SCRIPTED:
         lead = (
@@ -1663,7 +1663,10 @@ def answer_note(elicited: bool | str, channel: str, stated: str, used: bool) -> 
             return lead + " Its reply could not be used." + imposed
         if stated:
             return lead + words.replace("Their", "Its")
-        return lead + " The county was re-scored under what it chose."
+        return lead + (
+            " ask_user_preferences re-scored the county under what it chose. Call "
+            "risk_scenario with this preset for the full table."
+        )
     if channel == "script":
         return (
             "the script held no reply for this question, so nobody answered. The "
@@ -1711,9 +1714,8 @@ def weighting_effect(name: str) -> dict[str, Any]:
         "weights_origin": risk.origin,
         "dropped_against_each_other_weighting": dropped,
         "note": (
-            "these units were re-scored under the weighting named above, through the "
-            "same call risk_scenario makes. Pass that name as the preset argument to "
-            "risk_scenario to work with the full table."
+            "ask_user_preferences re-scored these units under the weighting named above. "
+            "Call risk_scenario with this preset for the full table."
         ),
     }
 
@@ -2284,6 +2286,22 @@ def _agreement_checks() -> list[tuple[str, bool]]:
          == f"{schemas.vulnerable_population_label()} in the priority set"),
         ("the comparison covered every weighting the project defines",
          compared["weightings_compared"] == len(WEIGHT_PRESETS)),
+        ("the scenario help names the scenario an empty name gets, and it is the shallowest",
+         f"Leave empty for {_scenario('').name}, the shallowest" in schemas._SCENARIO_HELP
+         and _scenario("").surge_height_m == min(item.surge_height_m for item in HAZARD_SCENARIOS)),
+        ("an unknown scenario name is refused with the list the help promises",
+         sorted(hazard_exposure(scenario="not_a_scenario").get("scenarios", [])) == sorted(SCENARIOS)),
+        ("the agent's rules tell the model to name only the tools it called",
+         "Name only the tools you called in this run." in importlib.import_module(f"{__package__}.agent").RULES),
+        ("no note a preference returns says risk_scenario has run",
+         all(
+             "same call risk_scenario makes" not in text and "Call risk_scenario with this preset" in text
+             for text in (
+                 answer_note(True, "terminal", "", True),
+                 answer_note(SCRIPTED, "script", "", True),
+                 weighting_effect(DEFAULT_PRESET.name)["note"],
+             )
+         )),
     ]
 
 
