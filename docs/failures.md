@@ -2163,3 +2163,11 @@ zero-change first-attempt success.
 **Why.** Not determined. The check reads any returned feature outside the requested bbox as a swapped coordinate order. One feature of 71 fell outside, and which feature, or why, was not inspected.
 **Did the agent recover?** No. The transfer stopped with a structured failure report. Nothing was changed, as the plan for item B requires.
 **Kept as a paper failure case?** Not decided.
+
+## 2026-11-04 — the cold-start answer ranked tracts without asking for a preference
+
+**What happened.** The first live cold start from chat, `python -m src.demo --area transfer "Which communities should be prioritised under a three metre surge, and who does that choice leave out?"` (`google/gemini-2.5-pro`, log `outputs/agent-area/20261104T190600026683Z-dd30bc68/transfer-work/20261104T190600026683Z-dd30bc68/logs/run_20261104_140600.jsonl`), acquired every layer into an empty Chatham workspace, called `compare_scenarios` and gave a final answer that ranks tracts under all three weightings. It never called `ask_user_preferences`, although `src/agent.py` `RULES` say "Call ask_user_preferences BEFORE you decide one". The run finished in 10 model calls within the bound of 15, the critic sent back one draft for an untraced "15 social vulnerability indicators", and the primary snapshot fingerprint was unchanged.
+**Where.** The model's tool sequence, against the preference rule in `src/agent.py` `RULES`.
+**Why.** Not determined. The answer compares every named weighting instead of choosing one, which the rule may not read as a priority ordering.
+**Did the agent recover?** No. The final answer passed the critic without a preference being asked.
+**Kept as a paper failure case?** Not decided.
