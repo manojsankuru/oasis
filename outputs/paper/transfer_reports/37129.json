@@ -1,0 +1,212 @@
+{
+  "alignment": null,
+  "boundary_verification": null,
+  "config_paths_restored": true,
+  "datasets": [],
+  "error": {
+    "message": "https://overpass-api.de/api/interpreter: 1 of 71 returned features fall outside the requested bbox (-78.02992200018996, 33.786800000001406, -77.67527599957793, 34.38935900017112); the south,west,north,east conversion is wrong and the layer describes somewhere else",
+    "message_sha256": "8e81f8e9f14c21d195a045be80f4aa7731a0b4e835a39f30d0137fc361c94015",
+    "type": "ServiceError"
+  },
+  "finished_at": "2026-11-04T16:05:45.250593+00:00",
+  "last_observable_action": "ServiceError raised during acquisition: https://overpass-api.de/api/interpreter: 1 of 71 returned features fall outside the requested bbox (-78.02992200018996, 33.786800000001406, -77.67527599957793, 34.38935900017112); the south,west,north,east conversion is wrong and the layer describes somewhere else",
+  "manifest_path": "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot/manifest.json",
+  "network_attempts": null,
+  "partial_pipeline_files": [],
+  "pipeline": null,
+  "pipeline_output_path": "outputs/paper/transfer/20261104T160445491859Z-25f2d947",
+  "primary_snapshot_after": {
+    "inventory": {
+      "3depelevation.tif": {
+        "sha256": "e043cedeab927393d67e078b32a2eeda883feb40a482b01eedf2ffcf992fa25e",
+        "size": 32773212,
+        "st_mtime_ns": 1793808010980127900
+      },
+      "acs.parquet": {
+        "sha256": "0a2d2e2fc6e3fbf528982d66dcd2f755f5373fed93e5c39d59ead8482be23647",
+        "size": 92138,
+        "st_mtime_ns": 1793808010937985500
+      },
+      "acs_block_groups.parquet": {
+        "sha256": "bcb3edd3732b87db7407625b46c14a7aa4983c8612bbb5f110c6670374229dfc",
+        "size": 12302,
+        "st_mtime_ns": 1793808010938985000
+      },
+      "block_groups.geojson": {
+        "sha256": "727feb28e263675ee697d44fd0538fc3546c47644ac653a3e430fd2ca21c6c22",
+        "size": 4211886,
+        "st_mtime_ns": 1793808010943502600
+      },
+      "facilities.geojson": {
+        "sha256": "848ab6a5d8b125d7040de1724cd3e1381cf1cfd40cf8c492df2b1508566bb77c",
+        "size": 1020829,
+        "st_mtime_ns": 1793808010999887200
+      },
+      "flood_zones.geojson": {
+        "sha256": "3d1c97f364d79ddea88df2f57d2d52e3736b1d8a24ffe31782bcf796f7bfaa8a",
+        "size": 159,
+        "st_mtime_ns": 1793808010944510800
+      },
+      "manifest.json": {
+        "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+        "size": 39338,
+        "st_mtime_ns": 1793808010935983100
+      },
+      "tracts.geojson": {
+        "sha256": "bd0cdf4598a261ab2b9dc2a84c7b2912d483f1c57c2835daa197d46ce3bf75b3",
+        "size": 2198821,
+        "st_mtime_ns": 1793808010996879800
+      }
+    },
+    "manifest": {
+      "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+      "size": 39338,
+      "st_mtime_ns": 1793808010935983100
+    },
+    "manifest_path": "data/snapshot/manifest.json",
+    "tract_count": 99
+  },
+  "primary_snapshot_before": {
+    "inventory": {
+      "3depelevation.tif": {
+        "sha256": "e043cedeab927393d67e078b32a2eeda883feb40a482b01eedf2ffcf992fa25e",
+        "size": 32773212,
+        "st_mtime_ns": 1793808010980127900
+      },
+      "acs.parquet": {
+        "sha256": "0a2d2e2fc6e3fbf528982d66dcd2f755f5373fed93e5c39d59ead8482be23647",
+        "size": 92138,
+        "st_mtime_ns": 1793808010937985500
+      },
+      "acs_block_groups.parquet": {
+        "sha256": "bcb3edd3732b87db7407625b46c14a7aa4983c8612bbb5f110c6670374229dfc",
+        "size": 12302,
+        "st_mtime_ns": 1793808010938985000
+      },
+      "block_groups.geojson": {
+        "sha256": "727feb28e263675ee697d44fd0538fc3546c47644ac653a3e430fd2ca21c6c22",
+        "size": 4211886,
+        "st_mtime_ns": 1793808010943502600
+      },
+      "facilities.geojson": {
+        "sha256": "848ab6a5d8b125d7040de1724cd3e1381cf1cfd40cf8c492df2b1508566bb77c",
+        "size": 1020829,
+        "st_mtime_ns": 1793808010999887200
+      },
+      "flood_zones.geojson": {
+        "sha256": "3d1c97f364d79ddea88df2f57d2d52e3736b1d8a24ffe31782bcf796f7bfaa8a",
+        "size": 159,
+        "st_mtime_ns": 1793808010944510800
+      },
+      "manifest.json": {
+        "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+        "size": 39338,
+        "st_mtime_ns": 1793808010935983100
+      },
+      "tracts.geojson": {
+        "sha256": "bd0cdf4598a261ab2b9dc2a84c7b2912d483f1c57c2835daa197d46ce3bf75b3",
+        "size": 2198821,
+        "st_mtime_ns": 1793808010996879800
+      }
+    },
+    "manifest": {
+      "sha256": "b037ceebff19a55479a58c4d912f58f88a2ce251955846c660b160a3f3b6336d",
+      "size": 39338,
+      "st_mtime_ns": 1793808010935983100
+    },
+    "manifest_path": "data/snapshot/manifest.json",
+    "tract_count": 99
+  },
+  "primary_snapshot_unchanged": true,
+  "primary_tradeoff": {
+    "byte_count": 1992,
+    "bytes_equal": true,
+    "columns": [
+      "preset",
+      "scenario",
+      "population_in_priority",
+      "vulnerable_population_in_priority",
+      "mean_inundation_m",
+      "top_geoids",
+      "displaced_geoids"
+    ],
+    "columns_equal": true,
+    "destination": "outputs/paper/tradeoff.csv",
+    "destination_sha256": "bec5ca3f1cfacb724476ccf616afb6c8c85a006902e9a45fa7b09b2e1dffbff1",
+    "row_count": 9,
+    "rows_equal": true,
+    "source": "outputs/tradeoff.csv",
+    "source_sha256": "bec5ca3f1cfacb724476ccf616afb6c8c85a006902e9a45fa7b09b2e1dffbff1"
+  },
+  "retries_by_stage": null,
+  "retry_observability": "not_exposed",
+  "run_id": "20261104T160445491859Z-25f2d947",
+  "safety_verification": {
+    "config_paths_after": {
+      "DATA_DIR": "data",
+      "DERIVED_DIR": "data/derived",
+      "MANIFEST_PATH": "data/snapshot/manifest.json",
+      "PROJECT_ROOT": ".",
+      "SNAPSHOT_DIR": "data/snapshot"
+    },
+    "config_paths_before": {
+      "DATA_DIR": "data",
+      "DERIVED_DIR": "data/derived",
+      "MANIFEST_PATH": "data/snapshot/manifest.json",
+      "PROJECT_ROOT": ".",
+      "SNAPSHOT_DIR": "data/snapshot"
+    },
+    "config_paths_restored": true,
+    "git_data_state": {
+      "clean": true,
+      "staged_diff": {
+        "error": "",
+        "output": "",
+        "return_code": 0
+      },
+      "status": {
+        "error": "",
+        "output": "",
+        "return_code": 0
+      },
+      "unstaged_diff": {
+        "error": "",
+        "output": "",
+        "return_code": 0
+      }
+    },
+    "isolated_layout": {
+      "DATA_DIR": "outputs/transfer-work/20261104T160445491859Z-25f2d947/data",
+      "DERIVED_DIR": "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/derived",
+      "MANIFEST_PATH": "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot/manifest.json",
+      "PROJECT_ROOT": "outputs/transfer-work/20261104T160445491859Z-25f2d947",
+      "SNAPSHOT_DIR": "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot"
+    },
+    "post_attempt_errors": [],
+    "primary_fingerprint_error": null,
+    "primary_registry_reload": true,
+    "primary_snapshot_unchanged": true
+  },
+  "schema_version": 1,
+  "snapshot_path": "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot",
+  "stage": "acquisition",
+  "started_at": "2026-11-04T16:04:45.495935+00:00",
+  "status": "failed",
+  "study_area": {
+    "county_fips": "129",
+    "name": "New Hanover County, North Carolina",
+    "state_fips": "37",
+    "working_crs": "EPSG:5070"
+  },
+  "unregistered_partial_files": [
+    "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot/3depelevation.tif",
+    "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot/acs.parquet",
+    "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot/acs_block_groups.parquet",
+    "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot/block_groups.geojson",
+    "outputs/transfer-work/20261104T160445491859Z-25f2d947/data/snapshot/tracts.geojson"
+  ],
+  "warnings": [],
+  "work_root": "outputs/transfer-work/20261104T160445491859Z-25f2d947",
+  "working_crs": "EPSG:5070",
+  "written_files": []
+}
