@@ -1827,10 +1827,20 @@ def ask_user_preferences(question: str) -> ToolResult:
 @tool
 def run_spatial_code(code: str, timeout_s: float = 60.0) -> ToolResult:
     """Execute model-written Python against the cleaned layers."""
+    global _FAILED_CODE_RUNS
     module = _backing("run_spatial_code")
     if isinstance(module, dict):
         return module
+    if CODE_ATTEMPTS is not None and _FAILED_CODE_RUNS >= CODE_ATTEMPTS:
+        return {
+            "error": REPAIR_OFF,
+            "detail": (
+                f"repair is switched off for this run: {_FAILED_CODE_RUNS} code run(s) in a "
+                f"row failed, which is all this run allows, so this code was not run"
+            ),
+        }
     run = module.Sandbox().run(code, timeout_s=timeout_s)
+    _FAILED_CODE_RUNS = 0 if run.exit_code == 0 else _FAILED_CODE_RUNS + 1
     return {
         "exit_code": run.exit_code,
         "stdout": run.stdout,
@@ -1846,6 +1856,11 @@ def validate_answer(answer: str) -> ToolResult:
     module = _backing("validate_answer")
     if isinstance(module, dict):
         return module
+    if not CRITIC_ENABLED:
+        return {
+            "error": CRITIC_OFF,
+            "detail": "the critic is switched off for this run, so the draft was not checked",
+        }
     report = module.Critic().check(answer, logged_calls(), 1)
     return {
         "cycle": report.cycle,
@@ -1896,6 +1911,33 @@ def _retrievers() -> tuple[Retriever, ...]:
         Retriever((acquire.DATASET_FACILITIES,), acquire.acquire_facilities, True),
         Retriever((acquire.DATASET_FLOOD_ZONES,), acquire.acquire_flood_zones, True),
     )
+
+
+CODE_ATTEMPTS: int | None = None
+"""How many code runs in a row may fail before `run_spatial_code` refuses the next.
+
+None is the full system: the model repairs for as long as the iteration bound
+allows. 1 is the cohort's repair-off condition. Set for each run by
+`configure_run`, which `agent.run_agent` calls."""
+
+CRITIC_ENABLED: bool = True
+"""False in the cohort's critic-off condition, where `validate_answer` refuses."""
+
+_FAILED_CODE_RUNS = 0
+"""Code runs in a row that failed in this run. A successful run resets it."""
+
+REPAIR_OFF = "repair_off"
+CRITIC_OFF = "critic_off"
+
+
+def configure_run(code_attempts: int | None = None, critic_enabled: bool = True) -> None:
+    """Set what one run allows, starting from no failed code run."""
+    global CODE_ATTEMPTS, CRITIC_ENABLED, _FAILED_CODE_RUNS
+    if code_attempts is not None and int(code_attempts) < 1:
+        raise ValueError(f"code_attempts must be at least 1, or None, not {code_attempts}")
+    CODE_ATTEMPTS = None if code_attempts is None else int(code_attempts)
+    CRITIC_ENABLED = bool(critic_enabled)
+    _FAILED_CODE_RUNS = 0
 
 
 def module_present(name: str) -> bool:
@@ -2063,6 +2105,49 @@ def _every_result() -> dict[str, ToolResult]:
         name: TOOL_FUNCTIONS[name](**SAMPLE_ARGUMENTS[name])
         for name in sorted(TOOL_FUNCTIONS)
     }
+
+
+def _scratch_checks(scratch: Path) -> list[tuple[str, bool]]:
+    """That the suite's own analysis build wrote into the scratch directory."""
+    state = analysis()
+    written = list(state.result.written)
+    rasters = [Path(surface.depth_path) for surface in state.result.hazard.surfaces.values()]
+    print(f"  the shared run wrote {len(written)} table(s) and {len(rasters)} depth raster(s); "
+          f"all inside the scratch directory: "
+          f"{all(scratch in path.parents for path in written + rasters)}")
+
+    settings = tuple(getattr(config, name) for name in verify.SCRATCH_SETTINGS)
+    with tempfile.TemporaryDirectory(prefix="tools-stamp-check-") as folder:
+        watched = Path(folder)
+        committed = watched / "committed.csv"
+        committed.write_bytes(b"geoid,score\r\n1,0.5\r\n")
+        os.utime(committed, ns=(1_000_000_000, 1_000_000_000))
+
+        def rewrite(inner: Path) -> list[tuple[str, bool]]:
+            committed.write_bytes(b"geoid,score\r\n1,0.5\r\n")
+            return []
+
+        def leave(inner: Path) -> list[tuple[str, bool]]:
+            return []
+
+        rewritten = verify.checked_in_scratch("tools-stamp-", rewrite, watched=(watched,))
+        os.utime(committed, ns=(1_000_000_000, 1_000_000_000))
+        left = verify.checked_in_scratch("tools-stamp-", leave, watched=(watched,))
+        nothing = watched / "nothing"
+        nothing.mkdir()
+        unwatched = verify.checked_in_scratch("tools-stamp-", leave, watched=(nothing,))
+    restored = tuple(getattr(config, name) for name in verify.SCRATCH_SETTINGS) == settings
+    return [
+        ("the shared run wrote its tables into the scratch directory, not outputs/",
+         bool(written) and all(scratch in path.parents for path in written)),
+        ("and its depth rasters too, not data/derived/",
+         bool(rasters) and all(scratch in path.parents for path in rasters)),
+        ("a committed file rewritten with identical bytes is still reported as changed",
+         rewritten[-1][1] is False),
+        ("a suite that writes nothing is reported as changing nothing", left[-1][1] is True),
+        ("a watch over no file proves nothing, so it does not pass", unwatched[-1][1] is False),
+        ("the build directories are put back once a scratch suite ends", restored),
+    ]
 
 
 def _surface_checks(results: dict[str, ToolResult]) -> list[tuple[str, bool]]:
@@ -2755,6 +2840,115 @@ def _map_checks() -> list[tuple[str, bool]]:
          from_file == ranked and len(ranked) > 0 and ranked != default_top),
         ("every argument risk_scenario advertises besides the weights is one it takes",
          advertised <= set(inspect.signature(risk_scenario).parameters) and "export_map" in advertised),
+    ]
+
+
+def _condition_checks() -> list[tuple[str, bool]]:
+    """The cohort's switches, through `agent.run_agent` with only the model scripted.
+
+    Everything goes through `agent.tools`, the copy the executor really calls, and
+    that copy is lent this suite's analysis for the duration, so the check costs
+    two scripted runs rather than a second pipeline build."""
+    from types import SimpleNamespace
+
+    from . import agent, llm_client
+
+    target = agent.tools
+    lent = target._ANALYSIS
+    target._ANALYSIS = analysis()
+
+    def call(name: str, arguments: dict[str, Any], index: int) -> Any:
+        return SimpleNamespace(
+            id=f"call_{index}", function=SimpleNamespace(name=name, arguments=json.dumps(arguments))
+        )
+
+    def run(**options: Any) -> dict[str, Any]:
+        script: list[list[Any] | None] = [
+            [call("run_spatial_code", {"code": "raise ValueError('first attempt')"}, 1)],
+            [call("run_spatial_code", {"code": "print('second attempt')"}, 2)],
+            [call("validate_answer", {"answer": "The total is 4 people."}, 3)],
+            None,
+        ]
+
+        def chat(client: Any, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None,
+                 model: str | None = None) -> Any:
+            calls = script.pop(0) if script else None
+            message = SimpleNamespace(content=None if calls else "The code gave no usable figure.", tool_calls=calls)
+            return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="tool_calls" if calls else "stop")])
+
+        def client() -> Any:
+            return object()
+
+        real = llm_client.make_client, llm_client.chat
+        saved = config.LOGS_DIR, config.OUTPUTS_DIR
+        llm_client.make_client, llm_client.chat = client, chat
+        try:
+            with tempfile.TemporaryDirectory(prefix="tools-conditions-", ignore_cleanup_errors=True) as folder:
+                config.LOGS_DIR = config.OUTPUTS_DIR = Path(folder)
+                result = agent.run_agent("conditions check", verbose=False, **options)
+                return {**result, "transcript_name": Path(result["transcript_path"]).name}
+        finally:
+            llm_client.make_client, llm_client.chat = real
+            config.LOGS_DIR, config.OUTPUTS_DIR = saved
+
+    def code_results(result: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            step["payload"]["result"]
+            for step in result["steps"]
+            if step.get("step") == "tool_result" and step["payload"].get("tool") == "run_spatial_code"
+        ]
+
+    def started(result: dict[str, Any]) -> dict[str, Any]:
+        return next(step["payload"] for step in result["steps"] if step.get("step") == "run_start")
+
+    def critic_passes(result: dict[str, Any]) -> int:
+        return sum(step.get("step") == agent.CRITIC_STEP for step in result["steps"])
+
+    def validated(result: dict[str, Any]) -> dict[str, Any]:
+        return next(
+            (step["payload"]["result"] for step in result["steps"]
+             if step.get("step") == "tool_result" and step["payload"].get("tool") == "validate_answer"),
+            {},
+        )
+
+    try:
+        off = run(use_critic=False, code_attempts=1, run_id="tools-conditions-off")
+        off_settings = (target.CODE_ATTEMPTS, target.CRITIC_ENABLED)
+        target.configure_run(code_attempts=1)
+        fresh = target.run_spatial_code(code="print('a new run starts clean')")
+        full = run(run_id="tools-conditions-full")
+        full_settings = (target.CODE_ATTEMPTS, target.CRITIC_ENABLED)
+    finally:
+        target.configure_run()
+        target._ANALYSIS = lent
+    off_code, full_code = code_results(off), code_results(full)
+    print(f"  critic and repair off: code results {[item.get('exit_code', item.get('error')) for item in off_code]}, "
+          f"critic passes {critic_passes(off)}, transcript {off['transcript_name']}")
+    print(f"  full system: code results {[item.get('exit_code', item.get('error')) for item in full_code]}, "
+          f"critic passes {critic_passes(full)}")
+    print(f"  validate_answer inside the run with the critic off: {validated(off).get('error')!r}; "
+          f"with it on: {validated(full).get('error')!r}")
+    return [
+        ("with repair off, the first code run runs and fails",
+         len(off_code) == 2 and off_code[0].get("exit_code") not in (0, None)),
+        ("and the next code call is refused as repair_off, never run",
+         off_code[1].get("error") == target.REPAIR_OFF and "exit_code" not in off_code[1]),
+        ("with repair on, the same second call runs",
+         len(full_code) == 2 and full_code[0].get("exit_code") not in (0, None) and full_code[1].get("exit_code") == 0),
+        ("with the critic off no draft is checked; with it on the draft is",
+         critic_passes(off) == 0 and critic_passes(full) == 1),
+        ("run_start records each run's switches",
+         (started(off).get("use_critic"), started(off).get("code_attempts")) == (False, 1)
+         and (started(full).get("use_critic"), started(full).get("code_attempts")) == (True, None)),
+        ("a caller's run id names the transcript", off["transcript_name"] == "run_tools-conditions-off.json"),
+        ("the loop hands the switches to the tools the executor calls", off_settings == (1, False)),
+        ("and a run with no switches gets the shipped settings back", full_settings == (None, True)),
+        ("validate_answer refuses the model while the critic is off, and answers it when it is on",
+         validated(off).get("error") == target.CRITIC_OFF
+         and validated(full).get("error") is None and "numbers_checked" in validated(full)),
+        ("a new run starts with no failed code run carried over", fresh.get("exit_code") == 0),
+        ("code_attempts below one is refused",
+         verify.refuses(lambda: target.configure_run(code_attempts=0), ValueError, "at least 1")),
     ]
 
 
@@ -3593,13 +3787,14 @@ def _self_check() -> int:
     # `_scripted_checks` names a script of its own and puts this one back.
     scripted = os.environ.pop(SCRIPTED_REPLIES_ENV, None)
     try:
-        return _run_checks()
+        checks = verify.checked_in_scratch("geoagent-tools-check-", _run_checks)
     finally:
         if scripted is not None:
             os.environ[SCRIPTED_REPLIES_ENV] = scripted
+    return verify.report(checks)
 
 
-def _run_checks() -> int:
+def _run_checks(scratch: Path) -> list[tuple[str, bool]]:
     """Every check, in order, with the environment `_self_check` prepared."""
     global ELICIT
     # `SAMPLE_ARGUMENTS` calls every tool, `ask_user_preferences` among them, and
@@ -3612,7 +3807,9 @@ def _run_checks() -> int:
     finally:
         ELICIT = True
 
-    checks = _surface_checks(results)
+    checks = _scratch_checks(scratch)
+    print()
+    checks += _surface_checks(results)
     print()
     checks += _fault_checks()
     print()
@@ -3652,6 +3849,8 @@ def _run_checks() -> int:
     print()
     checks += _map_checks()
     print()
+    checks += _condition_checks()
+    print()
     checks += _cache_checks()
     print()
     checks += verify.discipline_checks(sys.modules[__name__])
@@ -3667,7 +3866,7 @@ def _run_checks() -> int:
         print()
         print(f"the loop's collaborators -- {module.__name__}:")
         checks += verify.discipline_checks(module)
-    return verify.report(checks)
+    return checks
 
 
 if __name__ == "__main__":
