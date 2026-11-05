@@ -14,11 +14,15 @@ the one nobody re-reads.
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import re
+import subprocess
 import sys
+import tempfile
+from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, Callable, Iterator
 
 from . import acquire, config
 
@@ -205,6 +209,138 @@ def refuses(call: Any, kind: type[BaseException], phrase: str) -> bool:
     except Exception:
         return False
     return False
+
+
+SCRATCH_SETTINGS: tuple[str, ...] = ("OUTPUTS_DIR", "DERIVED_DIR", "LOGS_DIR")
+"""The `config` directories an analysis build or an agent run writes into.
+
+Six committed files live under the first two. Rebuilt on Linux, the tables come
+back with LF where the commits hold CRLF and the raster deflates to different
+bytes, so a check that rebuilt them in place dirtied the checkout with identical
+content."""
+
+WATCHED_DIRECTORIES: tuple[str, ...] = ("OUTPUTS_DIR", "DERIVED_DIR", "SNAPSHOT_DIR")
+"""Where the committed outputs and data live, read off `config` at call time."""
+
+
+@contextlib.contextmanager
+def scratch_builds(prefix: str) -> Iterator[Path]:
+    """Send every build inside the block to a temporary directory, then restore."""
+    saved = {name: getattr(config, name) for name in SCRATCH_SETTINGS}
+    with tempfile.TemporaryDirectory(prefix=prefix, ignore_cleanup_errors=True) as where:
+        scratch = Path(where)
+        try:
+            for name, value in saved.items():
+                setattr(config, name, scratch / value.name)
+            yield scratch
+        finally:
+            for name, value in saved.items():
+                setattr(config, name, value)
+
+
+def file_stamps(paths: list[Path]) -> dict[str, tuple[int, int]]:
+    """Size and modification time of each of these files that exists."""
+    return {
+        path.as_posix(): (path.stat().st_size, path.stat().st_mtime_ns)
+        for path in paths
+        if path.is_file()
+    }
+
+
+def files_under(*directories: Path) -> list[Path]:
+    return [
+        path
+        for directory in directories
+        if directory.is_dir()
+        for path in sorted(directory.rglob("*"))
+        if path.is_file()
+    ]
+
+
+def git_listing(root: Path, *arguments: str) -> list[str] | None:
+    """One NUL-separated git listing under `root`, or None when git cannot answer."""
+    try:
+        done = subprocess.run(
+            ["git", "-C", str(root), *arguments], capture_output=True, check=True, timeout=120
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return [item for item in done.stdout.decode("utf-8", "replace").split("\0") if item]
+
+
+def git_ignores(root: Path, path: Path) -> bool | None:
+    """Do git's ignore rules exclude this path? None when git cannot answer."""
+    try:
+        done = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-q", "--no-index", str(path)],
+            capture_output=True, timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return {0: True, 1: False}.get(done.returncode)
+
+
+def committed_state(directories: tuple[Path, ...]) -> tuple[dict[str, tuple[int, int]], list[str]] | None:
+    """Stamps of the files git tracks under these directories, and git's status for them.
+
+    Tracked files only, so a live run writing its own ignored transcript while a
+    check runs is not a change; the status lines catch an unignored file appearing."""
+    project = config.PROJECT_ROOT
+    try:
+        scopes = [directory.resolve().relative_to(project.resolve()).as_posix() for directory in directories]
+    except ValueError:
+        return None
+    tracked = git_listing(project, "ls-files", "-z", "--", *scopes)
+    status = git_listing(
+        project, "--no-optional-locks", "status", "--porcelain", "-z", "--untracked-files=all", "--", *scopes
+    )
+    if tracked is None or status is None:
+        return None
+    return file_stamps([project / name for name in tracked]), status
+
+
+def checked_in_scratch(
+    prefix: str,
+    run: Callable[[Path], list[tuple[str, bool]]],
+    watched: tuple[Path, ...] | None = None,
+) -> list[tuple[str, bool]]:
+    """Run a suite with its builds in scratch, and check that no committed file moved."""
+    if watched is None:
+        directories = tuple(getattr(config, name) for name in WATCHED_DIRECTORIES)
+        state: Callable[[], tuple[dict[str, tuple[int, int]], list[str]] | None] = (
+            lambda: committed_state(directories)
+        )
+    else:
+        directories = watched
+        state = lambda: (file_stamps(files_under(*watched)), [])
+    first = state()
+    if first is None:
+        directories = watched or directories
+        state = lambda: (file_stamps(files_under(*directories)), [])
+        first = state()
+    before, status_before = first
+    with scratch_builds(prefix) as scratch:
+        checks = run(scratch)
+        loaded = sys.modules.get(f"{__package__}.tools")
+        if loaded is not None:
+            loaded.invalidate()
+    after, status_after = state() or ({}, [])
+    moved = sorted(name for name in before.keys() | after.keys() if before.get(name) != after.get(name))
+    appeared = sorted(set(status_after) - set(status_before))
+    print()
+    print(f"  {len(before)} watched file(s) under {', '.join(item.name for item in directories)}; "
+          f"changed while the checks ran: {len(moved)}; new status lines: {len(appeared)}")
+    for name in (moved + appeared)[:10]:
+        print(f"    {name}")
+    return checks + [
+        ("no tracked file under outputs/, data/derived/ or data/snapshot/ changed while the checks ran",
+         bool(before) and not moved and not appeared),
+    ]
+
+
+def lf_normalised(content: bytes) -> bytes:
+    """Text bytes with CRLF read as LF. A NUL in the first 8000 bytes marks binary, kept as is."""
+    return content if b"\0" in content[:8000] else content.replace(b"\r\n", b"\n")
 
 
 def report(checks: list[tuple[str, bool]]) -> int:
