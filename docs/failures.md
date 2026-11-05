@@ -2171,3 +2171,19 @@ zero-change first-attempt success.
 **Why.** Not determined. The answer compares every named weighting instead of choosing one, which the rule may not read as a priority ordering.
 **Did the agent recover?** No. The final answer passed the critic without a preference being asked.
 **Kept as a paper failure case?** Not decided.
+
+## 2026-11-04 — a faults check read a refused connection's timeout as no transport error
+
+**What happened.** `python -m src.faults --check` failed one check on this Windows machine, both at the pushed `8f5e08c` and with the bbox-guard change: "a transport error reached the real request path". The check sends a request to a closed loopback port with `timeout_s=2.0`. Acquire's error text was "http://127.0.0.1:55719/0/query: ConnectTimeout: HTTPConnectionPool(host='127.0.0.1', port=55719): Max retries ...", and the check accepted only the text "ConnectionError". Three runs failed the same way. Because `faults --check` is the suite `mutate.py` judges `acquire` mutations by, a red baseline also stops any `acquire` sweep before it starts, with "BASELINE IS NOT GREEN".
+**Where.** `src/faults.py`, `_raster_and_error_checks`.
+**Why.** Windows refuses a connection to a closed localhost port only after retrying it. Three timed attempts here took 2.06 s, 2.02 s and 2.05 s to raise `ConnectionRefusedError`, which is longer than the 2.0 s connect timeout, so `requests` raised `ConnectTimeout`, a subclass of `ConnectionError`.
+**Did the agent recover?** Not an agent run. The check now accepts `ConnectTimeout` as well as `ConnectionError`, and `faults --check` passes 146 of 146.
+**Kept as a paper failure case?** Not decided.
+
+## 2026-11-05 — the New Hanover failure was one school at the bbox edge, and the guard was too strict
+
+**What happened.** The two New Hanover County, NC (37, 129) transfer failures on 2026-11-04 refused the OSM facilities layer because "1 of 71 returned features fall outside the requested bbox". The first attempt, run `20261104T160016542695Z-b964337e`, survives only as console output, because its structured report was overwritten. The second is `outputs/paper/transfer_reports/37129.json`. After the guard change at `d5ea362`, the unchanged transfer harness completed on New Hanover: run `20261105T024007659103Z-85795081`, report `outputs/paper/transfer_reports/37129-20261105T024007659103Z-85795081.json`. The facilities layer kept all 71 features, and its provenance note says "verified after the fact: 70 of 71 returned points fall inside the requested bbox and 1 lies outside it." The one outside is OSM way 419544620, Southport Elementary School. Its `out center` point (-78.030809, 33.925269) sits 0.000887 degrees, about 82 m, west of the bbox edge at -78.029922.
+**Where.** `src/acquire.py`, `fetch_osm`.
+**Why.** Overpass returns every way that touches the bbox, and `out center` places a way's centre on its whole extent, which can lie outside the bbox. The guard read any feature outside the bbox as a swapped south,west,north,east order. A swap asks about another place, so most of the layer lands outside, or nothing comes back. The guard now refuses a layer only when most of its features lie outside. It keeps the rest, with a provenance note naming how many lie outside, and it notes an empty answer as unchecked.
+**Did the agent recover?** Not an agent run. With the guard changed, the transfer completed with the primary snapshot unchanged.
+**Kept as a paper failure case?** Yes, by the owner's decision: a guard that was too strict.
