@@ -17,6 +17,7 @@ import json
 import math
 import os
 import re
+import shutil
 import socket
 import sys
 import tempfile
@@ -539,6 +540,10 @@ def _read_overlap(
     return PriorityOverlap(area_name=area_name, runs=runs, jaccard=matrix)
 
 
+def _same_text(first: Path, second: Path) -> bool:
+    return verify.lf_normalised(first.read_bytes()) == verify.lf_normalised(second.read_bytes())
+
+
 def _load_inputs() -> FigureInputs:
     transfer = _canonical_transfer_source()
     primary_tradeoff_path = config.PAPER_DIR / pipeline.TRADEOFF_NAME
@@ -546,8 +551,8 @@ def _load_inputs() -> FigureInputs:
     _require(pipeline_tradeoff_path.is_file(), f"primary pipeline trade-off is missing: {pipeline_tradeoff_path}")
     _require(primary_tradeoff_path.is_file(), f"primary paper trade-off is missing: {primary_tradeoff_path}")
     _require(
-        primary_tradeoff_path.read_bytes() == pipeline_tradeoff_path.read_bytes(),
-        "primary paper trade-off is not byte-identical to the pipeline artifact",
+        _same_text(primary_tradeoff_path, pipeline_tradeoff_path),
+        "primary paper trade-off differs from the pipeline artifact beyond line endings",
     )
     primary_tradeoff = _read_tradeoff(
         primary_tradeoff_path,
@@ -995,6 +1000,32 @@ def _forbidden_call_checks(module: ModuleType) -> list[tuple[str, bool]]:
     ]
 
 
+def _line_ending_load_checks() -> list[tuple[str, bool]]:
+    """Load the real evidence with an LF copy of the pipeline trade-off, then an edited one."""
+    saved = config.OUTPUTS_DIR
+    with tempfile.TemporaryDirectory(prefix="figures-lf-") as folder:
+        copy = Path(folder)
+        for path in sorted(saved.glob("risk_*.csv")) + [saved / pipeline.TRADEOFF_NAME]:
+            shutil.copyfile(path, copy / path.name)
+        tradeoff = copy / pipeline.TRADEOFF_NAME
+        tradeoff.write_bytes(verify.lf_normalised(tradeoff.read_bytes()))
+        try:
+            config.OUTPUTS_DIR = copy
+            with _offline():
+                lf_loaded = bool(_load_inputs().primary_tradeoff is not None)
+            text = tradeoff.read_bytes()
+            tradeoff.write_bytes(text.replace(b",", b";", 1))
+            with _offline():
+                edited_refused = verify.refuses(_load_inputs, ValueError, "beyond line endings")
+        finally:
+            config.OUTPUTS_DIR = saved
+    return [
+        ("the evidence loads when the pipeline trade-off has LF line endings and the paper copy CRLF",
+         lf_loaded),
+        ("and is refused when the pipeline trade-off differs in content", edited_refused),
+    ]
+
+
 def _negative_guard_checks(inputs: FigureInputs) -> list[tuple[str, bool]]:
     risk = inputs.risk.joined.drop(columns=[inputs.risk.joined.geometry.name]).copy()
     duplicate = risk.copy()
@@ -1024,7 +1055,16 @@ def _negative_guard_checks(inputs: FigureInputs) -> list[tuple[str, bool]]:
     lopsided["tradeoffs"]["primary"]["overlap"]["jaccard"]["value"][0][1] = 0.125
     absent = deepcopy(numbers)
     del absent["tradeoffs"]["primary"]["overlap"]
+    with tempfile.TemporaryDirectory(prefix="figures-eol-") as folder:
+        crlf, lf, other = (Path(folder) / name for name in ("crlf.csv", "lf.csv", "other.csv"))
+        crlf.write_bytes(b"geoid,score\r\n1,0.5\r\n")
+        lf.write_bytes(b"geoid,score\n1,0.5\n")
+        other.write_bytes(b"geoid,score\n1,0.6\n")
+        endings_only = _same_text(crlf, lf)
+        content_differs = _same_text(crlf, other)
     return [
+        ("a trade-off copy that differs from its source only in line endings matches it", endings_only),
+        ("a trade-off copy that differs in content does not", not content_differs),
         (
             "an overlap matrix that no longer matches the trade-off table is refused",
             verify.refuses(
@@ -1180,6 +1220,7 @@ def _self_check() -> int:
         ]
     )
     checks.extend(_negative_guard_checks(inputs))
+    checks.extend(_line_ending_load_checks())
     checks.extend(_forbidden_call_checks(sys.modules[__name__]))
     checks.extend(verify.discipline_checks(sys.modules[__name__]))
     return verify.report(checks)
