@@ -299,7 +299,7 @@
       }
     }
   },
-  "generated_at": "2026-11-04T19:23:51.523965+00:00",
+  "generated_at": "2026-11-05T16:11:36.543121+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -2079,6 +2079,56 @@
       "role": "run-scoped transfer trade-off table",
       "sha256": "8fc860a34bd97c1aebb6c04583ef3806c3e23f36dde379372535b150b54719fb"
     },
+    "outputs/paper/transfer/20261104T160115283090Z-8aa48554/pipeline_report.txt": {
+      "bytes": 27554,
+      "role": "transfer outputs of run 20261104T160115283090Z-8aa48554",
+      "sha256": "e83239664421dbf6c31f35c6fea789195e7b6e0b083b6a9fa11bf460b543ac67"
+    },
+    "outputs/paper/transfer/20261104T160115283090Z-8aa48554/risk_surge_1_5m_svi_equal.csv": {
+      "bytes": 22497,
+      "role": "transfer outputs of run 20261104T160115283090Z-8aa48554",
+      "sha256": "1be17ccf77e48b61e07bd9036ee48eea67a8c3d27f31014a5af52bc1c7202735"
+    },
+    "outputs/paper/transfer/20261104T160115283090Z-8aa48554/risk_surge_3_0m_svi_equal.csv": {
+      "bytes": 23660,
+      "role": "transfer outputs of run 20261104T160115283090Z-8aa48554",
+      "sha256": "a8c96c3672277ab4152de8e26f4ff1aaa6241ef0d9b2e45711ea1452a7dc38e4"
+    },
+    "outputs/paper/transfer/20261104T160115283090Z-8aa48554/risk_surge_5_0m_svi_equal.csv": {
+      "bytes": 24140,
+      "role": "transfer outputs of run 20261104T160115283090Z-8aa48554",
+      "sha256": "ca0429bd7c98111c5578ac7a7e4a5f8e3e7cf8cfe2203a3dc4c44a2bdc2a10cf"
+    },
+    "outputs/paper/transfer/20261104T160115283090Z-8aa48554/tradeoff.csv": {
+      "bytes": 1876,
+      "role": "transfer outputs of run 20261104T160115283090Z-8aa48554",
+      "sha256": "de5980b6b6e6a0462e5c2ee99e43a61922ff7aede3c0cf94f8ab58a064ecaeca"
+    },
+    "outputs/paper/transfer/20261105T024007659103Z-85795081/pipeline_report.txt": {
+      "bytes": 27356,
+      "role": "transfer outputs of run 20261105T024007659103Z-85795081",
+      "sha256": "e29317d8df730dd6b3b2b5c578d9b2f3f864d5f800afb4b455565fb33e75256e"
+    },
+    "outputs/paper/transfer/20261105T024007659103Z-85795081/risk_surge_1_5m_svi_equal.csv": {
+      "bytes": 12453,
+      "role": "transfer outputs of run 20261105T024007659103Z-85795081",
+      "sha256": "cd7464bfa2eda568c8df3d38cb5f1dfe8596f8b90d78251a88d79b42176aec8d"
+    },
+    "outputs/paper/transfer/20261105T024007659103Z-85795081/risk_surge_3_0m_svi_equal.csv": {
+      "bytes": 12497,
+      "role": "transfer outputs of run 20261105T024007659103Z-85795081",
+      "sha256": "e859a21873a8430a5462603f51b4f664f4d726fe657150b871977dbc96acf907"
+    },
+    "outputs/paper/transfer/20261105T024007659103Z-85795081/risk_surge_5_0m_svi_equal.csv": {
+      "bytes": 12624,
+      "role": "transfer outputs of run 20261105T024007659103Z-85795081",
+      "sha256": "725a74681c0ffaf328951d1282ce75298544f5abe641cb4b076ac29378dae581"
+    },
+    "outputs/paper/transfer/20261105T024007659103Z-85795081/tradeoff.csv": {
+      "bytes": 1806,
+      "role": "transfer outputs of run 20261105T024007659103Z-85795081",
+      "sha256": "f195bba22ce7149556ac8f203d6e8f18a394291d4ab634bdcb0e722ddfa027f0"
+    },
     "outputs/paper/transfer_attempts/20260901T165757230230Z-aa13b0d4.json": {
       "bytes": 7692,
       "role": "preserved initial failed transfer attempt",
@@ -2088,6 +2138,21 @@
       "bytes": 92756,
       "role": "canonical transfer report",
       "sha256": "7cdd95e291bd13e5ea1f6b7f3a249a0f1897e69ad23c6d453e50b36f4d76b131"
+    },
+    "outputs/paper/transfer_reports/37129-20261105T024007659103Z-85795081.json": {
+      "bytes": 93128,
+      "role": "per-run transfer report",
+      "sha256": "e0295891ef9d15dd7895e5f89b2b9b5313161755d055d5bbfafec2931cbab73e"
+    },
+    "outputs/paper/transfer_reports/37129.json": {
+      "bytes": 8116,
+      "role": "per-run transfer report",
+      "sha256": "2dca4d8447446b70918540d0a3799573ad29408e42b8ed270976b53a7dc8caf7"
+    },
+    "outputs/paper/transfer_reports/48167.json": {
+      "bytes": 93304,
+      "role": "per-run transfer report",
+      "sha256": "9ff2fe251f68936acbcf16f21c0de7da4ff2e0cf830d80bb32e053d88f399fc7"
     },
     "outputs/pipeline_report.txt": {
       "bytes": 27521,
@@ -2120,9 +2185,9 @@
       "sha256": "5221cf4b952c93f1ade74d8982a4516fac76b5423b53ada74d27e0b90447557d"
     },
     "src/agent.py": {
-      "bytes": 16492,
+      "bytes": 17193,
       "role": "configuration constant source: agent",
-      "sha256": "946ce9f5e1133cc641a10d52e3e9b40a103dee8dda1ec547f1771748aaa11955"
+      "sha256": "1a4a069d65139c48f2848ba2ebe451a6e20cd8d3891a2160967acdc3ed9eeeaa"
     },
     "src/config.py": {
       "bytes": 6050,
@@ -2135,24 +2200,24 @@
       "sha256": "d2c9cb41cb764e95198d35de1781a3092b197ac182a62c70d2ecc305cd7e7e2e"
     },
     "src/experiments/report.py": {
-      "bytes": 170812,
+      "bytes": 202205,
       "role": "configuration constant source: report",
-      "sha256": "b96a1103974c235ed1979dfdf2895ccb4d43498d9467cf36b14365b719570e91"
+      "sha256": "6f4fbebde45f81609d048a5ce4314ff4ac75ea7840a5a6e4c187b47e4e9e98cc"
     },
     "src/hazard.py": {
-      "bytes": 66600,
+      "bytes": 66736,
       "role": "configuration constant source: hazard",
-      "sha256": "2783ae99e3c1752d05c5e5a3f7bc097cce3790238e411790bf04d3306cb62512"
+      "sha256": "af34c07b508acdf3a882d78d8de81d339eea46939ffe9a81890d858ddde9d241"
     },
     "src/risk.py": {
-      "bytes": 67965,
+      "bytes": 68099,
       "role": "configuration constant source: risk",
-      "sha256": "2fbc6c24916b2a5c349c70af12c0bb09a914506ac1b896e4837dd65bfd635da1"
+      "sha256": "846dda6dcc95cf39ef303eacfc335b92290f9479533452f4ab12dbfb5e754729"
     },
     "src/sandbox.py": {
-      "bytes": 79370,
+      "bytes": 79507,
       "role": "configuration constant source: sandbox",
-      "sha256": "ab9bd67cd83275ac9f366c141b63800b1a0b26263071333016f66b85906ab771"
+      "sha256": "5aacc0d706eb81f2f1e6a2df3db2eb0ac2db36900e82a752ee4f667ac948f557"
     },
     "src/vulnerability.py": {
       "bytes": 40944,
@@ -5985,6 +6050,63 @@
         "13051990000"
       ]
     }
+  },
+  "transfer_reports": {
+    "completed_counties": [
+      "Galveston County, Texas",
+      "New Hanover County, North Carolina"
+    ],
+    "completed_reports": 2,
+    "directory": "outputs/paper/transfer_reports",
+    "failed_counties": [
+      "New Hanover County, North Carolina"
+    ],
+    "failed_reports": 1,
+    "reports": [
+      {
+        "derivation": "run id, county, status and stage, with the validated outputs of a completed run or the error type of a failed one",
+        "selector": "$",
+        "source": "outputs/paper/transfer_reports/48167.json",
+        "unit": "transfer report",
+        "value": {
+          "county": "Galveston County, Texas",
+          "geoid": "48167",
+          "outputs": "outputs/paper/transfer/20261104T160115283090Z-8aa48554",
+          "run_id": "20261104T160115283090Z-8aa48554",
+          "stage": "complete",
+          "status": "completed"
+        }
+      },
+      {
+        "derivation": "run id, county, status and stage, with the validated outputs of a completed run or the error type of a failed one",
+        "selector": "$",
+        "source": "outputs/paper/transfer_reports/37129.json",
+        "unit": "transfer report",
+        "value": {
+          "county": "New Hanover County, North Carolina",
+          "error_message_sha256": "8e81f8e9f14c21d195a045be80f4aa7731a0b4e835a39f30d0137fc361c94015",
+          "error_type": "ServiceError",
+          "geoid": "37129",
+          "run_id": "20261104T160445491859Z-25f2d947",
+          "stage": "acquisition",
+          "status": "failed"
+        }
+      },
+      {
+        "derivation": "run id, county, status and stage, with the validated outputs of a completed run or the error type of a failed one",
+        "selector": "$",
+        "source": "outputs/paper/transfer_reports/37129-20261105T024007659103Z-85795081.json",
+        "unit": "transfer report",
+        "value": {
+          "county": "New Hanover County, North Carolina",
+          "geoid": "37129",
+          "outputs": "outputs/paper/transfer/20261105T024007659103Z-85795081",
+          "run_id": "20261105T024007659103Z-85795081",
+          "stage": "complete",
+          "status": "completed"
+        }
+      }
+    ]
   },
   "verification": {
     "all_paper_todos_resolved": false,
