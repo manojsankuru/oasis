@@ -593,6 +593,10 @@ def _refusal_checks() -> list[tuple[str, bool]]:
 
 
 def _self_check() -> int:
+    return verify.report(verify.checked_in_scratch("geoagent-pipeline-check-", _all_checks))
+
+
+def _all_checks(scratch: Path) -> list[tuple[str, bool]]:
     result = run()
     print(
         f"study area: {result.study_area.name}   "
@@ -610,7 +614,7 @@ def _self_check() -> int:
     checks += _refusal_checks()
     print()
     checks += verify.discipline_checks(sys.modules[__name__])
-    return verify.report(checks)
+    return checks
 
 
 if __name__ == "__main__":
