@@ -241,9 +241,19 @@ def run_agent(
     max_iterations: int = config.MAX_ITERATIONS,
     verbose: bool = True,
     max_revisions: int = MAX_REVISIONS,
+    use_critic: bool = True,
+    code_attempts: int | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
-    """One question, up to `max_iterations` turns, everything logged."""
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    """One question, up to `max_iterations` turns, everything logged.
+
+    `use_critic=False` skips the critic entirely: no pass over a draft, and
+    `validate_answer` refuses. `code_attempts` is how many code runs in a row may
+    fail before `run_spatial_code` refuses the next one, so 1 turns repair off and
+    None leaves it to the iteration bound. A caller's `run_id` names the log and
+    the transcript, which is how a harness knows which run a crash belongs to.
+    """
+    run_id = run_id or datetime.now().strftime("%Y%m%d_%H%M%S")
     config.ensure_dirs()
     logger = RunLogger(run_id)
     tracer = trace.Tracer(verbose)
@@ -251,6 +261,7 @@ def run_agent(
     model = model or config.MODEL
     specs = tools.tool_specs()
     tools.forget_calls(question)
+    tools.configure_run(code_attempts=code_attempts, critic_enabled=use_critic)
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt()},
@@ -264,6 +275,8 @@ def run_agent(
             "base_url": config.API_BASE_URL,
             "tools_offered": [spec["function"]["name"] for spec in specs],
             "tools_pending": list(tools.pending_tools()),
+            "use_critic": use_critic,
+            "code_attempts": code_attempts,
         },
     )
     tracer.question(question, model, config.API_BASE_URL)
@@ -274,7 +287,7 @@ def run_agent(
     tool_calls_made = 0
     run_started = time.time()
 
-    critic = critic_module()
+    critic = critic_module() if use_critic else None
     revisions = Revisions(available=critic is not None)
     previous: tuple[CriticReport, str] | None = None
 
