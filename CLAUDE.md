@@ -25,9 +25,13 @@ responds to the program committee reviews.
 - `/failure` the moment something breaks, with the real error text.
 - The critic's ordering-gate wording (`ORDERING_LANGUAGE`, `WEIGHTING_LANGUAGE`,
   `TRADEOFF_LANGUAGE`) has been frozen since `c7df797`. From the commit that
-  declares the Session 7 cohort questions until the cohort finishes, nothing in
-  `src/critic.py`, the RULES text in `src/agent.py` or the notes the tools return
-  changes. Log a misfire with `/failure` and change nothing.
+  declares the Session 7 cohort questions until the cohort finishes, none of these
+  changes: `src/critic.py`, the RULES text in `src/agent.py`, the notes the tools
+  return, the tool descriptions and argument help in `src/schemas.py`, the model id
+  and model settings in `src/llm_client.py` and `src/config.py`, and the scripted
+  replies in `outputs/paper/cohort_replies.json`. `python -m src.experiments.cohort
+  --run` refuses to start a cell when a file the declaration fingerprinted differs.
+  Log a misfire with `/failure` and change nothing.
 - `src/contracts.py` stays frozen.
 - The model-visible tool count stays at 11.
 - Every number in the paper comes from `outputs/paper/numbers.json`.
@@ -39,8 +43,11 @@ responds to the program committee reviews.
   `data/derived/surge_3_0m_depth.tif`,
   `outputs/tradeoff.csv`, `outputs/pipeline_report.txt` and the three
   `outputs/risk_surge_*_svi_equal.csv` tables. A live acquisition, the
-  `acquire_dataset` tool, any analysis build (including `critic --check`) and
-  `hazard --check` or a hazard mutation sweep can rewrite them. Before any commit,
+  `acquire_dataset` tool, an analysis build such as `python -m src.pipeline`, and
+  `hazard --check` or a hazard mutation sweep can rewrite them. `critic --check`,
+  `tools --check` and `cohort --check` send their builds to a temporary directory
+  and fail if anything under `outputs/`, `data/derived/` or `data/snapshot/`
+  changed. Before any commit,
   and after any sweep, `git status` must show all fourteen unmodified. Restore any
   that changed with `git checkout -- <file>`, and never stage them while a sweep
   is running.
@@ -133,6 +140,8 @@ question -> orchestrator (LLM) -> tools --------------------> answer
 | `src/vulnerability.py` | percentile index, weights as parameters |
 | `src/hazard.py` | exposure from raster and vector hazard layers |
 | `src/experiments/transfer.py` | isolated second-area acquisition/pipeline evidence; never model-visible |
+| `src/experiments/cohort.py` | the declared Session 7 cohort: declare, run and resume its cells; never model-visible |
+| `src/experiments/redact.py` | takes the project id and named secrets out of a transcript before it is committed |
 | `src/risk.py` | hazard × exposure × vulnerability × resilience, components reported separately |
 | `src/pipeline.py` / `src/risk.py` | scenario and weighting sweep; `ScenarioRow` trade-off table |
 | `src/sandbox.py` | subprocess execution of model-written code, traceback return |
@@ -181,6 +190,8 @@ Every run writes `logs/run_<id>.jsonl` (one object per step, untruncated) and
 `.env` and `application_default_credentials.json` are git-ignored and must stay
 that way. Never write a key into `.env.example`, a test, a log, or a commit.
 Before any push: `git log --all -S<key-fragment>` must return nothing.
+A run transcript is committed only after `src/experiments/redact.py` has taken the
+project id and every named secret out of it.
 
 ## Deliberately out of scope
 
