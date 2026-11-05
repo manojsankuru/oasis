@@ -28,6 +28,7 @@ outputs/*
 !outputs/faults.json
 !outputs/paper/
 !outputs/paper/**
+!outputs/paper/fixtures/run_20261029_144950.json
 !outputs/tradeoff.csv
 !outputs/risk_surge_*_svi_equal.csv
 !outputs/pipeline_report.txt
