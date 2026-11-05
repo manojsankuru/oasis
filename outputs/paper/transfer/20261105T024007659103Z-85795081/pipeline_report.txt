@@ -1,0 +1,263 @@
+PIPELINE -- New Hanover County, North Carolina
+  working crs EPSG:5070   8 cleaned layer(s), 3 scenario(s), no model involved
+
+AlignmentReport -- New Hanover County, North Carolina
+
+  reprojected                 7         dataset(s), each read from its Provenance declared_crs -> working_crs
+      acs                   n/a -> EPSG:5070           not a vector layer
+      acs_block_groups      n/a -> EPSG:5070           not a vector layer
+      block_groups          EPSG:4326 -> EPSG:5070     observed on load: EPSG:5070
+      elevation             EPSG:5070 -> EPSG:5070     not a vector layer
+      facilities            EPSG:4326 -> EPSG:5070     observed on load: EPSG:5070
+      flood_zones           EPSG:4326 -> EPSG:5070     observed on load: EPSG:5070
+      tracts                EPSG:4326 -> EPSG:5070     observed on load: EPSG:5070
+  geometries_repaired         0         0 of 279 geometries were invalid across 4 layer(s)
+  geometries_dropped          0         of 279 examined: 0 missing, 0 empty, 0 unrepairable, 0 left enclosing no area
+      block_groups          examined 153    invalid 0    repaired 0    dropped 0
+      facilities            examined 71     invalid 0    repaired 0    dropped 0
+      flood_zones           examined 0      invalid 0    repaired 0    dropped 0
+      tracts                examined 55     invalid 0    repaired 0    dropped 0
+  sentinels_removed           {}        0 negative value(s) among 6466 present of 6466 cells over 114 column(s); 0 unparseable
+      acs                   112 column(s) x 55 row(s) = 6160 cells, 6160 present, 0 negative
+      acs_block_groups      2 column(s) x 153 row(s) = 306 cells, 306 present, 0 negative
+      this county carries no negative Census value in any scrubbed column; the family checked against is 18 generated jam codes, and the removal test is the sign, not the list
+  unmatched_left              0         geometry GEOIDs with no attribute row, of 416 compared across 2 join(s)
+  unmatched_right             0         attribute GEOIDs with no geometry, 208 matched
+      tracts + acs: 55 geometries (width [11]) and 55 attribute rows (width [11]) -> 55 joined
+      block_groups + acs_block_groups: 153 geometries (width [12]) and 153 attribute rows (width [12]) -> 153 joined
+
+  apportioned                 1         column(s) rolled up from a finer geography, over 153 finer unit(s)
+      sum of 153 block_groups_joined value(s) into 55 tracts_joined unit(s) by GEOID prefix, width 12 -> 11
+      0 child unit(s) with no parent, 0 parent(s) with no child, 0 aggregate(s) suppressed by a missing child
+  apportionment_error         {'population': 0.0} worst unit, not the county total -- a maximum cannot cancel the way a sum can
+      population            max |aggregated - published| = 0 over 55 unit(s); 235,229 aggregated against 235,229 published
+                            the % is taken over the 53 unit(s) publishing a non-zero value; 2 publish zero, where a relative error has no meaning and the absolute difference above is the real number
+                            this zero is guaranteed rather than measured: the Census controls block-group population to sum to the published tract estimate, so population is the one variable whose apportionment cannot disagree. An uncontrolled variable would not
+  units_below_cell_threshold  0         of 208 polygon(s) over 2 layer(s), threshold 10 cells
+      tracts_joined         55 polygon(s) over 3depelevation.tif: smallest covers 1349 cell(s), median 6,931, largest 311,437
+                            946,713 cell centre(s) inside them = 946,713 usable + 0 nodata + 0 non-finite; 0 polygon(s) held none, 0 fell outside the raster
+                            29.9954 m cells of 899.7 m2 in EPSG:5070, all_touched=False -- a cell belongs to the polygon its centre falls in, which is the rule the check verified
+      block_groups_joined   153 polygon(s) over 3depelevation.tif: smallest covers 161 cell(s), median 2,096, largest 311,437
+                            946,713 cell centre(s) inside them = 946,713 usable + 0 nodata + 0 non-finite; 0 polygon(s) held none, 0 fell outside the raster
+                            29.9954 m cells of 899.7 m2 in EPSG:5070, all_touched=False -- a cell belongs to the polygon its centre falls in, which is the rule the check verified
+
+  temporal_span               7         dataset vintage(s), read from Provenance
+      acs                   ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)
+      acs_block_groups      ACS 5-Year Detailed Tables (c_vintage 2024, temporal 2024/2024)
+      block_groups          Census Block Groups (layer 1) from service v11.5
+      elevation             3DEPElevation (esriImageServiceDataTypeElevation) from service v11.3; USGS National Map 3D Elevation Program (3DEP). October 27, 2026.
+      facilities            OSM planet as of 2026-11-05T02:40:19Z, via Overpass API 0.7.62.11 87bfad18
+      flood_zones           unavailable at retrieval time
+      tracts                Census Tracts (layer 0) from service v11.5
+
+  degraded retrievals -- zero features is an absence of data, not of hazard:
+      flood_zones: DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone ArcGISErrorBody: https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query: HTTP 200 with an ArcGIS error body (code 500): Error performing query operation
+
+  canonical columns derived from the resolved specs (9):
+      acs.pct_age_65_plus                100 * sum of 12 estimate(s) / B01001_001E, undefined where the denominator is zero
+      acs.pct_disability                 100 * sum of 12 estimate(s) / B18101_001E, undefined where the denominator is zero
+      acs.pct_limited_english            100 * sum of 24 estimate(s) / B16005_001E, undefined where the denominator is zero
+      acs.pct_no_vehicle                 100 * sum of 1 estimate(s) / B08201_001E, undefined where the denominator is zero
+      acs.pct_poverty                    100 * sum of 1 estimate(s) / B17001_001E, undefined where the denominator is zero
+      acs.population                     sum of 1 estimate(s) = B01003_001E
+      acs.population_moe                 root of the summed squares, the Bureau's published rule for the margin of a derived sum: B01003_001M
+      acs_block_groups.population        sum of 1 estimate(s) = B01003_001E
+      acs_block_groups.population_moe    root of the summed squares, the Bureau's published rule for the margin of a derived sum: B01003_001M
+
+  undefined shares            10        value(s) a zero universe left with no share -- counted here because a null this module makes by dividing is the same fact as one it makes by scrubbing
+      acs.pct_age_65_plus                2
+      acs.pct_disability                 2
+      acs.pct_limited_english            2
+      acs.pct_no_vehicle                 2
+      acs.pct_poverty                    2
+  columns dropped from joins  156       raw and coordinate-bearing column(s) cut so no tool can serialise a coordinate out of an aligned layer
+      block_groups_joined                24 dropped
+      tracts_joined                      132 dropped
+
+  warnings (6):
+      - flood_zones: retrieval degraded, so its 0 features are an absence of data rather than an absence of hazard. DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone
+      - acs: pct_age_65_plus is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_disability is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_limited_english is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_no_vehicle is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_poverty is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+
+RISK COMPONENTS -- surge_1_5m at 1.5 m, preset svi_equal (published_index)
+
+  inundated_fraction     weight 0.2500  direction +1  published 55 of 55, ranked over 55
+      why  the share of the unit's land the modelled surge covers -- the hazard itself, in the units it was measured in, before anyone is counted
+  exposed_population     weight 0.2500  direction +1  published 55 of 55, ranked over 55
+      why  how many residents live on that flooded land, summed from block groups rather than assumed spread evenly across the tract
+  vulnerability_index    weight 0.2500  direction +1  published 53 of 55, ranked over 53
+      why  how hard it is for those residents to leave and to recover, from the weighted percentile index over the five indicators
+  resilience_index       weight 0.2500  direction -1  published 55 of 55, ranked over 55
+      why  how many hospitals, schools, fire stations and community centres the unit can reach, which is the only capacity this snapshot can measure
+
+  exposure   25,932 resident(s) summed from 153 block groups, against 34,653 from the tract-uniform assumption over 55 tracts_joined
+             worst unit differs by 2,840 resident(s) = 71.73% over 55 comparable unit(s), 16 publishing zero; county population 235,229
+             sum of 153 block groups value(s) into 55 tracts_joined unit(s) by GEOID prefix, width 12 -> 11
+  resilience 71 of 71 facility(ies) within 5,000 m; per unit min 3, median 21.0, max 41; 0 unit(s) reach none
+             tag key 'amenity' read from facilities provenance: {"amenity": "^(hospital|school|community_centre|fire_station)$"}
+             matches by tag {'school': 936, 'fire_station': 206, 'hospital': 51, 'community_centre': 6}
+  vulnerability 53 of 55 unit(s) scored, 2 unscored
+
+  score      53 of 55 unit(s) scored, 2 unscored; 0.2207 to 0.8375
+             weights from https://www.atsdr.cdc.gov/place-health/php/svi/index.html
+
+PRIORITY TABLE -- top 10 of 53 scored unit(s)
+  rank  geoid            pop  flooded  exposed  meandep   vuln  resil  score
+     1  37129012106    7,207   0.3868    2,408    0.394  0.528  0.091  0.837
+     2  37129012300    8,653   0.4585    1,128    0.605  0.589  0.136  0.831
+     3  37129012201    2,928   0.5441    1,285    0.599  0.475  0.091  0.802
+     4  37129012107    4,534   0.4186    1,116    0.430  0.426  0.036  0.748
+     5  37129012202    3,873   0.4935      979    0.513  0.287  0.036  0.710
+     6  37129012203    2,466   0.7058      578    0.880  0.332  0.036  0.706
+     7  37129011503    4,831   0.4779    2,341    0.423  0.657  0.918  0.701
+     8  37129011800    2,776   0.8960    2,344    1.178  0.270  0.309  0.696
+     9  37129012108    3,420   0.2833      952    0.326  0.432  0.091  0.694
+    10  37129012111    6,663   0.3915    2,302    0.375  0.509  0.536  0.693
+  2 unit(s) are absent from this list because a component is undefined for them: ['37129980100', '37129990100']
+
+RISK COMPONENTS -- surge_3_0m at 3.0 m, preset svi_equal (published_index)
+
+  inundated_fraction     weight 0.2500  direction +1  published 55 of 55, ranked over 55
+      why  the share of the unit's land the modelled surge covers -- the hazard itself, in the units it was measured in, before anyone is counted
+  exposed_population     weight 0.2500  direction +1  published 55 of 55, ranked over 55
+      why  how many residents live on that flooded land, summed from block groups rather than assumed spread evenly across the tract
+  vulnerability_index    weight 0.2500  direction +1  published 53 of 55, ranked over 53
+      why  how hard it is for those residents to leave and to recover, from the weighted percentile index over the five indicators
+  resilience_index       weight 0.2500  direction -1  published 55 of 55, ranked over 55
+      why  how many hospitals, schools, fire stations and community centres the unit can reach, which is the only capacity this snapshot can measure
+
+  exposure   39,040 resident(s) summed from 153 block groups, against 47,905 from the tract-uniform assumption over 55 tracts_joined
+             worst unit differs by 3,010 resident(s) = 71.39% over 55 comparable unit(s), 14 publishing zero; county population 235,229
+             sum of 153 block groups value(s) into 55 tracts_joined unit(s) by GEOID prefix, width 12 -> 11
+  resilience 71 of 71 facility(ies) within 5,000 m; per unit min 3, median 21.0, max 41; 0 unit(s) reach none
+             tag key 'amenity' read from facilities provenance: {"amenity": "^(hospital|school|community_centre|fire_station)$"}
+             matches by tag {'school': 936, 'fire_station': 206, 'hospital': 51, 'community_centre': 6}
+  vulnerability 53 of 55 unit(s) scored, 2 unscored
+
+  score      53 of 55 unit(s) scored, 2 unscored; 0.2116 to 0.8284
+             weights from https://www.atsdr.cdc.gov/place-health/php/svi/index.html
+
+PRIORITY TABLE -- top 10 of 53 scored unit(s)
+  rank  geoid            pop  flooded  exposed  meandep   vuln  resil  score
+     1  37129012106    7,207   0.4859    3,148    1.039  0.528  0.091  0.828
+     2  37129012300    8,653   0.5579    1,817    1.368  0.589  0.136  0.827
+     3  37129012201    2,928   0.7314    1,871    1.575  0.475  0.091  0.797
+     4  37129012107    4,534   0.5965    1,921    1.179  0.426  0.036  0.771
+     5  37129012202    3,873   0.6213    1,554    1.352  0.287  0.036  0.715
+     6  37129012108    3,420   0.4567    1,465    0.880  0.432  0.091  0.703
+     7  37129012111    6,663   0.4969    3,338    1.034  0.509  0.536  0.698
+     8  37129012203    2,466   0.7582      694    1.982  0.332  0.036  0.697
+     9  37129011503    4,831   0.5844    2,814    1.216  0.657  0.918  0.696
+    10  37129011800    2,776   0.9891    2,753    2.617  0.270  0.309  0.687
+  2 unit(s) are absent from this list because a component is undefined for them: ['37129980100', '37129990100']
+
+RISK COMPONENTS -- surge_5_0m at 5.0 m, preset svi_equal (published_index)
+
+  inundated_fraction     weight 0.2500  direction +1  published 55 of 55, ranked over 55
+      why  the share of the unit's land the modelled surge covers -- the hazard itself, in the units it was measured in, before anyone is counted
+  exposed_population     weight 0.2500  direction +1  published 55 of 55, ranked over 55
+      why  how many residents live on that flooded land, summed from block groups rather than assumed spread evenly across the tract
+  vulnerability_index    weight 0.2500  direction +1  published 53 of 55, ranked over 53
+      why  how hard it is for those residents to leave and to recover, from the weighted percentile index over the five indicators
+  resilience_index       weight 0.2500  direction -1  published 55 of 55, ranked over 55
+      why  how many hospitals, schools, fire stations and community centres the unit can reach, which is the only capacity this snapshot can measure
+
+  exposure   60,541 resident(s) summed from 153 block groups, against 67,931 from the tract-uniform assumption over 55 tracts_joined
+             worst unit differs by 2,656 resident(s) = 50.66% over 55 comparable unit(s), 11 publishing zero; county population 235,229
+             sum of 153 block groups value(s) into 55 tracts_joined unit(s) by GEOID prefix, width 12 -> 11
+  resilience 71 of 71 facility(ies) within 5,000 m; per unit min 3, median 21.0, max 41; 0 unit(s) reach none
+             tag key 'amenity' read from facilities provenance: {"amenity": "^(hospital|school|community_centre|fire_station)$"}
+             matches by tag {'school': 936, 'fire_station': 206, 'hospital': 51, 'community_centre': 6}
+  vulnerability 53 of 55 unit(s) scored, 2 unscored
+
+  score      53 of 55 unit(s) scored, 2 unscored; 0.1979 to 0.8238
+             weights from https://www.atsdr.cdc.gov/place-health/php/svi/index.html
+
+PRIORITY TABLE -- top 10 of 53 scored unit(s)
+  rank  geoid            pop  flooded  exposed  meandep   vuln  resil  score
+     1  37129012106    7,207   0.6230    4,233    2.160  0.528  0.091  0.824
+     2  37129012300    8,653   0.6473    2,945    2.570  0.589  0.136  0.813
+     3  37129012107    4,534   0.8310    3,273    2.620  0.426  0.036  0.780
+     4  37129012201    2,928   0.8273    2,222    3.142  0.475  0.091  0.779
+     5  37129012202    3,873   0.8421    3,398    2.808  0.287  0.036  0.747
+     6  37129012108    3,420   0.6912    2,222    2.045  0.432  0.091  0.735
+     7  37129012110    4,855   0.3591    1,773    0.587  0.558  0.245  0.726
+     8  37129012111    6,663   0.6475    4,600    2.182  0.509  0.536  0.698
+     9  37129011503    4,831   0.7147    3,408    2.511  0.657  0.918  0.696
+    10  37129012203    2,466   0.8722    1,229    3.618  0.332  0.036  0.692
+  2 unit(s) are absent from this list because a component is undefined for them: ['37129980100', '37129990100']
+
+TRADE-OFF -- the same county under three weightings, and who each one drops
+  preset                 scenario           pop  vuln pop  mean m  displaced
+  svi_equal              surge_1_5m      47,351    27,354   0.572  1 unit(s)
+  svi_themes             surge_1_5m      47,351    18,701   0.572  1 unit(s)
+  evacuation_capacity    surge_1_5m      46,528    26,216   0.570  1 unit(s)
+
+  svi_equal prioritises ['37129012106', '37129012300', '37129012201', '37129012107', '37129012202', '37129012203', '37129011503', '37129011800', '37129012108', '37129012111']
+      and does NOT prioritise ['37129012004'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+  svi_themes prioritises ['37129012106', '37129012300', '37129012201', '37129012107', '37129012202', '37129012203', '37129012111', '37129011503', '37129011800', '37129012108']
+      and does NOT prioritise ['37129012004'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+  evacuation_capacity prioritises ['37129012106', '37129012300', '37129012201', '37129012107', '37129012108', '37129012202', '37129012203', '37129011800', '37129012004', '37129012111']
+      and does NOT prioritise ['37129011503'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+
+TRADE-OFF -- the same county under three weightings, and who each one drops
+  preset                 scenario           pop  vuln pop  mean m  displaced
+  svi_equal              surge_3_0m      47,351    27,354   1.424  1 unit(s)
+  svi_themes             surge_3_0m      47,351    18,701   1.424  1 unit(s)
+  evacuation_capacity    surge_3_0m      46,528    26,216   1.396  1 unit(s)
+
+  svi_equal prioritises ['37129012106', '37129012300', '37129012201', '37129012107', '37129012202', '37129012108', '37129012111', '37129012203', '37129011503', '37129011800']
+      and does NOT prioritise ['37129012004'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+  svi_themes prioritises ['37129012106', '37129012300', '37129012201', '37129012107', '37129012202', '37129012111', '37129012203', '37129011503', '37129012108', '37129011800']
+      and does NOT prioritise ['37129012004'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+  evacuation_capacity prioritises ['37129012300', '37129012106', '37129012201', '37129012107', '37129012108', '37129012202', '37129012203', '37129011800', '37129012111', '37129012004']
+      and does NOT prioritise ['37129011503'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+
+TRADE-OFF -- the same county under three weightings, and who each one drops
+  preset                 scenario           pop  vuln pop  mean m  displaced
+  svi_equal              surge_5_0m      49,430    32,209   2.424  1 unit(s)
+  svi_themes             surge_5_0m      49,430    18,701   2.424  1 unit(s)
+  evacuation_capacity    surge_5_0m      47,375    27,063   2.634  1 unit(s)
+
+  svi_equal prioritises ['37129012106', '37129012300', '37129012107', '37129012201', '37129012202', '37129012108', '37129012110', '37129012111', '37129011503', '37129012203']
+      and does NOT prioritise ['37129011800'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+  svi_themes prioritises ['37129012106', '37129012300', '37129012107', '37129012202', '37129012201', '37129012108', '37129012111', '37129012110', '37129012203', '37129011503']
+      and does NOT prioritise ['37129011800'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+  evacuation_capacity prioritises ['37129012106', '37129012300', '37129012107', '37129012201', '37129012108', '37129012202', '37129012203', '37129012110', '37129012111', '37129011800']
+      and does NOT prioritise ['37129011503'], which another weighting in this table does -- those are the units whose priority depends on a value judgement rather than on the data
+
+  written:
+      risk_surge_1_5m_svi_equal.csv
+      risk_surge_3_0m_svi_equal.csv
+      risk_surge_5_0m_svi_equal.csv
+      tradeoff.csv
+
+  warnings (25):
+      - flood_zones: retrieval degraded, so its 0 features are an absence of data rather than an absence of hazard. DEGRADED: this optional dataset could not be retrieved and the run continued on the elevation raster alone
+      - acs: pct_age_65_plus is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_disability is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_limited_english is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_no_vehicle is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - acs: pct_poverty is undefined for 2 of 55 unit(s) whose universe for that indicator is zero. Those units carry no value rather than a zero, and any ranking over this column omits them
+      - flood_zones: retrieval degraded, so the hazard in this table is the bathtub over elevation ALONE. Its zero features are an absence of data, not an absence of regulatory flood risk, and every inundated fraction here is therefore unconstrained by the mapped floodplain
+      - tracts_joined: 16 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage
+      - exposure granularity: summing block groups gives 25,932 exposed resident(s) against 34,653 from the tract-uniform assumption, worst unit 2,840 resident(s). That gap is a result about granularity, not an error either estimate made
+      - tracts_joined: 2 of 55 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['37129980100', '37129990100']
+      - tracts_joined: percentile ranks were taken over fewer than 55 unit(s) for {'pct_poverty': 53, 'pct_age_65_plus': 53, 'pct_disability': 53, 'pct_no_vehicle': 53, 'pct_limited_english': 53}, so the denominator of those ranks is the number of units publishing a value, not the number of units
+      - tracts_joined: 2 of 55 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['37129980100', '37129990100']
+      - every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit
+      - tracts_joined: 14 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage
+      - exposure granularity: summing block groups gives 39,040 exposed resident(s) against 47,905 from the tract-uniform assumption, worst unit 3,010 resident(s). That gap is a result about granularity, not an error either estimate made
+      - tracts_joined: 2 of 55 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['37129980100', '37129990100']
+      - tracts_joined: percentile ranks were taken over fewer than 55 unit(s) for {'pct_poverty': 53, 'pct_age_65_plus': 53, 'pct_disability': 53, 'pct_no_vehicle': 53, 'pct_limited_english': 53}, so the denominator of those ranks is the number of units publishing a value, not the number of units
+      - tracts_joined: 2 of 55 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['37129980100', '37129990100']
+      - every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit
+      - tracts_joined: 11 tract(s) publish a exposed_population_uniform of zero, so the granularity difference for them is the absolute one above and not a percentage
+      - exposure granularity: summing block groups gives 60,541 exposed resident(s) against 67,931 from the tract-uniform assumption, worst unit 2,656 resident(s). That gap is a result about granularity, not an error either estimate made
+      - tracts_joined: 2 of 55 unit(s) carry no vulnerability index because at least one indicator is undefined for them, and every ranking below omits them: ['37129980100', '37129990100']
+      - tracts_joined: percentile ranks were taken over fewer than 55 unit(s) for {'pct_poverty': 53, 'pct_age_65_plus': 53, 'pct_disability': 53, 'pct_no_vehicle': 53, 'pct_limited_english': 53}, so the denominator of those ranks is the number of units publishing a value, not the number of units
+      - tracts_joined: 2 of 55 unit(s) carry no risk score because at least one component is undefined for them, and every priority list omits them: ['37129980100', '37129990100']
+      - every component is percentile-ranked before it is weighted, so this score is COUNTY-RELATIVE: it says which units here are worst, never whether here is bad. The absolute hazard is in inundated_fraction beside it, and on a county with no inundation at all this column would still rank every unit
