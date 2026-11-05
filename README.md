@@ -1,4 +1,4 @@
-# Write, Run, Repair: A Self-Debugging GeoAI Agent for Equity-Centered Coastal Flood-Risk Analysis
+## Autonomous GeoAI for Disaster Resilience: A Tool-Augmented Agent for Vulnerability Analysis
 
 This repository is an LLM agent that retrieves public geospatial data, writes and repairs its own spatial analysis code, and ranks census tracts by hurricane storm-surge risk under a weighting the user chooses. A critic traces the numbers in each answer back to logged tool results, and the same code ran on a second county after one county-neutral acquisition repair.
 
