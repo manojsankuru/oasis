@@ -1845,6 +1845,10 @@ def _surface_checks() -> list[tuple[str, bool]]:
 
 
 def _self_check() -> int:
+    return verify.report(verify.checked_in_scratch("geoagent-sandbox-check-", _all_checks))
+
+
+def _all_checks(scratch: Path) -> list[tuple[str, bool]]:
     print("SANDBOX -- model-written code in a child process\n")
     box = Sandbox()
 
@@ -1876,7 +1880,7 @@ def _self_check() -> int:
     print()
     print(format_metrics())
     print()
-    return verify.report(checks)
+    return checks
 
 
 if __name__ == "__main__":
