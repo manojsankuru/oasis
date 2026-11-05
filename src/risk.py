@@ -1489,6 +1489,10 @@ def _contract_checks() -> list[tuple[str, bool]]:
 
 
 def _self_check() -> int:
+    return verify.report(verify.checked_in_scratch("geoagent-risk-check-", _all_checks))
+
+
+def _all_checks(scratch: Path) -> list[tuple[str, bool]]:
     registry = Registry()
     registry.load_manifest()
     aligner = Alignment(registry)
@@ -1506,7 +1510,7 @@ def _self_check() -> int:
     checks += _county_checks(aligner)
     print()
     checks += _contract_checks()
-    return verify.report(checks)
+    return checks
 
 
 if __name__ == "__main__":
