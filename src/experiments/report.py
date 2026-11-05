@@ -34,7 +34,8 @@ from typing import Any, Callable, TypeAlias
 import pandas as pd
 import rasterio
 
-from .. import agent, config, contracts, hazard, risk, sandbox, schemas, verify, vulnerability
+from .. import agent, config, contracts, critic, hazard, risk, sandbox, schemas, verify, vulnerability
+from . import cohort
 
 JsonScalar: TypeAlias = str | int | float | bool | None
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
@@ -172,6 +173,15 @@ AGENT_METRICS = (
     "mean_duration",
 )
 
+AGENT_MANIFEST_RELATIVE = Path("outputs/paper/agent_evaluation_manifest.json")
+TRANSFER_REPORTS_RELATIVE = Path("outputs/paper/transfer_reports")
+TRANSFER_REPORT_STATUSES = ("completed", "failed")
+RANKING_TOOLS = ("risk_scenario", "compare_scenarios", "vulnerability_index")
+WEIGHT_RESULT_KEYS = ("weights_used", "indicator_weights_used", "component_weights")
+TRACT_GEOID = re.compile(r"(?<!\d)\d{11}(?!\d)")
+WHO_LOSES_FINDING = "does not say who loses"
+SENTENCE_END = re.compile(r"[.!?](?=\s)|\n")
+
 EXPECTED_PAPER_KEYS = (
     "abstract.primary_tract_count",
     "abstract.scenario_count",
@@ -233,11 +243,9 @@ def _sha256(path: Path) -> str:
 
 def _fingerprint(path: Path) -> tuple[str, int]:
     try:
-        content = path.read_bytes()
+        content = verify.lf_normalised(path.read_bytes())
     except OSError as exc:
         raise EvidenceError(f"missing source file: {path}") from exc
-    if b"\0" not in content[:8000]:
-        content = content.replace(b"\r\n", b"\n")
     return hashlib.sha256(content).hexdigest(), len(content)
 
 
@@ -1538,6 +1546,349 @@ def _require_paper_claims(payload: dict[str, JsonValue]) -> None:
         raise EvidenceError("the same preset leads at both quantiles, so the paper sentence on the cut no longer holds")
 
 
+def _transfer_reports_payload(
+    root: Path,
+    sources: dict[str, JsonValue],
+    scenarios: tuple[str, ...],
+    presets: tuple[str, ...],
+) -> dict[str, JsonValue]:
+    """Every per-run transfer report, one row per run id, completed and failed apart."""
+    directory = root / TRANSFER_REPORTS_RELATIVE
+    rows: list[JsonValue] = []
+    statuses: list[tuple[str, str]] = []
+    for path in sorted(directory.glob("*.json")) if directory.is_dir() else []:
+        source = _source(sources, path, root, "per-run transfer report")
+        found = _load_json(path)
+        study = _mapping(found.get("study_area"), f"{source}.study_area")
+        status = found.get("status")
+        if status not in TRANSFER_REPORT_STATUSES:
+            raise EvidenceError(f"transfer report {source} has status {status!r}, not one of {TRANSFER_REPORT_STATUSES}")
+        if found.get("primary_snapshot_unchanged") is not True:
+            raise EvidenceError(f"transfer report {source} does not show the primary snapshot unchanged")
+        run_id = str(found.get("run_id", ""))
+        if not RUN_ID.fullmatch(run_id):
+            raise EvidenceError(f"wrong transfer run ID in {source}: {run_id!r}")
+        county = str(study.get("name", ""))
+        row: dict[str, JsonValue] = {
+            "run_id": run_id,
+            "county": county,
+            "geoid": f"{study.get('state_fips', '')}{study.get('county_fips', '')}",
+            "status": str(status),
+            "stage": str(found.get("stage", "")),
+        }
+        if status == "completed":
+            area = config.StudyArea(
+                name=county,
+                state_fips=str(study.get("state_fips", "")),
+                county_fips=str(study.get("county_fips", "")),
+            )
+            _validate_transfer_report(found, area, scenarios, presets)
+            _, outputs = _safe_transfer_directory(root, found)
+            expected = (
+                "pipeline_report.txt",
+                *(f"risk_{scenario}_{vulnerability.DEFAULT_PRESET.name}.csv" for scenario in scenarios),
+                "tradeoff.csv",
+            )
+            missing = [name for name in expected if not (outputs / name).is_file()]
+            if missing:
+                raise EvidenceError(f"transfer report {source} is completed but its outputs are missing: {missing}")
+            for name in expected:
+                _source(sources, outputs / name, root, f"transfer outputs of run {run_id}")
+            row["outputs"] = _portable(outputs, root)
+        else:
+            error = _mapping(found.get("error"), f"{source}.error")
+            row["error_type"] = str(error.get("type", ""))
+            row["error_message_sha256"] = str(error.get("message_sha256", ""))
+        rows.append(_metric(
+            row, "transfer report", source, "$",
+            "run id, county, status and stage, with the validated outputs of a completed run "
+            "or the error type of a failed one",
+        ))
+        statuses.append((county, str(status)))
+    rows.sort(key=lambda item: str(_mapping(item, "transfer report row")["value"]["run_id"]))
+    return {
+        "directory": TRANSFER_REPORTS_RELATIVE.as_posix(),
+        "reports": rows,
+        "completed_counties": sorted({county for county, status in statuses if status == "completed"}),
+        "failed_counties": sorted({county for county, status in statuses if status == "failed"}),
+        "completed_reports": sum(status == "completed" for _, status in statuses),
+        "failed_reports": sum(status == "failed" for _, status in statuses),
+    }
+
+
+def _sentence_at(text: str, index: int) -> str:
+    """The sentence around one character of an answer. A decimal point ends none."""
+    starts = [match.end() for match in SENTENCE_END.finditer(text, 0, index)]
+    found = SENTENCE_END.search(text, index)
+    return text[starts[-1] if starts else 0 : found.start() if found else len(text)]
+
+
+def _names_weight(sentence: str, key: str) -> bool:
+    """Does the sentence name this weight's indicator or component, with or without pct_?"""
+    lowered = sentence.lower()
+    bare = key.lower().removeprefix("pct_")
+    return any(name in lowered for name in {key.lower(), bare, bare.replace("_", " ")} if name)
+
+
+def _ratio(count: int, total: int) -> dict[str, JsonValue]:
+    return {"count": count, "of": total, "rate": round(count / total, 6) if total else None}
+
+
+def _run_measures(transcript: dict[str, Any]) -> dict[str, Any]:
+    """Every per-run quantity the declared measures are built from, read off one transcript."""
+    steps = [step for step in _sequence(transcript.get("steps"), "transcript.steps") if isinstance(step, dict)]
+    totals = _mapping(transcript.get("totals"), "transcript.totals")
+    results = [
+        step["payload"] for step in steps
+        if step.get("step") == "tool_result" and isinstance(step.get("payload"), dict)
+    ]
+
+    def outputs(name: str) -> list[dict[str, Any]]:
+        return [item.get("result") or {} for item in results if item.get("tool") == name]
+
+    code = outputs("run_spatial_code")
+    ran = [item for item in code if isinstance(item.get("exit_code"), int)]
+    failed = [item for item in ran if item["exit_code"] != 0]
+    sessions: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    for item in ran:
+        current.append(item)
+        if item["exit_code"] == 0:
+            sessions.append(current)
+            current = []
+    if current:
+        sessions.append(current)
+
+    drafts = [
+        (index, str(step["payload"].get("content") or ""))
+        for index, step in enumerate(steps)
+        if step.get("step") == "llm_response" and isinstance(step.get("payload"), dict)
+        and not step["payload"].get("tool_calls")
+    ]
+    judge = critic.Critic()
+    first_passed = (
+        bool(drafts) and bool(drafts[0][1].strip())
+        and judge.check(drafts[0][1], steps[: drafts[0][0]], 1).passed
+    )
+    final = str(transcript.get("final_answer") or "")
+    answered = bool(final.strip())
+    report = judge.check(final, steps, 1)
+    accounted = critic.as_result(report, judge)
+
+    compared = outputs("compare_scenarios")
+    displaced = {
+        str(geoid)
+        for item in compared
+        for row in item.get("rows") or []
+        for geoid in (row.get("displaced_geoids") or {}).get("listed") or []
+    }
+    named = {match.group(0) for match in TRACT_GEOID.finditer(final)}
+
+    weights = [
+        (str(key), float(value))
+        for name in RANKING_TOOLS
+        for item in outputs(name)
+        for result_key in WEIGHT_RESULT_KEYS
+        for key, value in (item.get(result_key) or {}).items()
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and float(value) != 0.0
+    ]
+    ranked = {
+        str(row.get(contracts.Col.GEOID))
+        for name in RANKING_TOOLS
+        for item in outputs(name)
+        for row in item.get("ranking") or []
+        if isinstance(row, dict)
+    } | {
+        str(geoid)
+        for item in compared
+        for row in item.get("rows") or []
+        for geoid in (row.get("top_geoids") or {}).get("listed") or []
+    }
+    weight_at = [
+        claim.start
+        for claim in critic.claims(final)
+        if any(
+            critic.rounds_to(claim, value) and _names_weight(_sentence_at(final, claim.start), key)
+            for key, value in weights
+        )
+    ]
+    ranked_at = [match.start() for match in TRACT_GEOID.finditer(final) if match.group(0) in ranked]
+    return {
+        "llm_calls": _integer(totals.get("llm_calls"), "totals.llm_calls"),
+        "gis_tool_calls": _integer(totals.get("gis_tool_calls"), "totals.gis_tool_calls"),
+        "duration": float(_number(totals.get("duration_seconds"), "totals.duration_seconds")),
+        "generated_code_calls": len(code),
+        "successful_code_runs": len(ran) - len(failed),
+        "failed_code_runs": len(failed),
+        "error_taxonomy": Counter(str(item.get("error_type") or "unclassified") for item in failed),
+        "repair_attempts": sum(before["exit_code"] != 0 for before in ran[:-1]),
+        "repair_successes": sum(
+            session[0]["exit_code"] != 0 and any(item["exit_code"] == 0 for item in session[1:])
+            for session in sessions
+        ),
+        "critic_cycles": sum(step.get("step") == agent.CRITIC_STEP for step in steps),
+        "critic_firings": sum(
+            step.get("step") == agent.CRITIC_STEP and not (step.get("payload") or {}).get("passed")
+            for step in steps
+        ),
+        "revisions_requested": sum(step.get("step") == agent.REVISION_STEP for step in steps),
+        "first_draft_passed": first_passed,
+        "final_draft_passed": answered and report.passed,
+        "numbers_checked": report.numbers_checked,
+        "numbers_traceable": report.numbers_traceable,
+        "numerals_seen": int(accounted.get("numerals_seen", 0)),
+        "numerals_masked_by_reason": Counter(accounted.get("numerals_masked_by_reason") or {}),
+        "compared": bool(compared),
+        "named_displaced": bool(named & displaced),
+        "who_loses_gate_passed": answered and not any(
+            item.kind == "unsupported_claim" and WHO_LOSES_FINDING in item.detail for item in report.findings
+        ),
+        "tool_credit_error": bool(critic.tools_named_not_called(final, steps)),
+        "weights_and_ranking": bool(weight_at) and bool(ranked_at),
+        "weights_first": bool(weight_at) and bool(ranked_at) and min(weight_at) < min(ranked_at),
+        "validate_answer_calls": len(outputs("validate_answer")),
+        "stop_reason": str(transcript.get("stop_reason") or "none"),
+    }
+
+
+def _condition_measures(
+    entries: list[dict[str, Any]],
+    runs: list[dict[str, Any]],
+    source: str,
+    condition: str,
+    declared: dict[str, str],
+) -> dict[str, JsonValue]:
+    """The declared measures for one condition, each traced to the manifest."""
+    count = len(runs)
+    selector = f"$.runs[condition={condition}]"
+
+    def total(key: str) -> int:
+        return int(sum(run[key] for run in runs))
+
+    def counted(key: str) -> dict[str, int]:
+        merged: Counter[str] = Counter()
+        for run in runs:
+            merged.update(run[key])
+        return dict(sorted(merged.items()))
+
+    compared = [run for run in runs if run["compared"]]
+    weighed = [run for run in runs if run["weights_and_ranking"]]
+    values: dict[str, tuple[JsonValue, str]] = {
+        "question_count": (len({entry["question_id"] for entry in entries}), "questions"),
+        "llm_calls": (total("llm_calls"), "model calls"),
+        "gis_tool_calls": (total("gis_tool_calls"), "tool calls"),
+        "generated_code_calls": (total("generated_code_calls"), "code calls"),
+        "successful_code_runs": (total("successful_code_runs"), "code runs"),
+        "failed_code_runs": (total("failed_code_runs"), "code runs"),
+        "error_taxonomy": (counted("error_taxonomy"), "code runs by error type"),
+        "repair_attempts": (total("repair_attempts"), "code runs"),
+        "repair_successes": (total("repair_successes"), "code sessions"),
+        "critic_cycles": (total("critic_cycles"), "critic passes"),
+        "critic_firings": (total("critic_firings"), "critic passes"),
+        "revisions_requested": (total("revisions_requested"), "revision requests"),
+        "first_draft_pass_rate": (_ratio(sum(run["first_draft_passed"] for run in runs), count), "share of runs"),
+        "final_draft_pass_rate": (_ratio(sum(run["final_draft_passed"] for run in runs), count), "share of runs"),
+        "numbers_checked": (total("numbers_checked"), "numbers"),
+        "numbers_traceable": (total("numbers_traceable"), "numbers"),
+        "mean_turns": (round(total("llm_calls") / count, 6) if count else None, "model calls per run"),
+        "mean_duration": (round(sum(run["duration"] for run in runs) / count, 6) if count else None, "seconds per run"),
+        "numerals_seen": (total("numerals_seen"), "numerals"),
+        "numerals_masked_by_reason": (counted("numerals_masked_by_reason"), "numerals by mask"),
+        "who_loses_named_displaced_unit_rate": (
+            _ratio(sum(run["named_displaced"] for run in compared), len(compared)), "share of runs"),
+        "who_loses_gate_pass_rate": (
+            _ratio(sum(run["who_loses_gate_passed"] for run in compared), len(compared)), "share of runs"),
+        "tool_credit_errors": (_ratio(sum(run["tool_credit_error"] for run in runs), count), "share of runs"),
+        "weights_before_ranking_rate": (
+            _ratio(sum(run["weights_first"] for run in weighed), len(weighed)), "share of runs"),
+        "validate_answer_calls": (total("validate_answer_calls"), "tool calls"),
+        "harness_errors": (sum(entry["status"] == "error" for entry in entries), "cells"),
+        "stop_reasons": (dict(sorted(Counter(run["stop_reason"] for run in runs).items())), "runs by stop reason"),
+    }
+    return {
+        name: _metric(value, unit, source, selector, declared.get(name, "") or name)
+        for name, (value, unit) in values.items()
+    }
+
+
+def _agent_payload(
+    root: Path, sources: dict[str, JsonValue]
+) -> tuple[dict[str, JsonValue], list[str], str]:
+    """The agent_behaviour block, the agent keys still missing, and why they are."""
+    path = root / AGENT_MANIFEST_RELATIVE
+    if not path.is_file():
+        return (
+            {
+                "status": "missing_evidence",
+                "evaluation_cohort": None,
+                "reason": "no declared paper evaluation manifest selects exact run IDs and questions",
+            },
+            list(AGENT_METRICS),
+            "no declared paper evaluation cohort; arbitrary development runs were excluded",
+        )
+    source = _source(sources, path, root, "declared agent evaluation manifest")
+    manifest = _load_json(path)
+    conditions = [str(_mapping(item, "manifest condition")["name"]) for item in _sequence(manifest.get("conditions"), "manifest.conditions")]
+    declared = {str(key): str(value) for key, value in _mapping(manifest.get("measures"), "manifest.measures").items()}
+    undeclared = sorted(set(cohort.MEASURES) - set(declared))
+    if undeclared:
+        raise EvidenceError(f"the manifest declares no definition for {undeclared}")
+    finished: dict[tuple[str, str], dict[str, Any]] = {}
+    for raw in _sequence(manifest.get("runs"), "manifest.runs"):
+        entry = _mapping(raw, "manifest run")
+        if entry.get("status") in cohort.FINISHED:
+            finished[(str(entry["question_id"]), str(entry["condition"]))] = entry
+    cells = _integer(manifest.get("cell_count"), "manifest.cell_count")
+    summary: dict[str, JsonValue] = {
+        "manifest": source,
+        "declared_at": str(manifest.get("declared_at", "")),
+        "git_sha": str(manifest.get("git_sha", "")),
+        "cell_count": cells,
+        "finished_cells": len(finished),
+        "conditions": conditions,
+    }
+    if not finished:
+        return (
+            {"status": "declared_no_runs", "evaluation_cohort": summary,
+             "reason": "the cohort is declared and no cell has finished"},
+            list(AGENT_METRICS),
+            "the declared cohort has no finished cell yet",
+        )
+    declared_critic = _mapping(manifest.get("frozen_files") or {}, "manifest.frozen_files").get("src/critic.py")
+    critic_path = root / "src" / "critic.py"
+    if not declared_critic:
+        raise EvidenceError("the manifest declares no fingerprint for the critic its measures re-run")
+    if not critic_path.is_file() or cohort.fingerprint(critic_path) != declared_critic:
+        raise EvidenceError(
+            "the declared critic changed since the declaration, so the measures it re-runs would move"
+        )
+    _source(sources, critic_path, root, "the declared critic the cohort measures re-run")
+    measured: dict[str, JsonValue] = {}
+    for condition in conditions:
+        entries = [entry for (_, name), entry in finished.items() if name == condition]
+        runs: list[dict[str, Any]] = []
+        for entry in entries:
+            if entry["status"] != "completed":
+                continue
+            transcript = root / str(entry["transcript"])
+            _source(sources, transcript, root, f"cohort transcript {entry['run_id']}")
+            runs.append(_run_measures(_load_json(transcript)))
+        measured[condition] = _condition_measures(entries, runs, source, condition, declared)
+    complete = len(finished) == cells
+    block: dict[str, JsonValue] = {
+        "status": "complete" if complete else "partial",
+        "evaluation_cohort": summary,
+        "conditions": measured,
+    }
+    if complete:
+        return block, [], ""
+    return (
+        block,
+        list(AGENT_METRICS),
+        f"computed over {len(finished)} of {cells} declared cells; the cohort has not finished",
+    )
+
+
 def _changes_file_payload(data: bytes, row_count: int, source: str) -> dict[str, JsonValue]:
     selector = PRIORITY_CHANGES_RELATIVE.as_posix()
     return {
@@ -2013,6 +2364,8 @@ def _assemble(root: Path, generated_at: str | None = None) -> tuple[dict[str, Js
     )
 
     robustness_payload = _robustness_payload(fault_values, faults_source)
+    transfer_reports = _transfer_reports_payload(repository, sources, scenarios, presets)
+    agent_behaviour, agent_missing, agent_reason = _agent_payload(repository, sources)
     report: dict[str, JsonValue] = {
         "schema_version": SCHEMA_VERSION,
         "generated_at": generated_at or _utc_now(),
@@ -2361,11 +2714,8 @@ def _assemble(root: Path, generated_at: str | None = None) -> tuple[dict[str, Js
                 "count of the two distinct configured study-area values",
             ),
         },
-        "agent_behaviour": {
-            "status": "missing_evidence",
-            "evaluation_cohort": None,
-            "reason": "no declared paper evaluation manifest selects exact run IDs and questions",
-        },
+        "agent_behaviour": agent_behaviour,
+        "transfer_reports": transfer_reports,
         "transfer": {
             "run_id": _metric(
                 run_id,
@@ -2499,10 +2849,10 @@ def _assemble(root: Path, generated_at: str | None = None) -> tuple[dict[str, Js
         "missing_evidence": [
             {
                 "key": f"agent_behaviour.{name}",
-                "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded",
-                "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+                "reason": agent_reason,
+                "expected_source": AGENT_MANIFEST_RELATIVE.as_posix(),
             }
-            for name in AGENT_METRICS
+            for name in agent_missing
         ],
         "remaining_paper_todos": prose_todos,
     }
@@ -2606,6 +2956,7 @@ def _validate_payload(payload: dict[str, JsonValue], root: Path, paper_path: Pat
         "configuration",
         "agent_behaviour",
         "transfer",
+        "transfer_reports",
         "verification",
         "paper_keys",
         "missing_evidence",
@@ -3241,6 +3592,13 @@ def _write_fixture(root: Path) -> None:
         "error": {"type": "TransientError", "message": "offline fixture failure"},
     }
     _write_fixture_json(root / ATTEMPTS_RELATIVE / f"{failed_run_id}.json", failed_attempt)
+    county = f"{config.TRANSFER_AREA.state_fips}{config.TRANSFER_AREA.county_fips}"
+    _write_fixture_json(root / TRANSFER_REPORTS_RELATIVE / f"{county}-{transfer_run_id}.json", transfer_report)
+    _write_fixture_json(
+        root / TRANSFER_REPORTS_RELATIVE / f"{county}-{failed_run_id}.json",
+        {**failed_attempt, "primary_snapshot_unchanged": True, "config_paths_restored": True,
+         "error": {**failed_attempt["error"], "message_sha256": "0" * 64}},
+    )
     _write_fixture_json(root / FAULTS_RELATIVE, _fixture_faults())
     paper = root / PAPER_RELATIVE
     paper.parent.mkdir(parents=True, exist_ok=True)
@@ -3464,6 +3822,212 @@ def _hash_change_refusal(base: Path, cases: Path, delete: bool) -> bool:
     )
 
 
+STUB_GEOIDS = ("99001000100", "99001000200", "99001000300")
+
+
+def _stub_transcript(answer: str | None, *, code: tuple[int, ...] = (), compared: bool = True,
+                     tools_called: tuple[str, ...] = (), stop_reason: str = "final_answer") -> dict[str, Any]:
+    """A clearly synthetic cohort transcript: no model ran, the steps are written here."""
+    steps: list[dict[str, Any]] = [{"step": "run_start", "payload": {"question": "stub"}}]
+    if compared:
+        steps.append({"step": "tool_result", "payload": {"tool": "compare_scenarios", "arguments": {}, "result": {
+            "indicator_weights_used": {"pct_poverty": 0.5, "pct_no_vehicle": 0.5, "pct_disability": 0.0},
+            "rows": [{"preset": "svi_equal", "top_geoids": {"listed": [STUB_GEOIDS[0]]},
+                      "displaced_geoids": {"listed": [STUB_GEOIDS[1]]}}],
+        }}})
+    for exit_code in code:
+        steps.append({"step": "tool_result", "payload": {"tool": "run_spatial_code", "arguments": {}, "result": {
+            "exit_code": exit_code, "stdout": "", "stderr": "", "duration_s": 0.1,
+            "error_type": None if exit_code == 0 else "KeyError"}}})
+    for name in tools_called:
+        steps.append({"step": "tool_result", "payload": {"tool": name, "arguments": {}, "result": {"stub": True}}})
+    if answer is not None:
+        steps.append({"step": "llm_response", "payload": {"content": answer, "tool_calls": []}})
+    return {
+        "run_id": "stub", "stub": True, "final_answer": answer, "stop_reason": stop_reason,
+        "totals": {"llm_calls": 2, "gis_tool_calls": sum(step["step"] == "tool_result" for step in steps),
+                   "duration_seconds": 3.0},
+        "steps": steps,
+    }
+
+
+def _write_stub_cohort(root: Path, *, finish: bool) -> None:
+    """A stub manifest over two questions and the three declared conditions."""
+    answers = {
+        ("s1", "full"): _stub_transcript(
+            f"Under svi_equal with pct_poverty 0.5, tract {STUB_GEOIDS[0]} comes first, and it leaves "
+            f"out tract {STUB_GEOIDS[1]}, which another weighting would have prioritised.", code=(1, 0)),
+        ("s1", "critic_off"): _stub_transcript(
+            f"A 0.5 m surge floods it. Tract {STUB_GEOIDS[0]} ranks first under svi_equal; "
+            "the weight pct_poverty is 0.5.",
+            code=(1,), tools_called=("validate_answer",)),
+        ("s1", "repair_off"): _stub_transcript(
+            f"The `risk_scenario` tool ranked tract {STUB_GEOIDS[0]} first under svi_equal, and "
+            "pct_disability got 0 weight.", code=(1, 1)),
+        ("s2", "full"): _stub_transcript("No figure is reported.", compared=False),
+        ("s2", "repair_off"): _stub_transcript(None, compared=False, stop_reason="max_iterations"),
+    }
+    critic_stub = root / "src" / "critic.py"
+    critic_stub.parent.mkdir(parents=True, exist_ok=True)
+    critic_stub.write_text("# offline stand-in for the declared critic\n", encoding="utf-8")
+    runs: list[dict[str, Any]] = []
+    for (question, condition), transcript in answers.items():
+        relative = Path("outputs/paper/cohort") / f"run_{question}_{condition}.json"
+        _write_fixture_json(root / relative, transcript)
+        runs.append({"question_id": question, "condition": condition, "run_id": f"{question}_{condition}",
+                     "status": "completed", "transcript": relative.as_posix()})
+    runs.append({"question_id": "s2", "condition": "critic_off", "run_id": "s2_critic_off_lost", "status": "interrupted"})
+    if finish:
+        runs.append({"question_id": "s2", "condition": "critic_off", "run_id": "s2_critic_off",
+                     "status": "error", "error": {"type": "RuntimeError", "message": "stub"}})
+    cells = [{"question_id": question, "condition": condition.name}
+             for question in ("s1", "s2") for condition in cohort.CONDITIONS]
+    _write_fixture_json(root / AGENT_MANIFEST_RELATIVE, {
+        "schema_version": 1, "kind": "declared agent evaluation cohort", "stub": True,
+        "declared_at": "2099-01-01T00:00:00+00:00", "git_sha": "0" * 40,
+        "conditions": [{"name": item.name, "use_critic": item.use_critic, "code_attempts": item.code_attempts,
+                        "definition": item.definition} for item in cohort.CONDITIONS],
+        "cells": cells, "cell_count": len(cells), "measures": dict(cohort.MEASURES), "runs": runs,
+        "frozen_files": {"src/critic.py": cohort.fingerprint(critic_stub)},
+    })
+
+
+def _built_from(base: Path, cases: Path, name: str, mutate: Callable[[Path], None]) -> dict[str, Any]:
+    """Copy the good fixture, apply one change, and return the report it builds."""
+    where = cases / name
+    shutil.copytree(base, where)
+    mutate(where)
+    return build_report(where, "2099-01-02T00:00:00+00:00")
+
+
+def _cohort_checks(base: Path, cases: Path) -> list[tuple[str, bool]]:
+    declared = _built_from(base, cases, "cohort-declared", lambda where: _write_fixture_json(
+        where / AGENT_MANIFEST_RELATIVE, {
+            "schema_version": 1, "declared_at": "2099-01-01T00:00:00+00:00", "git_sha": "0" * 40,
+            "conditions": [{"name": item.name} for item in cohort.CONDITIONS],
+            "cells": [], "cell_count": 6, "measures": dict(cohort.MEASURES), "runs": []}))
+    partial = _built_from(base, cases, "cohort-partial", lambda where: _write_stub_cohort(where, finish=False))
+    finished = _built_from(base, cases, "cohort-finished", lambda where: _write_stub_cohort(where, finish=True))
+    agent_keys = {f"agent_behaviour.{name}" for name in AGENT_METRICS}
+
+    def missing(payload: dict[str, Any]) -> set[str]:
+        return {item["key"] for item in payload["missing_evidence"]} & agent_keys
+
+    measured = finished["agent_behaviour"]["conditions"]
+
+    def value(condition: str, name: str) -> Any:
+        return measured[condition][name]["value"]
+
+    print(f"  stub cohort, full: repair {value('full', 'repair_successes')}, "
+          f"who loses {value('full', 'who_loses_named_displaced_unit_rate')}, "
+          f"weights first {value('full', 'weights_before_ranking_rate')}")
+    print(f"  stub cohort, critic_off: who-loses gate {value('critic_off', 'who_loses_gate_pass_rate')}, "
+          f"validate_answer calls {value('critic_off', 'validate_answer_calls')}, "
+          f"harness errors {value('critic_off', 'harness_errors')}")
+    return [
+        ("a declared cohort with no finished cell keeps every agent key missing, and says why",
+         declared["agent_behaviour"]["status"] == "declared_no_runs" and missing(declared) == agent_keys
+         and all("no finished cell" in item["reason"] for item in declared["missing_evidence"] if item["key"] in agent_keys)),
+        ("a partial cohort is computed but its keys stay missing until every cell finishes",
+         partial["agent_behaviour"]["status"] == "partial" and missing(partial) == agent_keys),
+        ("a finished cohort computes every condition and leaves no agent key missing",
+         finished["agent_behaviour"]["status"] == "complete" and missing(finished) == set()
+         and set(measured) == {item.name for item in cohort.CONDITIONS}
+         and all(set(measured[name]) >= set(AGENT_METRICS) for name in measured)),
+        ("every agent metric traces to the manifest, with the declared definition as its derivation",
+         all(item["source"] == AGENT_MANIFEST_RELATIVE.as_posix()
+             and item["derivation"] == cohort.MEASURES[name]
+             for condition in measured.values() for name, item in condition.items())),
+        ("a code session that failed then succeeded is one repair success, and two failures are none",
+         value("full", "repair_successes") == 1 and value("repair_off", "repair_successes") == 0
+         and value("repair_off", "repair_attempts") == 1 and value("repair_off", "failed_code_runs") == 2),
+        ("an answer naming a displaced GEOID counts, one naming only the leader does not",
+         value("full", "who_loses_named_displaced_unit_rate") == {"count": 1, "of": 1, "rate": 1.0}
+         and value("critic_off", "who_loses_named_displaced_unit_rate") == {"count": 0, "of": 1, "rate": 0.0}),
+        ("the who-loses gate is read off the declared critic, beside it",
+         value("full", "who_loses_gate_pass_rate")["rate"] == 1.0
+         and value("critic_off", "who_loses_gate_pass_rate")["rate"] == 0.0),
+        ("an answer crediting a tool the run never called is a tool-credit error",
+         value("repair_off", "tool_credit_errors")["count"] == 1 and value("full", "tool_credit_errors")["count"] == 0),
+        ("a weight stated before the first ranked GEOID counts as first, one stated after does not",
+         value("full", "weights_before_ranking_rate") == {"count": 1, "of": 1, "rate": 1.0}
+         and value("critic_off", "weights_before_ranking_rate") == {"count": 0, "of": 1, "rate": 0.0}),
+        ("validate_answer calls and harness errors are counted; an interrupted entry is not a result",
+         value("critic_off", "validate_answer_calls") == 1 and value("critic_off", "harness_errors") == 1
+         and value("critic_off", "question_count") == 2),
+        ("stop reasons are counted per condition",
+         value("repair_off", "stop_reasons") == {"final_answer": 1, "max_iterations": 1}),
+        ("a run that ends with no answer does not pass, first draft or final",
+         value("repair_off", "final_draft_pass_rate") == {"count": 0, "of": 2, "rate": 0.0}
+         and value("repair_off", "first_draft_pass_rate")["count"] == 0),
+        ("a zero weight is never a stated weight, even in a sentence that names it",
+         value("repair_off", "weights_before_ranking_rate") == {"count": 0, "of": 0, "rate": None}),
+        ("a cohort measured with a critic edited after the declaration is refused",
+         _fixture_failure(base, cases, "cohort-critic-edited", _edited_critic_cohort, "declared critic changed")),
+    ]
+
+
+def _edited_critic_cohort(where: Path) -> None:
+    _write_stub_cohort(where, finish=True)
+    stub = where / "src" / "critic.py"
+    stub.write_text(stub.read_text(encoding="utf-8") + "EDITED = True\n", encoding="utf-8")
+
+
+def _transfer_report_checks(base: Path, cases: Path, good: dict[str, Any]) -> list[tuple[str, bool]]:
+    block = good["transfer_reports"]
+    rows = [item["value"] for item in block["reports"]]
+    county = f"{config.TRANSFER_AREA.state_fips}{config.TRANSFER_AREA.county_fips}"
+    directory = TRANSFER_REPORTS_RELATIVE
+
+    def edit_first(status: str | None = None, unchanged: bool | None = None, outputs: str | None = None) -> Callable[[Path], None]:
+        def mutate(where: Path) -> None:
+            path = sorted((where / directory).glob("*.json"))[0]
+            payload = _load_json(path)
+            if status is not None:
+                payload["status"] = status
+            if unchanged is not None:
+                payload["primary_snapshot_unchanged"] = unchanged
+            if outputs is not None:
+                payload["pipeline_output_path"] = outputs
+            _write_fixture_json(path, payload)
+        return mutate
+
+    completed_path = next(path for path in sorted((base / directory).glob("*.json"))
+                          if _load_json(path).get("status") == "completed")
+    lost_run = "20990101T000000000000Z-0000beef"
+
+    def lost_outputs(where: Path) -> None:
+        payload = _load_json(completed_path)
+        payload["run_id"] = lost_run
+        payload["pipeline_output_path"] = (TRANSFER_RELATIVE / lost_run).as_posix()
+        _write_fixture_json(where / directory / f"{county}-{lost_run}.json", payload)
+
+    empty = _built_from(base, cases, "transfer-reports-none", lambda where: shutil.rmtree(where / directory))
+    print(f"  per-run transfer reports: {[(row['run_id'][-8:], row['status']) for row in rows]}")
+    return [
+        ("every per-run report is read, one row per run id, in run-id order",
+         len(rows) == 2 and [row["run_id"] for row in rows] == sorted(row["run_id"] for row in rows)),
+        ("a county with a failed and a completed report is listed under both",
+         block["completed_counties"] == [config.TRANSFER_AREA.name]
+         and block["failed_counties"] == [config.TRANSFER_AREA.name]
+         and (block["completed_reports"], block["failed_reports"]) == (1, 1)),
+        ("a completed row names its validated outputs and a failed one its error type",
+         any(row["status"] == "completed" and row.get("outputs", "").startswith(TRANSFER_RELATIVE.as_posix())
+             for row in rows)
+         and any(row["status"] == "failed" and row.get("error_type") == "TransientError" for row in rows)),
+        ("each row traces to its own report file",
+         all(item["source"].startswith(directory.as_posix() + "/") for item in block["reports"])),
+        ("a report with a status nobody defined is refused",
+         _fixture_failure(base, cases, "transfer-report-status", edit_first(status="maybe"), "status")),
+        ("a report whose primary snapshot changed is refused",
+         _fixture_failure(base, cases, "transfer-report-snapshot", edit_first(unchanged=False), "primary snapshot")),
+        ("a completed report whose outputs were never committed is refused",
+         _fixture_failure(base, cases, "transfer-report-outputs", lost_outputs, "outputs are missing")),
+        ("with no per-run reports the block is empty, not an error",
+         empty["transfer_reports"]["reports"] == [] and empty["transfer_reports"]["completed_counties"] == []),
+    ]
+
+
 def _claims_case(payload: dict[str, Any], *, same_leader: bool = False, tie: bool = False) -> dict[str, Any]:
     case = json.loads(json.dumps(payload))
     leaders = case["tradeoffs"]["primary"]["sensitivity_leaders"]
@@ -3523,6 +4087,8 @@ def _self_check() -> int:
             generated = generate(base, destination, fixed_time)
         after = _tree_hashes(base)
         parsed = _load_json(generated)
+        cohort_results = _cohort_checks(base, cases)
+        transfer_results = _transfer_report_checks(base, cases, good)
         crlf_text = outer / "eol-crlf.txt"
         lf_text = outer / "eol-lf.txt"
         binary = outer / "eol-binary.bin"
@@ -3939,6 +4505,7 @@ def _self_check() -> int:
                 ),
             ]
         )
+        checks += cohort_results + transfer_results
         checks += verify.discipline_checks(sys.modules[__name__])
         print(f"report check exercised {len(checks)} assertions")
         return verify.report(checks)
