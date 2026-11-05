@@ -1,8 +1,19 @@
 {
   "agent_behaviour": {
-    "evaluation_cohort": null,
-    "reason": "no declared paper evaluation manifest selects exact run IDs and questions",
-    "status": "missing_evidence"
+    "evaluation_cohort": {
+      "cell_count": 69,
+      "conditions": [
+        "full",
+        "critic_off",
+        "repair_off"
+      ],
+      "declared_at": "2026-11-05T19:50:26+00:00",
+      "finished_cells": 0,
+      "git_sha": "b4c2ea3b4f517e6fc193dcfb568b1e80f90a5756",
+      "manifest": "outputs/paper/agent_evaluation_manifest.json"
+    },
+    "reason": "the cohort is declared and no cell has finished",
+    "status": "declared_no_runs"
   },
   "alignment": {
     "primary": {
@@ -299,7 +310,7 @@
       }
     }
   },
-  "generated_at": "2026-11-05T16:11:36.543121+00:00",
+  "generated_at": "2026-11-05T19:55:08.029595+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -358,92 +369,92 @@
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.question_count",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.llm_calls",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.gis_tool_calls",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.generated_code_calls",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.successful_code_runs",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.failed_code_runs",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.error_taxonomy",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.repair_attempts",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.repair_successes",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.critic_cycles",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.critic_firings",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.revisions_requested",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.first_draft_pass_rate",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.final_draft_pass_rate",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.numbers_checked",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.numbers_traceable",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.mean_turns",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.mean_duration",
-      "reason": "no declared paper evaluation cohort; arbitrary development runs were excluded"
+      "reason": "the declared cohort has no finished cell yet"
     },
     {
       "expected_source": "outputs/faults.json",
@@ -2048,6 +2059,11 @@
       "bytes": 31421,
       "role": "fault-injection measurements",
       "sha256": "acaff44e52bacbc01b5753e5da7a196b4e7a4e3684a766cb293aec0cd354c292"
+    },
+    "outputs/paper/agent_evaluation_manifest.json": {
+      "bytes": 20993,
+      "role": "declared agent evaluation manifest",
+      "sha256": "6e8c3eacea6bfec3c0ddda20aa33a70a9bc4533581f51e0547ce8011b3e60f73"
     },
     "outputs/paper/tradeoff.csv": {
       "bytes": 1982,
