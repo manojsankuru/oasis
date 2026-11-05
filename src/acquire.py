@@ -2129,8 +2129,10 @@ def _overpass_bbox(bbox: BBox) -> tuple[float, float, float, float]:
     HTTP 200 with zero elements and reads as "this county has no hospitals".
 
     This is the only place in the repository that performs the conversion, and
-    `fetch_osm` proves it afterwards by checking that every returned point falls
-    inside the bbox it was given.
+    `fetch_osm` checks the answer afterwards. A swapped order asks about another
+    place, which returns points outside the bbox or none at all. Most of the layer
+    outside is refused. An empty answer cannot be checked this way, and its note
+    says so.
     """
     min_lon, min_lat, max_lon, max_lat = bbox
     return (min_lat, min_lon, max_lat, max_lon)
@@ -2226,6 +2228,17 @@ def _outside_bbox(gdf: gpd.GeoDataFrame, bbox: BBox, tolerance: float = 1e-6) ->
     return int((~inside).sum())
 
 
+def _mostly_outside(outside: int, total: int) -> bool:
+    """Do most of the returned points lie outside the requested bbox?
+
+    Overpass returns every way that touches the bbox, and `out center` places a
+    way's centre on its whole extent, so a way crossing the edge can put its centre
+    just outside. That is one or two features. A south,west,north,east order sent
+    the other way round asks about another place, and then most of them are, or
+    none come back at all, which this check cannot see."""
+    return outside * 2 > total
+
+
 def fetch_osm(
     bbox: BBox, tags: dict[str, str], *, timeout_s: float = 120.0
 ) -> tuple[gpd.GeoDataFrame, Provenance]:
@@ -2296,11 +2309,13 @@ def fetch_osm(
     )
 
     outside = _outside_bbox(gdf, bbox)
-    if outside:
+    if _mostly_outside(outside, len(gdf)):
         raise ServiceError(
             f"{OVERPASS_URL}: {outside} of {len(gdf)} returned features fall outside "
-            f"the requested bbox {bbox}; the south,west,north,east conversion is wrong "
-            "and the layer describes somewhere else"
+            f"the requested bbox {bbox}. Most of the layer lies somewhere else, which is "
+            "what a south,west,north,east order read the other way round produces. A way "
+            "that only touches the bbox can put its centre just past the edge, but that "
+            "is a feature or two, not most of the layer"
         )
 
     osm3s = payload.get("osm3s") or {}
@@ -2314,14 +2329,33 @@ def fetch_osm(
     generator = str(payload.get("generator") or "unstated")
 
     south, west, north, east = _overpass_bbox(bbox)
+    if outside:
+        containment = (
+            f"verified after the fact: {len(gdf) - outside} of {len(gdf)} returned points "
+            f"fall inside the requested bbox and {outside} "
+            f"{'lies' if outside == 1 else 'lie'} outside it. "
+            f"{'It is' if outside == 1 else 'They are'} kept: Overpass returns a way "
+            "that only touches the bbox, and out center can place its centre past the "
+            "edge. A swapped order would put most of the layer outside, so the check "
+            "still tells the two apart"
+        )
+    elif len(gdf):
+        containment = (
+            f"verified after the fact: all {len(gdf)} returned points fall inside the "
+            "requested bbox, which is what makes the order conversion a check rather "
+            "than a claim"
+        )
+    else:
+        containment = (
+            "no points came back, so the containment check had nothing to test; an "
+            "empty answer is also what a swapped south,west,north,east order returns"
+        )
     notes = [
         f"POST to Overpass; the query is in request_params, not reconstructed here",
         f"bbox converted from (min_lon, min_lat, max_lon, max_lat) {bbox} to Overpass "
         f"south,west,north,east ({south}, {west}, {north}, {east}) in "
         "acquire._overpass_bbox and nowhere else",
-        f"verified after the fact: all {len(gdf)} returned points fall inside the "
-        "requested bbox, which is what makes the order conversion a check rather than "
-        "a claim",
+        containment,
         f"out center tags: {kinds.get('node', 0)} node(s) carry their own position and "
         f"{kinds.get('way', 0)} way(s) carry a center, so both are usable as points",
         f"{len(elements)} element(s) returned, {without_point} without any point and "
@@ -3216,10 +3250,12 @@ def _osm_checks(bbox: BBox, timeout_s: float) -> list[tuple[str, bool]]:
     print(f"  vintage read from the body: {provenance.vintage}")
     print(f"  licence read from the body: {provenance.license}")
     checks.append(("the Overpass POST returns features, so section 5 is verified", len(gdf) > 0))
+    edge = _outside_bbox(gdf, bbox)
+    print(f"  {edge} of {len(gdf)} returned point(s) lie outside the bbox")
     checks.append(
         (
-            "every returned point falls inside the bbox, which is what proves the order",
-            len(gdf) > 0 and _outside_bbox(gdf, bbox) == 0,
+            "most returned points fall inside the bbox, which is what proves the order",
+            len(gdf) > 0 and not _mostly_outside(edge, len(gdf)),
         )
     )
     checks.append(
