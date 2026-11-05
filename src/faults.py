@@ -398,6 +398,7 @@ class FixtureSettings:
     metres: bool = False
     count_replies: tuple[int | str, ...] = ()
     count_log: list[dict[str, str]] = field(default_factory=list)
+    overpass: dict[str, Any] | None = None
 
 
 REFUSE = "refuse"
@@ -469,8 +470,20 @@ def sample_metadata() -> dict[str, Any]:
 
 
 class _FixtureHandler(BaseHTTPRequestHandler):
-    """Answers the three requests `fetch_arcgis_vector` makes, and nothing else:
-    the layer description, the `returnCountOnly` count, and a page of features."""
+    """Answers the three requests `fetch_arcgis_vector` makes -- the layer
+    description, the `returnCountOnly` count, and a page of features -- and the one
+    POST `fetch_osm` makes, with the Overpass body `FixtureSettings.overpass` names."""
+
+    def do_POST(self) -> None:
+        settings: FixtureSettings = getattr(self.server, "settings", FixtureSettings())
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        body = settings.overpass if settings.overpass is not None else {"elements": []}
+        encoded = json.dumps(body).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
 
     def do_GET(self) -> None:
         path, _, query = self.path.partition("?")
@@ -520,6 +533,33 @@ class _FixtureHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         """Silence the per-request line; the checks print their own."""
         return
+
+
+OVERPASS_BBOX: tuple[float, float, float, float] = (10.0, 50.0, 11.0, 51.0)
+"""A synthetic (min_lon, min_lat, max_lon, max_lat) extent, near no study area."""
+
+
+def overpass_body(inside: int, outside: int) -> dict[str, Any]:
+    """An Overpass answer over `OVERPASS_BBOX`: nodes inside it, and ways whose
+    centres lie just past its east edge, as a way that only touches the bbox can."""
+    min_lon, min_lat, max_lon, max_lat = OVERPASS_BBOX
+    elements: list[dict[str, Any]] = [
+        {"type": "node", "id": 1000 + index, "lat": min_lat + 0.5,
+         "lon": min_lon + 0.1 + 0.8 * index / max(inside, 1), "tags": {"amenity": "hospital"}}
+        for index in range(inside)
+    ]
+    elements += [
+        {"type": "way", "id": 9000 + index,
+         "center": {"lat": min_lat + 0.5, "lon": max_lon + 0.001 * (index + 1)},
+         "tags": {"amenity": "hospital"}}
+        for index in range(outside)
+    ]
+    return {
+        "version": 0.6,
+        "generator": "fixture Overpass",
+        "osm3s": {"timestamp_osm_base": "2026-11-04T00:00:00Z", "copyright": "fixture data"},
+        "elements": elements,
+    }
 
 
 @contextmanager
@@ -1609,6 +1649,64 @@ def _extent_checks() -> list[tuple[str, bool]]:
     ]
 
 
+def _overpass_checks() -> list[tuple[str, bool]]:
+    """That an edge way's centre is kept and counted, and a misplaced layer refused.
+
+    Through the real `fetch_osm`, against a loopback service that answers its POST:
+    the request, the JSON parse, the remark check, the guard and the provenance all
+    run as they do against the public instance."""
+    original = acquire.OVERPASS_URL
+    layouts = {"clean": (6, 0), "edge": (70, 1), "half": (2, 2), "most": (1, 3), "swapped": (0, 5), "empty": (0, 0)}
+    outcomes: dict[str, Any] = {}
+    try:
+        for label, (inside, outside) in layouts.items():
+            with local_service(FixtureSettings(overpass=overpass_body(inside, outside))) as url:
+                acquire.OVERPASS_URL = f"{url}/api/interpreter"
+                try:
+                    outcomes[label] = acquire.fetch_osm(OVERPASS_BBOX, {"amenity": "hospital"}, timeout_s=10.0)
+                except acquire.ServiceError as exc:
+                    outcomes[label] = exc
+    finally:
+        acquire.OVERPASS_URL = original
+
+    def kept(label: str) -> int:
+        found = outcomes[label]
+        return len(found[0]) if isinstance(found, tuple) else -1
+
+    def note(label: str) -> str:
+        found = outcomes[label]
+        if not isinstance(found, tuple):
+            return ""
+        return next(
+            (item for item in found[1].notes if item.startswith(("verified after the fact", "no points came back"))),
+            "",
+        )
+
+    for label in layouts:
+        found = outcomes[label]
+        shown = f"kept {kept(label)}" if isinstance(found, tuple) else f"refused: {str(found)[:90]}"
+        print(f"  {label} {layouts[label]}: {shown}")
+    refusal = str(outcomes["most"])
+    return [
+        ("a layer wholly inside the bbox is kept, and its note says all of it is inside",
+         kept("clean") == 6 and note("clean").startswith("verified after the fact: all 6")),
+        ("one way whose centre falls past the edge is kept with the rest",
+         kept("edge") == 71 and outcomes["edge"][1].feature_count == 71),
+        ("and the provenance note names how many lie outside",
+         "70 of 71 returned points fall inside" in note("edge") and "1 lies outside it" in note("edge")),
+        ("exactly half outside is not most of the layer, so it is kept", kept("half") == 4),
+        ("most of the layer outside is refused", isinstance(outcomes["most"], acquire.ServiceError)),
+        ("the refusal counts what fell outside and says most of the layer lies elsewhere",
+         "3 of 4 returned features" in refusal and "Most of the layer lies somewhere else" in refusal
+         and "south,west,north,east" in refusal),
+        ("an empty answer is noted as unchecked, not as all of it inside",
+         kept("empty") == 0 and "nothing to test" in note("empty")),
+        ("a layer wholly outside, as a swapped order returns, is refused",
+         isinstance(outcomes["swapped"], acquire.ServiceError)),
+        ("the service URL is put back afterwards", acquire.OVERPASS_URL == original),
+    ]
+
+
 def _raster_and_error_checks() -> list[tuple[str, bool]]:
     """Two refusals that leave something behind if they are wrong.
 
@@ -1695,7 +1793,7 @@ def _raster_and_error_checks() -> list[tuple[str, bool]]:
         ("a raster that cannot even be compared is removed too, whatever the error",
          unreadable_refused and unreadable_removed),
         ("a transport error reached the real request path",
-         "ConnectionError" in transport_error),
+         any(name in transport_error for name in ("ConnectionError", "ConnectTimeout"))),
         ("a transport error carries no query string, so no encoded extent reaches a note",
          hidden not in transport_error and "query withheld" in transport_error),
     ]
@@ -1766,6 +1864,8 @@ def _self_check() -> int:
     checks += _crs_recovery_checks()
     print()
     checks += _extent_checks()
+    print()
+    checks += _overpass_checks()
     print()
     checks += _raster_and_error_checks()
     print()
