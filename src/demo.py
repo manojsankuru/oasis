@@ -32,7 +32,7 @@ QUESTIONS = [
 AREA_SETTINGS: tuple[str, ...] = ("STUDY_AREA", "OUTPUTS_DIR", "PAPER_DIR", "LOGS_DIR")
 
 
-def cold_start(questions: list[str]) -> tuple[list[dict[str, Any]], bool]:
+def cold_start(questions: list[str], **options: Any) -> tuple[list[dict[str, Any]], bool]:
     originals = transfer.capture_config_paths()
     extras = {name: getattr(config, name) for name in AREA_SETTINGS}
     root = Path(originals["PROJECT_ROOT"]).resolve()
@@ -60,7 +60,7 @@ def cold_start(questions: list[str]) -> tuple[list[dict[str, Any]], bool]:
             tools.invalidate()
             Registry(config.STUDY_AREA).save_manifest()
             config.ensure_dirs()
-            results = [agent.run_agent(question) for question in questions]
+            results = [agent.run_agent(question, **options) for question in questions]
     finally:
         for name, value in extras.items():
             setattr(config, name, value)
