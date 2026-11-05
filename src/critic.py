@@ -1169,6 +1169,14 @@ def agent_shape(calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return steps
 
 
+REAL_RUN_FIXTURE: Path = config.PAPER_DIR / "fixtures" / "run_20261029_144950.json"
+"""The committed real transcript the real-answer checks read.
+
+The 29 Oct Session 3 run, redacted by `experiments.redact`. Pinned rather than
+the newest run on disk, so a fresh clone checks the same answer as every other
+checkout."""
+
+
 def transcripts() -> list[Path]:
     """Every run transcript on disk, newest first."""
     if not config.OUTPUTS_DIR.exists():
@@ -1176,8 +1184,28 @@ def transcripts() -> list[Path]:
     return sorted(config.OUTPUTS_DIR.glob("run_*.json"), reverse=True)
 
 
+def transcript_of(path: Path) -> tuple[str, list[dict[str, Any]], Path] | None:
+    """A transcript's answer and steps, if it carries both an answer and a tool result."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    answer = payload.get("final_answer")
+    steps = payload.get("steps")
+    if not isinstance(answer, str) or not answer.strip():
+        return None
+    if not normalise_steps(steps):
+        return None
+    return answer, steps, path
+
+
+def pinned_run() -> tuple[str, list[dict[str, Any]], Path] | None:
+    """The committed transcript, which is what the real-answer checks read."""
+    return transcript_of(REAL_RUN_FIXTURE)
+
+
 def real_run() -> tuple[str, list[dict[str, Any]], Path] | None:
-    """The newest transcript that carries both an answer and a tool result.
+    """The newest transcript on disk that carries both an answer and a tool result.
 
     Read from disk rather than pasted in, for two reasons. A real answer names
     real units, and a real GEOID carries the county prefix that
@@ -1186,17 +1214,9 @@ def real_run() -> tuple[str, list[dict[str, Any]], Path] | None:
     confirm the rule -- which is the S10 entry this session was told to read.
     """
     for path in transcripts():
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        answer = payload.get("final_answer")
-        steps = payload.get("steps")
-        if not isinstance(answer, str) or not answer.strip():
-            continue
-        if not normalise_steps(steps):
-            continue
-        return answer, steps, path
+        found = transcript_of(path)
+        if found is not None:
+            return found
     return None
 
 
@@ -1660,9 +1680,10 @@ def _shape_checks() -> list[tuple[str, bool]]:
     print(f"  tool-log shape: {as_result(tool_shape)}")
     print(f"  agent-log shape: {as_result(log_shape)}")
 
-    real = real_run()
+    real = pinned_run()
     if real is None:
-        print("  NO TRANSCRIPT ON DISK -- the real-run shape check cannot run")
+        print(f"  THE PINNED TRANSCRIPT IS MISSING ({REAL_RUN_FIXTURE.name}) -- "
+              "the real-run shape check cannot run")
         real_same = False
         real_where = "none"
     else:
@@ -1689,8 +1710,8 @@ def _shape_checks() -> list[tuple[str, bool]]:
         ("the normaliser reduces both shapes to the same calls",
          normalise_steps(agent_shape(calls)) == normalise_steps(calls)),
         ("a real transcript gives the same report through both shapes", real_same),
-        (f"the real-run fixture came from a transcript on disk ({real_where})",
-         real is not None),
+        (f"the real-run fixture is the committed transcript ({real_where})",
+         real is not None and real[2] == REAL_RUN_FIXTURE),
         ("a shape nobody planned for yields nothing rather than guessing",
          normalise_steps([{"nonsense": 1}, "not a dict", None]) == []),
         ("a non-list is not a log", normalise_steps("steps") == []),
@@ -1699,9 +1720,10 @@ def _shape_checks() -> list[tuple[str, bool]]:
 
 def _answer_checks() -> list[tuple[str, bool]]:
     """That the critic can fail, and that it stays quiet on a correct answer."""
-    real = real_run()
+    real = pinned_run()
     if real is None:
-        print("  NO TRANSCRIPT ON DISK -- the real-answer checks cannot run")
+        print(f"  THE PINNED TRANSCRIPT IS MISSING ({REAL_RUN_FIXTURE.name}) -- "
+              "the real-answer checks cannot run")
         return [("a real answer was available to check against", False)]
 
     answer, steps, path = real
@@ -1723,6 +1745,8 @@ def _answer_checks() -> list[tuple[str, bool]]:
 
     numbers = [item for item in caught.findings if item.kind == "untraceable_number"]
     return [
+        ("the real answer is the committed transcript's, not the newest run on disk",
+         path == REAL_RUN_FIXTURE),
         ("a real answer traces at least one number", clean.numbers_checked > 0),
         ("a real answer traces every number it reports",
          clean.numbers_traceable == clean.numbers_checked),
@@ -2349,7 +2373,11 @@ def _loop_checks() -> list[tuple[str, bool]]:
 
 def _self_check() -> int:
     print("CRITIC -- every reported number traced to a logged tool result\n")
+    return verify.report(verify.checked_in_scratch("geoagent-critic-check-", _run_checks))
 
+
+def _run_checks(scratch: Path) -> list[tuple[str, bool]]:
+    """Every check, in order, with the analysis builds sent to `scratch`."""
     checks = _claim_checks()
     print()
     checks += _mask_checks()
@@ -2384,10 +2412,21 @@ def _self_check() -> int:
     print()
     checks += _real_frame_checks()
     print()
+    checks += _built_in(scratch)
+    print()
     checks += _surface_checks()
     print()
     checks += verify.discipline_checks(sys.modules[__name__])
-    return verify.report(checks)
+    return checks
+
+
+def _built_in(scratch: Path) -> list[tuple[str, bool]]:
+    """That the real frame the checks above read was built in the scratch directory."""
+    written = list(tools.analysis().result.written) if tools.analysis_built() else []
+    inside = bool(written) and all(scratch in path.parents for path in written)
+    print(f"  the real frame came from a run that wrote {len(written)} file(s), "
+          f"all inside the scratch directory: {inside}")
+    return [("the real frame these checks read was built in the scratch directory, not outputs/", inside)]
 
 
 def main() -> int:
