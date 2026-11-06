@@ -1,0 +1,14 @@
+study area: New Hanover County, North Carolina  (37129)
+storage crs: EPSG:4326   working crs: EPSG:5070
+
+study extent derived from 55 tract polygons: (-78.0299, 33.7868, -77.6753, 34.3894) in EPSG:4326
+
+transfer status: failed
+stage: acquisition
+run id: 20261104T160016542695Z-b964337e
+work root: <clone>\outputs\transfer-work\20261104T160016542695Z-b964337e
+pipeline output: <clone>\outputs\paper\transfer\20261104T160016542695Z-b964337e
+report: <clone>\outputs\paper\transfer_report.json
+config paths restored: True
+primary snapshot unchanged: True
+error: ServiceError: https://overpass-api.de/api/interpreter: 1 of 71 returned features fall outside the requested bbox (-78.02992200018996, 33.786800000001406, -77.67527599957793, 34.38935900017112); the south,west,north,east conversion is wrong and the layer describes somewhere else
