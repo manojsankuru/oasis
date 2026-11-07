@@ -62,9 +62,10 @@ CONDITIONS: tuple[Condition, ...] = (
     ),
     Condition(
         "repair_off", True, 1,
-        "the critic as in full; run_spatial_code runs a call until one code run fails, "
-        "then refuses every later call in the run with error repair_off, so no "
-        "traceback is ever repaired",
+        "no code after the first failed run: the critic as in full, and run_spatial_code "
+        "runs calls until one code run fails, then refuses every later call in the run "
+        "with error repair_off, new analysis as well as repairs, so no traceback is ever "
+        "repaired",
     ),
 )
 """The three conditions, defined by what the loop does rather than by name."""
@@ -109,8 +110,15 @@ MEASURES: dict[str, str] = {
     "validate_answer_calls": "validate_answer calls the model made, refusals included",
     "harness_errors": "cells whose run raised instead of finishing, recorded and never retried",
     "stop_reasons": "completed runs counted by stop_reason",
+    "noise_pairs": "of the questions whose full and repair_off runs both completed, those where neither run logged a failed code run, so repair_off never refused and the two runs had the same loop; the two transfer questions are included, though each of their cells acquires its data live",
+    "noise_final_draft_pass_differs": "of those noise pairs, the share whose two runs differ in final_draft_passed",
+    "noise_tool_credit_error_differs": "of those noise pairs, the share whose two runs differ in whether the final answer makes a tool-credit error",
+    "noise_top_ten_differs": "of those noise pairs where both runs ranked, the share whose top-ten GEOID sets differ; a run's top-ten set is the first ten GEOIDs, in any order, of the last ranking a ranking tool returned: the ranking rows of risk_scenario or vulnerability_index, or the top_geoids of the first row of compare_scenarios, which is the person's weighting when one was set and the default preset otherwise; fewer than ten when the tool returned fewer; a run ranked when that set is not empty",
 }
-"""Every measure the report computes, declared with its definition before any run."""
+"""Every measure the report computes, declared with its definition before any run.
+
+The noise measures set each condition effect beside the difference two runs of
+the same loop show: a pair with no failed code run is the same loop twice."""
 
 ISOLATION = (
     "each primary-county cell runs on its own copy of the committed snapshot, with its "
@@ -263,7 +271,9 @@ def model_settings(secrets: Mapping[str, str]) -> dict[str, Any]:
         "location": config.GOOGLE_CLOUD_LOCATION if config.PROVIDER == "vertex" else None,
         "endpoint": endpoint,
         "tool_choice": "auto",
-        "temperature": "provider default; llm_client sets none",
+        "temperature": config.MODEL_TEMPERATURE,
+        "client_timeout_s": config.MODEL_TIMEOUT_S,
+        "client_max_retries": config.MODEL_MAX_RETRIES,
     }
 
 
@@ -691,6 +701,12 @@ def _harness_checks() -> list[tuple[str, bool]]:
             "question": frozen_problems(moved_question, paths, secrets),
             "reply": frozen_problems(moved_reply, paths, secrets),
         }
+        client_settings = (config.MODEL_TEMPERATURE, config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES)
+        try:
+            config.MODEL_TEMPERATURE, config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES = 0.7, 12.0, 5
+            sampling_problems = frozen_problems(frozen, paths, secrets)
+        finally:
+            config.MODEL_TEMPERATURE, config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES = client_settings
         (root / "src" / "critic.py").write_bytes((root / "src" / "critic.py").read_bytes() + b"\n")
         frozen_edited = frozen_problems(frozen, paths, secrets)
         try:
@@ -794,6 +810,12 @@ def _harness_checks() -> list[tuple[str, bool]]:
         ("a checkout matching the declaration raises no frozen-file problem", frozen_clean == []),
         ("an edited frozen file is named, and the run is refused", frozen_edited == ["src/critic.py changed since the declaration"] and edited_refused),
         ("a changed model setting is named by key", branch_problems["model"] == ["the model settings differ from the declaration in ['location']"]),
+        ("the declaration records the temperature and the client bounds the runs will use",
+         (manifest["model"]["temperature"], manifest["model"]["client_timeout_s"], manifest["model"]["client_max_retries"])
+         == (config.MODEL_TEMPERATURE, config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES)),
+        ("a temperature or client bound changed after the declaration is named by key",
+         sampling_problems == ["the model settings differ from the declaration in "
+                               "['client_max_retries', 'client_timeout_s', 'temperature']"]),
         ("changed loop bounds are refused", branch_problems["bounds"] == ["the loop bounds differ from the declaration"]),
         ("a manifest whose question copy was edited is refused",
          branch_problems["question"] == ["the manifest's questions differ from cohort_questions.json"]),
