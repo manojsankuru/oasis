@@ -7,9 +7,9 @@
         "critic_off",
         "repair_off"
       ],
-      "declared_at": "2026-11-05T19:50:26+00:00",
+      "declared_at": "2026-11-07T00:46:20+00:00",
       "finished_cells": 0,
-      "git_sha": "b4c2ea3b4f517e6fc193dcfb568b1e80f90a5756",
+      "git_sha": "4160cc3f2fd064644bf226023be581e3cb6009ff",
       "manifest": "outputs/paper/agent_evaluation_manifest.json"
     },
     "reason": "the cohort is declared and no cell has finished",
@@ -310,7 +310,7 @@
       }
     }
   },
-  "generated_at": "2026-11-05T19:55:08.029595+00:00",
+  "generated_at": "2026-11-07T00:46:41.686799+00:00",
   "hazard": {
     "population_exposed_by_scenario": {
       "surge_1_5m": {
@@ -454,6 +454,26 @@
     {
       "expected_source": "outputs/paper/agent_evaluation_manifest.json",
       "key": "agent_behaviour.mean_duration",
+      "reason": "the declared cohort has no finished cell yet"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.run_to_run_noise.noise_pairs",
+      "reason": "the declared cohort has no finished cell yet"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.run_to_run_noise.noise_final_draft_pass_differs",
+      "reason": "the declared cohort has no finished cell yet"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.run_to_run_noise.noise_tool_credit_error_differs",
+      "reason": "the declared cohort has no finished cell yet"
+    },
+    {
+      "expected_source": "outputs/paper/agent_evaluation_manifest.json",
+      "key": "agent_behaviour.run_to_run_noise.noise_top_ten_differs",
       "reason": "the declared cohort has no finished cell yet"
     },
     {
@@ -2061,9 +2081,9 @@
       "sha256": "acaff44e52bacbc01b5753e5da7a196b4e7a4e3684a766cb293aec0cd354c292"
     },
     "outputs/paper/agent_evaluation_manifest.json": {
-      "bytes": 20993,
+      "bytes": 22242,
       "role": "declared agent evaluation manifest",
-      "sha256": "6e8c3eacea6bfec3c0ddda20aa33a70a9bc4533581f51e0547ce8011b3e60f73"
+      "sha256": "696119b54479fe92f28f64bb43e97ff63aae70b89eaf62fcd47a7e7f0a1e76e2"
     },
     "outputs/paper/tradeoff.csv": {
       "bytes": 1982,
@@ -2206,9 +2226,9 @@
       "sha256": "1a4a069d65139c48f2848ba2ebe451a6e20cd8d3891a2160967acdc3ed9eeeaa"
     },
     "src/config.py": {
-      "bytes": 6050,
+      "bytes": 6440,
       "role": "configuration constant source: config",
-      "sha256": "00e7693a3caa1f52005220f30484a138dac3152250b48943d5499539a0c9d1fa"
+      "sha256": "bc871b650395610a31d07b57cefced633da7ff0cfcb89060c56bfb06b81b5d08"
     },
     "src/contracts.py": {
       "bytes": 13186,
@@ -2216,9 +2236,9 @@
       "sha256": "d2c9cb41cb764e95198d35de1781a3092b197ac182a62c70d2ecc305cd7e7e2e"
     },
     "src/experiments/report.py": {
-      "bytes": 202205,
+      "bytes": 213217,
       "role": "configuration constant source: report",
-      "sha256": "6f4fbebde45f81609d048a5ce4314ff4ac75ea7840a5a6e4c187b47e4e9e98cc"
+      "sha256": "900390f4de55369df328ef00d20298d4f1116c6574f10d751ffdaae00eaf6e79"
     },
     "src/hazard.py": {
       "bytes": 66736,
