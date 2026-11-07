@@ -87,8 +87,12 @@ def message_to_dict(message: Any) -> dict[str, Any]:
     return payload
 
 
-LOOPBACK_SETTINGS = ("PROVIDER", "API_BASE_URL", "MODEL", "GEMINI_MODEL", "MODEL_TIMEOUT_S", "MODEL_MAX_RETRIES")
+LOOPBACK_SETTINGS = (
+    "PROVIDER", "API_BASE_URL", "MODEL", "GEMINI_MODEL", "MODEL_TEMPERATURE", "MODEL_TIMEOUT_S", "MODEL_MAX_RETRIES",
+)
 FAILING_PROMPT = "answer with a server error"
+SLOW_PROMPT = "answer after the client stopped waiting"
+SLOW_S = 1.5
 PROBE_SPEC = {
     "type": "function",
     "function": {
@@ -121,25 +125,36 @@ LOOPBACK_COMPLETION = {
 def _loopback(seen: list[dict[str, Any]]) -> Any:
     """A local endpoint that records every request body and answers like a chat server."""
     import http.server
+    import time
 
     class Endpoint(http.server.BaseHTTPRequestHandler):
         def do_POST(self) -> None:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
             seen.append({"path": self.path, "body": body, "authorization": self.headers.get("Authorization")})
-            failing = (body.get("messages") or [{}])[-1].get("content") == FAILING_PROMPT
+            prompt = (body.get("messages") or [{}])[-1].get("content")
+            if prompt == SLOW_PROMPT:
+                time.sleep(SLOW_S)
+            failing = prompt == FAILING_PROMPT
             payload = json.dumps({"error": {"message": "loopback"}} if failing else LOOPBACK_COMPLETION).encode()
-            self.send_response(500 if failing else 200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(payload)))
-            if failing:
-                self.send_header("retry-after-ms", "1")
-            self.end_headers()
-            self.wfile.write(payload)
+            try:
+                self.send_response(500 if failing else 200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                if failing:
+                    self.send_header("retry-after-ms", "1")
+                self.end_headers()
+                self.wfile.write(payload)
+            except OSError:
+                return None
 
         def log_message(self, message: str, *args: Any) -> None:
             return None
 
-    return http.server.ThreadingHTTPServer(("127.0.0.1", 0), Endpoint)
+    class Server(http.server.ThreadingHTTPServer):
+        def handle_error(self, request: Any, client_address: Any) -> None:
+            return None
+
+    return Server(("127.0.0.1", 0), Endpoint)
 
 
 def _attempts(seen: list[dict[str, Any]], client: OpenAI) -> int:
@@ -152,6 +167,23 @@ def _attempts(seen: list[dict[str, Any]], client: OpenAI) -> int:
     except InternalServerError:
         pass
     return sum(item["body"]["messages"][-1]["content"] == FAILING_PROMPT for item in seen[before:])
+
+
+def _timed_out(seen: list[dict[str, Any]], client: OpenAI) -> tuple[bool, float, int]:
+    """Whether a call the endpoint answers too slowly ends in a timeout, after how long, and in how many requests."""
+    import time
+
+    from openai import APITimeoutError
+
+    before = len(seen)
+    started = time.monotonic()
+    try:
+        chat(client, [{"role": "user", "content": SLOW_PROMPT}])
+        stopped = False
+    except APITimeoutError:
+        stopped = True
+    elapsed = time.monotonic() - started
+    return stopped, elapsed, sum(item["body"]["messages"][-1]["content"] == SLOW_PROMPT for item in seen[before:])
 
 
 def _self_check() -> int:
@@ -178,10 +210,13 @@ def _self_check() -> int:
         chat(client, [{"role": "user", "content": "probe"}])
         without_tools = seen[-1]["body"]
         declared_attempts = _attempts(seen, client)
-        config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES = 7.5, 0
+        config.MODEL_TEMPERATURE, config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES = 0.35, 0.5, 0
         moved = make_client()
         moved_bounds = (moved.timeout, moved.max_retries)
+        chat(moved, [{"role": "user", "content": "probe"}])
+        moved_temperature = seen[-1]["body"].get("temperature")
         moved_attempts = _attempts(seen, moved)
+        slow = _timed_out(seen, moved)
     finally:
         module.vertex_access_token = minted
         for name, value in saved.items():
@@ -193,6 +228,9 @@ def _self_check() -> int:
           f"tool_choice {body.get('tool_choice')!r}, path {with_tools['path']}")
     print(f"  client bounds: timeout {bounds[0]!r}, max_retries {bounds[1]!r}; a failing call sent "
           f"{declared_attempts} request(s), and {moved_attempts} with max_retries set to 0")
+    print(f"  with temperature 0.35, a 0.5 s timeout and no retry: the request sent temperature "
+          f"{moved_temperature!r}; a reply held back {SLOW_S} s timed out: {slow[0]}, after "
+          f"{slow[1]:.2f} s, in {slow[2]} request(s)")
     checks = [
         ("every request carries the configured temperature",
          body.get("temperature") == config.MODEL_TEMPERATURE
@@ -205,8 +243,12 @@ def _self_check() -> int:
          and with_tools["path"].endswith("/chat/completions")),
         ("a request with no tools sends no tools and no tool_choice",
          "tools" not in without_tools and "tool_choice" not in without_tools),
+        ("the temperature comes from config: a changed setting is what the next request sends",
+         moved_temperature == 0.35),
         ("the client takes its timeout and retry bound from config, not from the SDK defaults",
-         bounds == (config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES) and moved_bounds == (7.5, 0)),
+         bounds == (config.MODEL_TIMEOUT_S, config.MODEL_MAX_RETRIES) and moved_bounds == (0.5, 0)),
+        ("a reply slower than the configured timeout ends the call there, with no retry",
+         slow[0] and slow[1] < SLOW_S and slow[2] == 1),
         ("a failing call is sent once plus the configured retries, and no more",
          declared_attempts == 1 + config.MODEL_MAX_RETRIES and moved_attempts == 1),
         ("a tool call the SDK parsed comes back with its arguments decoded",
