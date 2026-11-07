@@ -181,6 +181,14 @@ WEIGHT_RESULT_KEYS = ("weights_used", "indicator_weights_used", "component_weigh
 TRACT_GEOID = re.compile(r"(?<!\d)\d{11}(?!\d)")
 WHO_LOSES_FINDING = "does not say who loses"
 SENTENCE_END = re.compile(r"[.!?](?=\s)|\n")
+TOP_TEN = 10
+NOISE_CONDITIONS = ("full", "repair_off")
+NOISE_METRICS = (
+    "noise_pairs",
+    "noise_final_draft_pass_differs",
+    "noise_tool_credit_error_differs",
+    "noise_top_ten_differs",
+)
 
 EXPECTED_PAPER_KEYS = (
     "abstract.primary_tract_count",
@@ -1630,6 +1638,22 @@ def _names_weight(sentence: str, key: str) -> bool:
     return any(name in lowered for name in {key.lower(), bare, bare.replace("_", " ")} if name)
 
 
+def _ranked_geoids(tool: str, result: dict[str, Any]) -> list[str]:
+    """The GEOIDs one ranking-tool result ranks, in rank order.
+
+    compare_scenarios ranks once per weighting, and its first row is the run's own:
+    the person's weighting when one was set, the default preset otherwise."""
+    if tool == "compare_scenarios":
+        rows = [row for row in result.get("rows") or [] if isinstance(row, dict)]
+        listed = ((rows[0].get("top_geoids") or {}).get("listed") or []) if rows else []
+        return [str(geoid) for geoid in listed]
+    return [
+        str(row[contracts.Col.GEOID])
+        for row in result.get("ranking") or []
+        if isinstance(row, dict) and row.get(contracts.Col.GEOID) is not None
+    ]
+
+
 def _ratio(count: int, total: int) -> dict[str, JsonValue]:
     return {"count": count, "of": total, "rate": round(count / total, 6) if total else None}
 
@@ -1713,6 +1737,13 @@ def _run_measures(transcript: dict[str, Any]) -> dict[str, Any]:
         )
     ]
     ranked_at = [match.start() for match in TRACT_GEOID.finditer(final) if match.group(0) in ranked]
+    rankings = [
+        geoids
+        for item in results
+        if item.get("tool") in RANKING_TOOLS
+        for geoids in [_ranked_geoids(str(item.get("tool")), item.get("result") or {})]
+        if geoids
+    ]
     return {
         "llm_calls": _integer(totals.get("llm_calls"), "totals.llm_calls"),
         "gis_tool_calls": _integer(totals.get("gis_tool_calls"), "totals.gis_tool_calls"),
@@ -1746,6 +1777,7 @@ def _run_measures(transcript: dict[str, Any]) -> dict[str, Any]:
         "tool_credit_error": bool(critic.tools_named_not_called(final, steps)),
         "weights_and_ranking": bool(weight_at) and bool(ranked_at),
         "weights_first": bool(weight_at) and bool(ranked_at) and min(weight_at) < min(ranked_at),
+        "top_ten": frozenset(rankings[-1][:TOP_TEN]) if rankings else None,
         "validate_answer_calls": len(outputs("validate_answer")),
         "stop_reason": str(transcript.get("stop_reason") or "none"),
     }
@@ -1811,6 +1843,44 @@ def _condition_measures(
     }
 
 
+def _noise_measures(
+    by_cell: dict[tuple[str, str], dict[str, Any]], source: str, declared: dict[str, str]
+) -> dict[str, JsonValue]:
+    """How far two runs of the same loop differ: full beside repair_off where repair_off never refused."""
+    full, repair = NOISE_CONDITIONS
+    questions = sorted(
+        {question for question, condition in by_cell if condition == full}
+        & {question for question, condition in by_cell if condition == repair}
+    )
+    pairs = [
+        (by_cell[(question, full)], by_cell[(question, repair)])
+        for question in questions
+        if by_cell[(question, full)]["failed_code_runs"] == 0
+        and by_cell[(question, repair)]["failed_code_runs"] == 0
+    ]
+    ranked = [(first, second) for first, second in pairs if first["top_ten"] and second["top_ten"]]
+
+    def differ(chosen: list[tuple[dict[str, Any], dict[str, Any]]], key: str) -> dict[str, JsonValue]:
+        return _ratio(sum(first[key] != second[key] for first, second in chosen), len(chosen))
+
+    values: dict[str, tuple[JsonValue, str]] = {
+        "noise_pairs": (_ratio(len(pairs), len(questions)), "question pairs"),
+        "noise_final_draft_pass_differs": (differ(pairs, "final_draft_passed"), "share of pairs"),
+        "noise_tool_credit_error_differs": (differ(pairs, "tool_credit_error"), "share of pairs"),
+        "noise_top_ten_differs": (differ(ranked, "top_ten"), "share of pairs"),
+    }
+    selector = f"$.runs[condition in ({full}, {repair})]"
+    return {
+        name: _metric(value, unit, source, selector, declared.get(name, "") or name)
+        for name, (value, unit) in values.items()
+    }
+
+
+def _agent_keys() -> list[str]:
+    """Every agent paper key that stays missing until the declared cohort finishes."""
+    return list(AGENT_METRICS) + [f"run_to_run_noise.{name}" for name in NOISE_METRICS]
+
+
 def _agent_payload(
     root: Path, sources: dict[str, JsonValue]
 ) -> tuple[dict[str, JsonValue], list[str], str]:
@@ -1823,7 +1893,7 @@ def _agent_payload(
                 "evaluation_cohort": None,
                 "reason": "no declared paper evaluation manifest selects exact run IDs and questions",
             },
-            list(AGENT_METRICS),
+            _agent_keys(),
             "no declared paper evaluation cohort; arbitrary development runs were excluded",
         )
     source = _source(sources, path, root, "declared agent evaluation manifest")
@@ -1851,7 +1921,7 @@ def _agent_payload(
         return (
             {"status": "declared_no_runs", "evaluation_cohort": summary,
              "reason": "the cohort is declared and no cell has finished"},
-            list(AGENT_METRICS),
+            _agent_keys(),
             "the declared cohort has no finished cell yet",
         )
     declared_critic = _mapping(manifest.get("frozen_files") or {}, "manifest.frozen_files").get("src/critic.py")
@@ -1864,6 +1934,7 @@ def _agent_payload(
         )
     _source(sources, critic_path, root, "the declared critic the cohort measures re-run")
     measured: dict[str, JsonValue] = {}
+    by_cell: dict[tuple[str, str], dict[str, Any]] = {}
     for condition in conditions:
         entries = [entry for (_, name), entry in finished.items() if name == condition]
         runs: list[dict[str, Any]] = []
@@ -1872,19 +1943,22 @@ def _agent_payload(
                 continue
             transcript = root / str(entry["transcript"])
             _source(sources, transcript, root, f"cohort transcript {entry['run_id']}")
-            runs.append(_run_measures(_load_json(transcript)))
+            run = _run_measures(_load_json(transcript))
+            by_cell[(str(entry["question_id"]), condition)] = run
+            runs.append(run)
         measured[condition] = _condition_measures(entries, runs, source, condition, declared)
     complete = len(finished) == cells
     block: dict[str, JsonValue] = {
         "status": "complete" if complete else "partial",
         "evaluation_cohort": summary,
         "conditions": measured,
+        "run_to_run_noise": _noise_measures(by_cell, source, declared),
     }
     if complete:
         return block, [], ""
     return (
         block,
-        list(AGENT_METRICS),
+        _agent_keys(),
         f"computed over {len(finished)} of {cells} declared cells; the cohort has not finished",
     )
 
@@ -3826,7 +3900,8 @@ STUB_GEOIDS = ("99001000100", "99001000200", "99001000300")
 
 
 def _stub_transcript(answer: str | None, *, code: tuple[int, ...] = (), compared: bool = True,
-                     tools_called: tuple[str, ...] = (), stop_reason: str = "final_answer") -> dict[str, Any]:
+                     tools_called: tuple[str, ...] = (), stop_reason: str = "final_answer",
+                     ranking: tuple[str, ...] = ()) -> dict[str, Any]:
     """A clearly synthetic cohort transcript: no model ran, the steps are written here."""
     steps: list[dict[str, Any]] = [{"step": "run_start", "payload": {"question": "stub"}}]
     if compared:
@@ -3835,6 +3910,9 @@ def _stub_transcript(answer: str | None, *, code: tuple[int, ...] = (), compared
             "rows": [{"preset": "svi_equal", "top_geoids": {"listed": [STUB_GEOIDS[0]]},
                       "displaced_geoids": {"listed": [STUB_GEOIDS[1]]}}],
         }}})
+    if ranking:
+        steps.append({"step": "tool_result", "payload": {"tool": "risk_scenario", "arguments": {}, "result": {
+            "ranking": [{contracts.Col.GEOID: geoid} for geoid in ranking]}}})
     for exit_code in code:
         steps.append({"step": "tool_result", "payload": {"tool": "run_spatial_code", "arguments": {}, "result": {
             "exit_code": exit_code, "stdout": "", "stderr": "", "duration_s": 0.1,
@@ -3864,8 +3942,9 @@ def _write_stub_cohort(root: Path, *, finish: bool) -> None:
         ("s1", "repair_off"): _stub_transcript(
             f"The `risk_scenario` tool ranked tract {STUB_GEOIDS[0]} first under svi_equal, and "
             "pct_disability got 0 weight.", code=(1, 1)),
-        ("s2", "full"): _stub_transcript("No figure is reported.", compared=False),
-        ("s2", "repair_off"): _stub_transcript(None, compared=False, stop_reason="max_iterations"),
+        ("s2", "full"): _stub_transcript("No figure is reported.", compared=False, ranking=STUB_GEOIDS),
+        ("s2", "repair_off"): _stub_transcript(None, compared=False, stop_reason="max_iterations",
+                                               ranking=STUB_GEOIDS[::-1]),
     }
     critic_stub = root / "src" / "critic.py"
     critic_stub.parent.mkdir(parents=True, exist_ok=True)
@@ -3914,6 +3993,8 @@ def _cohort_checks(base: Path, cases: Path) -> list[tuple[str, bool]]:
         return {item["key"] for item in payload["missing_evidence"]} & agent_keys
 
     measured = finished["agent_behaviour"]["conditions"]
+    noise = finished["agent_behaviour"]["run_to_run_noise"]
+    noise_keys = {f"agent_behaviour.run_to_run_noise.{name}" for name in NOISE_METRICS}
 
     def value(condition: str, name: str) -> Any:
         return measured[condition][name]["value"]
@@ -3962,8 +4043,98 @@ def _cohort_checks(base: Path, cases: Path) -> list[tuple[str, bool]]:
          and value("repair_off", "first_draft_pass_rate")["count"] == 0),
         ("a zero weight is never a stated weight, even in a sentence that names it",
          value("repair_off", "weights_before_ranking_rate") == {"count": 0, "of": 0, "rate": None}),
+        ("a finished cohort reports run-to-run noise beside the conditions, from its full and repair_off pairs",
+         noise["noise_pairs"]["value"] == {"count": 1, "of": 2, "rate": 0.5}
+         and noise["noise_final_draft_pass_differs"]["value"] == {"count": 1, "of": 1, "rate": 1.0}
+         and noise["noise_tool_credit_error_differs"]["value"] == {"count": 0, "of": 1, "rate": 0.0}
+         and noise["noise_top_ten_differs"]["value"] == {"count": 0, "of": 1, "rate": 0.0}),
+        ("every noise metric traces to the manifest, with the declared definition as its derivation",
+         set(noise) == set(NOISE_METRICS) and all(
+             item["source"] == AGENT_MANIFEST_RELATIVE.as_posix() and item["derivation"] == cohort.MEASURES[name]
+             for name, item in noise.items())),
+        ("the noise keys stay missing until every cell finishes, like the condition keys",
+         noise_keys <= {item["key"] for item in declared["missing_evidence"]}
+         and noise_keys <= {item["key"] for item in partial["missing_evidence"]}
+         and not noise_keys & {item["key"] for item in finished["missing_evidence"]}),
         ("a cohort measured with a critic edited after the declaration is refused",
          _fixture_failure(base, cases, "cohort-critic-edited", _edited_critic_cohort, "declared critic changed")),
+    ]
+
+
+def _ranking_step(tool: str, geoids: list[str]) -> dict[str, Any]:
+    """One ranking-tool result, in the shape the tool logs it."""
+    if tool == "compare_scenarios":
+        result: dict[str, Any] = {"rows": [{"preset": "mine", "top_geoids": {"listed": geoids}},
+                                           {"preset": "other", "top_geoids": {"listed": [STUB_GEOIDS[2]]}}]}
+    else:
+        result = {"ranking": [{contracts.Col.GEOID: geoid} for geoid in geoids]}
+    return {"step": "tool_result", "payload": {"tool": tool, "arguments": {}, "result": result}}
+
+
+def _top_ten_of(*steps: dict[str, Any]) -> frozenset[str] | None:
+    """The top-ten set a run with these tool results gets."""
+    transcript = _stub_transcript("No figure is reported.", compared=False)
+    transcript["steps"][1:1] = list(steps)
+    return _run_measures(transcript)["top_ten"]
+
+
+def _noise_run(failed: int = 0, passed: bool = True, credit: bool = False,
+               top: list[str] | None = None) -> dict[str, Any]:
+    """The per-run fields the noise measures read, and nothing else."""
+    return {"failed_code_runs": failed, "final_draft_passed": passed, "tool_credit_error": credit,
+            "top_ten": None if top is None else frozenset(top)}
+
+
+def _noise_checks() -> list[tuple[str, bool]]:
+    """The noise measures on hand-built runs, and the top-ten set on hand-built transcripts."""
+    tracts = [f"99001{index:06d}" for index in range(1, 25)]
+    by_cell = {
+        ("qa", "full"): _noise_run(top=tracts[:3]), ("qa", "repair_off"): _noise_run(passed=False, top=tracts[:3]),
+        ("qb", "full"): _noise_run(credit=True, top=tracts[:2]), ("qb", "repair_off"): _noise_run(top=tracts[2:4]),
+        ("qc", "full"): _noise_run(failed=1, passed=False, top=tracts[:1]),
+        ("qc", "repair_off"): _noise_run(top=tracts[5:6]),
+        ("qd", "full"): _noise_run(top=tracts[:1]),
+        ("qd", "repair_off"): _noise_run(failed=2, passed=False, credit=True, top=tracts[6:7]),
+        ("qe", "full"): _noise_run(), ("qe", "repair_off"): _noise_run(top=tracts[:3]),
+        ("qf", "full"): _noise_run(passed=False, credit=True, top=tracts[8:9]),
+        ("qa", "critic_off"): _noise_run(passed=False, credit=True, top=tracts[9:10]),
+    }
+    noise = _noise_measures(by_cell, AGENT_MANIFEST_RELATIVE.as_posix(), dict(cohort.MEASURES))
+
+    def value(name: str) -> Any:
+        return noise[name]["value"]
+
+    forward = _top_ten_of(_ranking_step("risk_scenario", tracts[:10]))
+    backward = _top_ten_of(_ranking_step("risk_scenario", tracts[9::-1]))
+    last = _top_ten_of(_ranking_step("risk_scenario", tracts[:10]), _ranking_step("vulnerability_index", tracts[10:20]))
+    refused = _top_ten_of(
+        _ranking_step("risk_scenario", tracts[:10]),
+        {"step": "tool_result", "payload": {"tool": "risk_scenario", "arguments": {}, "result": {"error": "unknown scenario"}}},
+    )
+    twelve = _top_ten_of(_ranking_step("risk_scenario", tracts[:12]))
+    compared = _top_ten_of(_ranking_step("compare_scenarios", tracts[12:22]))
+    unranked = _top_ten_of()
+    print(f"  noise on hand-built runs: pairs {value('noise_pairs')}, top ten {value('noise_top_ten_differs')}")
+    return [
+        ("noise pairs are the questions where neither full nor repair_off logged a failed code run",
+         value("noise_pairs") == {"count": 3, "of": 5, "rate": 0.6}),
+        ("a pair differs in final-draft pass or in tool-credit error when its two runs disagree",
+         value("noise_final_draft_pass_differs") == {"count": 1, "of": 3, "rate": 0.333333}
+         and value("noise_tool_credit_error_differs") == {"count": 1, "of": 3, "rate": 0.333333}),
+        ("the top-ten share counts only the pairs where both runs ranked",
+         value("noise_top_ten_differs") == {"count": 1, "of": 2, "rate": 0.5}),
+        ("every noise metric is a declared measure, read off the declared definition",
+         set(NOISE_METRICS) <= set(cohort.MEASURES) and set(noise) == set(NOISE_METRICS)
+         and all(noise[name]["derivation"] == cohort.MEASURES[name] for name in NOISE_METRICS)),
+        ("the noise conditions are declared conditions",
+         set(NOISE_CONDITIONS) <= {item.name for item in cohort.CONDITIONS}),
+        ("a run's top-ten set ignores rank order", forward is not None and forward == backward),
+        ("it is read off the last ranking, and a refusal after that ranking changes nothing",
+         last == frozenset(tracts[10:20]) and refused == frozenset(tracts[:10])),
+        ("only the first ten GEOIDs of a ranking count", twelve == frozenset(tracts[:10])),
+        ("compare_scenarios gives the run its first row, the run's own weighting",
+         compared == frozenset(tracts[12:22])),
+        ("a run with no ranking has no top-ten set", unranked is None),
     ]
 
 
@@ -4505,7 +4676,7 @@ def _self_check() -> int:
                 ),
             ]
         )
-        checks += cohort_results + transfer_results
+        checks += cohort_results + transfer_results + _noise_checks()
         checks += verify.discipline_checks(sys.modules[__name__])
         print(f"report check exercised {len(checks)} assertions")
         return verify.report(checks)
