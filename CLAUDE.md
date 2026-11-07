@@ -32,6 +32,17 @@ responds to the program committee reviews.
   replies in `outputs/paper/cohort_replies.json`. `python -m src.experiments.cohort
   --run` refuses to start a cell when a file the declaration fingerprinted differs.
   Log a misfire with `/failure` and change nothing.
+- The freeze stays this wide: one exact commit is easier to defend than a list of
+  exceptions. If something breaks mid-cohort, stop the run, log it with `/failure`,
+  fix it, and keep the stopped manifest and its `outputs/paper/cohort/` transcripts
+  as a failed attempt under `outputs/paper/cohort_attempts/`. Never delete them.
+  Then declare a new manifest and rerun all 69 cells.
+- The model runs at temperature 0, with a 300 s client timeout and 2 retries
+  (`config.MODEL_TEMPERATURE`, `MODEL_TIMEOUT_S`, `MODEL_MAX_RETRIES`).
+  `python -m src.llm_client --check` sends a request through the real SDK to a
+  loopback endpoint to show all three take effect.
+- In the paper, describe repair_off as "no code after the first failed run". It
+  refuses every later code call, new analysis as well as repairs.
 - `src/contracts.py` stays frozen.
 - The model-visible tool count stays at 11.
 - Every number in the paper comes from `outputs/paper/numbers.json`.
