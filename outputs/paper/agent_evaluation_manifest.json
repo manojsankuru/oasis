@@ -1,15 +1,17 @@
 {
   "schema_version": 1,
   "kind": "declared agent evaluation cohort",
-  "declared_at": "2026-11-05T19:50:26+00:00",
-  "git_sha": "b4c2ea3b4f517e6fc193dcfb568b1e80f90a5756",
+  "declared_at": "2026-11-07T00:46:20+00:00",
+  "git_sha": "4160cc3f2fd064644bf226023be581e3cb6009ff",
   "model": {
     "provider": "vertex",
     "model": "google/gemini-2.5-pro",
     "location": "us-central1",
     "endpoint": "https://us-central1-aiplatform.googleapis.com/v1beta1/projects/PROJECT_ID/locations/us-central1/endpoints/openapi",
     "tool_choice": "auto",
-    "temperature": "provider default; llm_client sets none"
+    "temperature": 0.0,
+    "client_timeout_s": 300.0,
+    "client_max_retries": 2
   },
   "bounds": {
     "max_iterations": 15,
@@ -24,8 +26,8 @@
     "src/critic.py": "5abc7b359d684d584ac4a314f814b3a27a09ce1e6ba76cb29d8aa688283b3eb4",
     "src/tools.py": "2742163c73379564ac74176aa1580e879fbe6646522a8eaceae6d0c7315ba7e4",
     "src/schemas.py": "c5de1640128e80cc68929d4a8f9330927516fdcd2d51d1386aa9b1094b5a36c9",
-    "src/llm_client.py": "08783101d9217c90c58657a8dc6bd05957f79b9c03b30c5d25772a51ad40daa5",
-    "src/config.py": "00e7693a3caa1f52005220f30484a138dac3152250b48943d5499539a0c9d1fa",
+    "src/llm_client.py": "aa40e03dae7f81ea58133733f6505c042aef7fb360365df9d4b7aff7ec9edce7",
+    "src/config.py": "bc871b650395610a31d07b57cefced633da7ff0cfcb89060c56bfb06b81b5d08",
     "src/sandbox.py": "5aacc0d706eb81f2f1e6a2df3db2eb0ac2db36900e82a752ee4f667ac948f557",
     "src/contracts.py": "d2c9cb41cb764e95198d35de1781a3092b197ac182a62c70d2ecc305cd7e7e2e"
   },
@@ -54,7 +56,7 @@
       "name": "repair_off",
       "use_critic": true,
       "code_attempts": 1,
-      "definition": "the critic as in full; run_spatial_code runs a call until one code run fails, then refuses every later call in the run with error repair_off, so no traceback is ever repaired"
+      "definition": "no code after the first failed run: the critic as in full, and run_spatial_code runs calls until one code run fails, then refuses every later call in the run with error repair_off, new analysis as well as repairs, so no traceback is ever repaired"
     }
   ],
   "questions": [
@@ -631,7 +633,11 @@
     "weights_before_ranking_rate": "of completed runs whose final answer states a nonzero weight a ranking tool reported, in a sentence that names that weight's indicator or component, and names a GEOID that tool ranked, the share where the first such weight comes before the first such GEOID",
     "validate_answer_calls": "validate_answer calls the model made, refusals included",
     "harness_errors": "cells whose run raised instead of finishing, recorded and never retried",
-    "stop_reasons": "completed runs counted by stop_reason"
+    "stop_reasons": "completed runs counted by stop_reason",
+    "noise_pairs": "of the questions whose full and repair_off runs both completed, those where neither run logged a failed code run, so repair_off never refused and the two runs had the same loop; the two transfer questions are included, though each of their cells acquires its data live",
+    "noise_final_draft_pass_differs": "of those noise pairs, the share whose two runs differ in final_draft_passed",
+    "noise_tool_credit_error_differs": "of those noise pairs, the share whose two runs differ in whether the final answer makes a tool-credit error",
+    "noise_top_ten_differs": "of those noise pairs where both runs ranked, the share whose top-ten GEOID sets differ; a run's top-ten set is the first ten GEOIDs, in any order, of the last ranking a ranking tool returned: the ranking rows of risk_scenario or vulnerability_index, or, from compare_scenarios, the top_geoids of the row the call ranked by, which is the row a stated weighting marks with answered_by and otherwise the row the call's preset argument names, the default preset when none was given; fewer than ten when the tool returned fewer; a run ranked when that set is not empty"
   },
   "transcripts": "outputs/paper/cohort",
   "runs": []
