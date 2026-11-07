@@ -118,6 +118,15 @@ REQUEST_TIMEOUT_S = 60.0
 MAX_RETRIES = 3
 RETRY_BACKOFF_S = 2.0
 
+MODEL_TEMPERATURE = 0.0
+MODEL_TIMEOUT_S = 300.0
+MODEL_MAX_RETRIES = 2
+"""What `llm_client` sends with every model call and the bounds it puts on one.
+
+Kept apart from the acquisition bounds above, which `methods.retry_bound` and the
+fault runs report. The SDK defaults are 600 s and 2 retries; invariant 7 asks for
+the values to be stated, and the cohort declaration records all three."""
+
 MAX_ITERATIONS = 15
 """Turns one question may take. Raised from six in S11: the revision cycle spends
 a turn per critic firing, and a question that needs a tool call, a preference, a
