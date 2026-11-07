@@ -1638,14 +1638,18 @@ def _names_weight(sentence: str, key: str) -> bool:
     return any(name in lowered for name in {key.lower(), bare, bare.replace("_", " ")} if name)
 
 
-def _ranked_geoids(tool: str, result: dict[str, Any]) -> list[str]:
+def _ranked_geoids(tool: str, arguments: dict[str, Any], result: dict[str, Any]) -> list[str]:
     """The GEOIDs one ranking-tool result ranks, in rank order.
 
-    compare_scenarios ranks once per weighting, and its first row is the run's own:
-    the person's weighting when one was set, the default preset otherwise."""
+    compare_scenarios ranks once per weighting, and the call's own row is the one it
+    ranked by: the row a stated weighting marks with answered_by, otherwise the row
+    its preset argument names, the default preset when none was given. A menu pick
+    is not moved to the first row, so the first row is not the call's own."""
     if tool == "compare_scenarios":
         rows = [row for row in result.get("rows") or [] if isinstance(row, dict)]
-        listed = ((rows[0].get("top_geoids") or {}).get("listed") or []) if rows else []
+        named = str(arguments.get("preset") or vulnerability.DEFAULT_PRESET.name)
+        own = [row for row in rows if "answered_by" in row] or [row for row in rows if row.get("preset") == named]
+        listed = ((own[0].get("top_geoids") or {}).get("listed") or []) if own else []
         return [str(geoid) for geoid in listed]
     return [
         str(row[contracts.Col.GEOID])
@@ -1741,7 +1745,7 @@ def _run_measures(transcript: dict[str, Any]) -> dict[str, Any]:
         geoids
         for item in results
         if item.get("tool") in RANKING_TOOLS
-        for geoids in [_ranked_geoids(str(item.get("tool")), item.get("result") or {})]
+        for geoids in [_ranked_geoids(str(item.get("tool")), item.get("arguments") or {}, item.get("result") or {})]
         if geoids
     ]
     return {
@@ -4062,13 +4066,15 @@ def _cohort_checks(base: Path, cases: Path) -> list[tuple[str, bool]]:
 
 
 def _ranking_step(tool: str, geoids: list[str]) -> dict[str, Any]:
-    """One ranking-tool result, in the shape the tool logs it."""
-    if tool == "compare_scenarios":
-        result: dict[str, Any] = {"rows": [{"preset": "mine", "top_geoids": {"listed": geoids}},
-                                           {"preset": "other", "top_geoids": {"listed": [STUB_GEOIDS[2]]}}]}
-    else:
-        result = {"ranking": [{contracts.Col.GEOID: geoid} for geoid in geoids]}
+    """One risk_scenario or vulnerability_index result, in the shape the tool logs it."""
+    result = {"ranking": [{contracts.Col.GEOID: geoid} for geoid in geoids]}
     return {"step": "tool_result", "payload": {"tool": tool, "arguments": {}, "result": result}}
+
+
+def _compare_step(arguments: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """One compare_scenarios result: a row per weighting, in the order the tool builds them."""
+    return {"step": "tool_result", "payload": {"tool": "compare_scenarios", "arguments": arguments,
+                                               "result": {"rows": rows}}}
 
 
 def _top_ten_of(*steps: dict[str, Any]) -> frozenset[str] | None:
@@ -4112,7 +4118,14 @@ def _noise_checks() -> list[tuple[str, bool]]:
         {"step": "tool_result", "payload": {"tool": "risk_scenario", "arguments": {}, "result": {"error": "unknown scenario"}}},
     )
     twelve = _top_ten_of(_ranking_step("risk_scenario", tracts[:12]))
-    compared = _top_ten_of(_ranking_step("compare_scenarios", tracts[12:22]))
+    default, other = vulnerability.WEIGHT_PRESETS[0].name, vulnerability.WEIGHT_PRESETS[1].name
+    named_rows = [{"preset": default, "top_geoids": {"listed": tracts[:10]}},
+                  {"preset": other, "top_geoids": {"listed": tracts[12:22]}}]
+    stated_rows = [{"preset": "person", "answered_by": "ask_user_preferences",
+                    "top_geoids": {"listed": tracts[14:24]}}] + named_rows
+    menu_pick = _top_ten_of(_compare_step({"preset": other}, named_rows))
+    no_pick = _top_ten_of(_compare_step({}, named_rows))
+    stated = _top_ten_of(_compare_step({"preset": other}, named_rows[1:] + stated_rows[:1] + named_rows[:1]))
     unranked = _top_ten_of()
     print(f"  noise on hand-built runs: pairs {value('noise_pairs')}, top ten {value('noise_top_ten_differs')}")
     return [
@@ -4132,8 +4145,10 @@ def _noise_checks() -> list[tuple[str, bool]]:
         ("it is read off the last ranking, and a refusal after that ranking changes nothing",
          last == frozenset(tracts[10:20]) and refused == frozenset(tracts[:10])),
         ("only the first ten GEOIDs of a ranking count", twelve == frozenset(tracts[:10])),
-        ("compare_scenarios gives the run its first row, the run's own weighting",
-         compared == frozenset(tracts[12:22])),
+        ("compare_scenarios gives the row the call ranked by: a menu pick's row, not the first row",
+         menu_pick == frozenset(tracts[12:22]) and no_pick == frozenset(tracts[:10])),
+        ("and a stated weighting's row, marked answered_by, wherever it sits",
+         stated == frozenset(tracts[14:24])),
         ("a run with no ranking has no top-ten set", unranked is None),
     ]
 
